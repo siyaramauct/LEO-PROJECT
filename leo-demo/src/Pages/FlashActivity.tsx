@@ -155,7 +155,7 @@ export default function FlashActivity() {
                 </div>
             </div>
             <section className="w-full px-4 flex flex-col items-center justify-center min-h-[calc(100vh-25rem)] gap-8 mt-5">
-                <Flashcard word={currentFlashCard.word} definition={currentFlashCard.definition} />
+                <Flashcard key={currentFlashCard.id} word={currentFlashCard.word} definition={currentFlashCard.definition} />
                 <div className="flex items-center gap-12 mt-4">
                     <button
                         className="flex items-center justify-center w-16 h-16 rounded-full bg-violet-700 active:scale-95 transition-transform shadow-md"
