@@ -1,7 +1,10 @@
 import LessonCard from "../Components/LessonCard"
 import Navbar from "../Components/Navbar"
 
+
 export default function Lessons() {
+
+
   const vocablessons = [
     {
       title: "Lesson 1: Basic Business English ",
