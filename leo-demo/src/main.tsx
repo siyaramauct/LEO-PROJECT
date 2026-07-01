@@ -4,6 +4,7 @@ import './index.css'
 import  { createBrowserRouter, RouterProvider } from "react-router-dom"
 import Lessons from "./Pages/Lessons.tsx"
 import FlashActivity from "./Pages/FlashActivity.tsx"
+import SignUp from './Pages/Signup.tsx'
 
 const router = createBrowserRouter([
   {
@@ -12,6 +13,9 @@ const router = createBrowserRouter([
   {
     path: "/lesson/:lessonId", element: <FlashActivity />
   },
+  {
+    path: "/signup", element: <SignUp />
+  }
 ]);
 
 createRoot(document.getElementById('root')!).render(
