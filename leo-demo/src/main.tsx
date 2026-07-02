@@ -5,6 +5,8 @@ import  { createBrowserRouter, RouterProvider } from "react-router-dom"
 import Lessons from "./Pages/Lessons.tsx"
 import FlashActivity from "./Pages/FlashActivity.tsx"
 import SignUp from './Pages/Signup.tsx'
+import RoleSelection from './Pages/RoleSelection.tsx'
+import Login from './Pages/Login.tsx'
 
 const router = createBrowserRouter([
   {
@@ -15,6 +17,12 @@ const router = createBrowserRouter([
   },
   {
     path: "/signup", element: <SignUp />
+  },
+  {
+    path: "/select-role", element: <RoleSelection />
+  },
+  {
+    path: "/login", element: <Login />
   }
 ]);
 

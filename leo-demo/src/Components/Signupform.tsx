@@ -4,7 +4,7 @@ type Inputs = {
   firstName: string
   lastName: string
   email: string
-  role: "student" | "teacher"
+  password: string
 }
 
 const field =
@@ -22,7 +22,7 @@ export default function SignupForm() {
   const onSubmit: SubmitHandler<Inputs> = (data) => console.log(data)
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4.5">
 
       {/* First name */}
       <div>
@@ -77,25 +77,33 @@ export default function SignupForm() {
         {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email.message}</p>}
       </div>
 
-      {/* Role */}
+      {/* Password */}
       <div>
-        <label htmlFor="role" className={label}>Role</label>
-        <select
-          id="role"
+        <label htmlFor="password" className={label}>Password</label>
+        <input
+          id="password"
+          type="password"
+          placeholder="Create a strong password"
           className={field}
-          {...register("role", { required: "Please select a role" })}
-        >
-          <option value="">Select a role</option>
-          <option value="student">Student</option>
-          <option value="teacher">Teacher</option>
-        </select>
-        {errors.role && <p className="mt-1 text-[11px] text-red-500">{errors.role.message}</p>}
+          {...register("password", {
+            required: "Password is required",
+            minLength: {
+              value: 8,
+              message: "Password must be at least 8 characters",
+            },
+            pattern: {
+              value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/,
+              message: "Use uppercase, lowercase, and a number",
+            },
+          })}
+        />
+        {errors.password && <p className="mt-1 text-[11px] text-red-500">{errors.password.message}</p>}
       </div>
 
       {/* Submit */}
       <button
         type="submit"
-        className="mt-1 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white transition hover:bg-violet-100 hover:text-violet-700 hover:border hover:border-violet-600"
+        className="mt-2 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white border border-violet-600 transition hover:bg-white hover:text-violet-600"
       >
         Create Account
       </button>
