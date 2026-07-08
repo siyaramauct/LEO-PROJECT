@@ -2,15 +2,20 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import  { createBrowserRouter, RouterProvider } from "react-router-dom"
-import Lessons from "./Pages/Lessons.tsx"
+import Lessons from './Pages/Lessons.tsx'
 import FlashActivity from "./Pages/FlashActivity.tsx"
 import SignUp from './Pages/Signup.tsx'
 import RoleSelection from './Pages/RoleSelection.tsx'
 import Login from './Pages/Login.tsx'
+import Home from './Pages/Home.tsx'
+import { AuthContextProvider } from '../context/AuthContext.tsx'
 
 const router = createBrowserRouter([
   {
-    path: "/", element: <Lessons />,
+    path: "/", element: <Home />,
+  },
+  {
+    path: "/lessons", element: <Lessons />,
   },
   {
     path: "/lesson/:lessonId", element: <FlashActivity />
@@ -28,6 +33,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthContextProvider>
+      <RouterProvider router={router} />
+    </AuthContextProvider>
   </StrictMode>,
 )

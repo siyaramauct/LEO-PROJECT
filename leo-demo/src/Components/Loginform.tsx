@@ -1,4 +1,7 @@
+import { useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext.tsx"
 
 type Inputs = {
   email: string
@@ -17,7 +20,23 @@ export default function LoginForm() {
     formState: { errors },
   } = useForm<Inputs>()
 
-  const onSubmit: SubmitHandler<Inputs> = (data) => console.log(data)
+  const { login } = useAuth()
+  const navigate = useNavigate()
+  const [saving, setSaving] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  const onSubmit: SubmitHandler<Inputs> = async (data) => {
+    setAuthError(null)
+    setSaving(true)
+    try {
+      await login(data.email, data.password)
+      navigate("/")
+    } catch (error: unknown) {
+      setAuthError(error instanceof Error ? error.message : "Invalid email or password.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -66,11 +85,15 @@ export default function LoginForm() {
       </div>
 
       {/* Submit */}
+      {authError && (
+        <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-[12px] text-red-600">{authError}</p>
+      )}
       <button
         type="submit"
-        className="mt-1 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white border border-violet-600 transition hover:bg-white hover:text-violet-600"
+        disabled={saving}
+        className="mt-1 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white border border-violet-600 transition hover:bg-white hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Sign In
+        {saving ? "Signing in..." : "Sign In"}
       </button>
 
     </form>

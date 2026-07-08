@@ -1,5 +1,7 @@
 import SignupForm from "../Components/Signupform";
 
+
+
 export default function SignUp() {
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col lg:flex-row bg-white">

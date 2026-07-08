@@ -1,4 +1,7 @@
+import { useRef, useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext.tsx"
 
 type Inputs = {
   firstName: string
@@ -19,7 +22,33 @@ export default function SignupForm() {
     formState: { errors },
   } = useForm<Inputs>()
 
-  const onSubmit: SubmitHandler<Inputs> = (data) => console.log(data)
+  const { signup } = useAuth()
+  const navigate = useNavigate()
+  const [saving, setSaving] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const submitLock = useRef(false)
+
+  const handleSignup: SubmitHandler<Inputs> = async (data) => {
+    if (submitLock.current) return
+
+    submitLock.current = true
+    setAuthError(null)
+    setSaving(true)
+    console.log("[Signup] Attempting signup for:", data.email)
+    try {
+      await signup(data.email, data.password, data.firstName, data.lastName)
+      console.log("[Signup] ✓ User created successfully:", data.email)
+      navigate("/select-role")
+    } catch (error: unknown) {
+      console.error("[Signup] ✗ Signup failed:", error)
+      setAuthError(error instanceof Error ? error.message : "Something went wrong. Please try again.")
+    } finally {
+      setSaving(false)
+      submitLock.current = false
+    }
+  }
+
+  const onSubmit: SubmitHandler<Inputs> = (data) => handleSignup(data)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4.5">
@@ -101,11 +130,15 @@ export default function SignupForm() {
       </div>
 
       {/* Submit */}
+      {authError && (
+        <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-[12px] text-red-600">{authError}</p>
+      )}
       <button
         type="submit"
-        className="mt-2 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white border border-violet-600 transition hover:bg-white hover:text-violet-600"
+        disabled={saving}
+        className="mt-2 w-full rounded-xl bg-violet-600 py-3.5 text-sm font-semibold tracking-wide text-white border border-violet-600 transition hover:bg-white hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Create Account
+        {saving ? "Creating account..." : "Create Account"}
       </button>
 
     </form>
