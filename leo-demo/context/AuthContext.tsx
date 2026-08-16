@@ -2,13 +2,6 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from "../src/supabase-client";
 
-export const Role = {
-    Student: 'student',
-    Teacher: 'teacher',
-} as const;
-
-export type Role = (typeof Role)[keyof typeof Role];
-
 interface AuthContextType {
     session: Session | null;
     loading: boolean;

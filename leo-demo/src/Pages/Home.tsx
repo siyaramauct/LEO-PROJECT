@@ -12,7 +12,7 @@ export default function Home() {
   const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setProfileLoading(false); return; }
+    if (!user) return;
     supabase
       .from("profiles")
       .select("name, surname, user_role")
@@ -25,7 +25,7 @@ export default function Home() {
       });
   }, [user]);
 
-  if (loading || profileLoading) {
+  if (loading || (user && profileLoading)) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
         <p className="text-sm text-slate-400">Loading...</p>

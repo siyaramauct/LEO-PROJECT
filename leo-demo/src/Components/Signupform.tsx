@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useRef, useState, type FormEventHandler } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext.tsx"
@@ -49,9 +49,12 @@ export default function SignupForm() {
   }
 
   const onSubmit: SubmitHandler<Inputs> = (data) => handleSignup(data)
+  const onFormSubmit: FormEventHandler<HTMLFormElement> = (event) => {
+    void handleSubmit(onSubmit)(event)
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4.5">
+    <form onSubmit={onFormSubmit} className="flex flex-col gap-4.5">
 
       {/* First name */}
       <div>

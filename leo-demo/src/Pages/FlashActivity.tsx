@@ -32,7 +32,7 @@ export default function FlashActivity() {
             setFlashcards(data);
         };
         fetchData();
-    }, []);
+    }, [params.lessonId]);
 
     const [flashcardIndex, setFlashcardIndex] = useState(0);
     const [score, setScore] = useState(0);

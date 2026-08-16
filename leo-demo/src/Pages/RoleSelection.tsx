@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { Role, useAuth } from "../../context/AuthContext.tsx";
+import { useAuth } from "../../context/AuthContext.tsx";
+import { Role, type Role as RoleType } from "../../context/roles";
 import { supabase } from "../supabase-client.ts";
 
-const roles: { value: Role; title: string; description: string; imageSrc: string; imageAlt: string }[] = [
+const roles: { value: RoleType; title: string; description: string; imageSrc: string; imageAlt: string }[] = [
   {
     value: Role.Student,
     title: "Student",
@@ -24,7 +25,7 @@ export default function RoleSelection() {
   const { session } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
   const [saving, setSaving] = useState(false);
   console.log("[RoleSelection] Mounted — user id:", user?.id, "| email:", user?.email , "user name:", user?.user_metadata?.name  );
 
