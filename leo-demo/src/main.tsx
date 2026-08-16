@@ -1,8 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import  { createBrowserRouter, RouterProvider } from "react-router-dom"
-import Lessons from './Pages/Lessons.tsx'
+import { createBrowserRouter, RouterProvider } from "react-router-dom"
+import Lessons from "./Pages/Lessons.tsx"
+import CreateLesson from "./Pages/CreateLesson"
+import ClassProgress from "./Pages/ClassProgress"
 import FlashActivity from "./Pages/FlashActivity.tsx"
 import SignUp from './Pages/Signup.tsx'
 import RoleSelection from './Pages/RoleSelection.tsx'
@@ -49,7 +51,13 @@ const router = createBrowserRouter([
   },
   {
     path: "/learning-hub", element: <LearningHub />
-  }
+  },
+  {
+    path: "/create-lesson", element: <CreateLesson />
+  },
+  {
+    path: "/class-progress", element: <ClassProgress />
+  },
 ]);
 
 createRoot(document.getElementById('root')!).render(

@@ -1,8 +1,9 @@
 import "./App.css"
-import Lessons from "./Pages/Lessons"
+import CreateLesson from "./Pages/CreateLesson"
+
 
 function App() {
-  return <Lessons />
+  return <CreateLesson />
 }
 
 export default App
