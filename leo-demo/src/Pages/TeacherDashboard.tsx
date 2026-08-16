@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import NavItem from "../Components/NavItem";
@@ -240,7 +241,7 @@ export default function TeacherDashboard() {
 
           <div className="grid grid-cols-2 gap-2">
 
-            <button className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-left transition hover:bg-violet-100">
+            <Link to="/create-lesson" className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-left transition hover:bg-violet-100">
 
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700">
                 <Plus size={20} />
@@ -256,9 +257,9 @@ export default function TeacherDashboard() {
                 </p>
               </div>
 
-            </button>
+            </Link>
 
-            <button className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100">
+            <Link to="/TeacherClassroom" className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100">
 
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm">
                 <Users size={19} />
@@ -274,7 +275,7 @@ export default function TeacherDashboard() {
                 </p>
               </div>
 
-            </button>
+            </Link>
 
           </div>
         </section>
@@ -377,13 +378,6 @@ export default function TeacherDashboard() {
         </section>
 
         {/* =========================
-            FLOATING CREATE BUTTON
-        ========================== */}
-        <button className="hidden">
-          <Plus size={25} />
-        </button>
-
-        {/* =========================
             MOBILE NAVIGATION
         ========================== */}
         <nav className="fixed bottom-0 left-0 right-0 z-10 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
@@ -391,19 +385,28 @@ export default function TeacherDashboard() {
           <NavItem
             icon={<Home size={19} />}
             label="Home"
+            to="/teacher-dashboard"
             active
           />
 
           <NavItem
             icon={<Users size={19} />}
             label="Classes"
+            to="/TeacherClassroom"
           />
 
-          <div className="w-10" />
+          <Link
+            to="/learning-hub"
+            aria-label="Open the learning hub"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white shadow-lg shadow-violet-200"
+          >
+            <Plus size={23} />
+          </Link>
 
           <NavItem
             icon={<BarChart3 size={19} />}
             label="Reports"
+            to="/class-progress"
           />
 
           <NavItem
@@ -439,17 +442,26 @@ export default function TeacherDashboard() {
             <SidebarItem
               icon={<Home size={18} />}
               label="Dashboard"
+              to="/teacher-dashboard"
               active
             />
 
             <SidebarItem
               icon={<Users size={18} />}
               label="Classes"
+              to="/TeacherClassroom"
+            />
+
+            <SidebarItem
+              icon={<Sparkles size={18} />}
+              label="Explore"
+              to="/learning-hub"
             />
 
             <SidebarItem
               icon={<BookOpen size={18} />}
               label="Lessons"
+              to="/lessons"
             />
 
             <SidebarItem
@@ -465,6 +477,7 @@ export default function TeacherDashboard() {
             <SidebarItem
               icon={<BarChart3 size={18} />}
               label="Reports"
+              to="/class-progress"
             />
 
           </nav>

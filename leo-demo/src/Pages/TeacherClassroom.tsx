@@ -197,11 +197,13 @@ export default function TeacherClassrooms() {
           <NavItem
             icon={<Home size={19} />}
             label="Home"
+            to="/teacher-dashboard"
           />
 
           <NavItem
             icon={<Users size={19} />}
             label="Classes"
+            to="/TeacherClassroom"
             active
           />
 
@@ -216,6 +218,7 @@ export default function TeacherClassrooms() {
           <NavItem
             icon={<BarChart3 size={19} />}
             label="Reports"
+            to="/class-progress"
           />
 
           <NavItem
@@ -255,26 +258,28 @@ export default function TeacherClassrooms() {
             <SidebarItem
               icon={<Home size={18} />}
               label="Dashboard"
+              to="/teacher-dashboard"
               inactiveClassName="text-white hover:bg-white/10"
             />
 
             <SidebarItem
               icon={<Users size={18} />}
               label="Classes"
+              to="/TeacherClassroom"
               active
             />
 
-            <Link
+            <SidebarItem
+              icon={<Sparkles size={18} />}
+              label="Explore"
               to="/learning-hub"
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white transition hover:bg-white/10"
-            >
-              <Sparkles size={18} />
-              <span>Explore</span>
-            </Link>
+              inactiveClassName="text-white hover:bg-white/10"
+            />
 
             <SidebarItem
               icon={<BookOpen size={18} />}
               label="Lessons"
+              to="/lessons"
               inactiveClassName="text-white hover:bg-white/10"
             />
 
@@ -293,6 +298,7 @@ export default function TeacherClassrooms() {
             <SidebarItem
               icon={<BarChart3 size={18} />}
               label="Reports"
+              to="/class-progress"
               inactiveClassName="text-white hover:bg-white/10"
             />
 

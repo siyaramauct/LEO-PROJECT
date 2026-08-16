@@ -171,10 +171,10 @@ function ClassroomForm({ idPrefix }: ClassroomFormProps) {
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem icon={<Home size={19} />} label="Home" />
-          <NavItem icon={<Users size={19} />} label="Classes" active />
+          <NavItem icon={<Home size={19} />} label="Home" to="/teacher-dashboard" />
+          <NavItem icon={<Users size={19} />} label="Classes" to="/TeacherClassroom" active />
           <Link to="/learning-hub" aria-label="Open the learning hub" className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white"><Plus size={23} /></Link>
-          <NavItem icon={<BarChart3 size={19} />} label="Reports" />
+          <NavItem icon={<BarChart3 size={19} />} label="Reports" to="/class-progress" />
           <NavItem icon={<User size={19} />} label="Profile" />
         </nav>
       </div>
@@ -183,13 +183,13 @@ function ClassroomForm({ idPrefix }: ClassroomFormProps) {
         <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-white">Teacher Portal</p></div>
           <nav className="space-y-2">
-            <SidebarItem icon={<Home size={18} />} label="Dashboard" />
-            <SidebarItem icon={<Users size={18} />} label="Classes" active />
-            <Link to="/learning-hub" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white transition hover:bg-white/10"><Sparkles size={18} /><span>Explore</span></Link>
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" />
+            <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
+            <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
+            <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
+            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
             <SidebarItem icon={<Layers size={18} />} label="Flashcards" />
             <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
-            <SidebarItem icon={<BarChart3 size={18} />} label="Reports" />
+            <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
           <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
         </aside>
