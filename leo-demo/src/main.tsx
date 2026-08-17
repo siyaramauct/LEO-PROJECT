@@ -6,10 +6,18 @@ import Lessons from "./Pages/Lessons.tsx"
 import FlashActivity from "./Pages/FlashActivity.tsx"
 import QuickQuiz from "./Pages/QuickQuiz.tsx"
 import LessonSummary from "./Pages/LessonSummary.tsx" 
+import StudentDashboard from "./Pages/StudentDashboard.tsx"
+import StudentFlashcards from "./Pages/StudentFlashcards.tsx"
 
 const router = createBrowserRouter([
   {
-    path: "/", element: <Lessons />,
+    path: "/", element: <StudentDashboard />,
+  },
+  {
+    path: "/lessons", element: <Lessons />,
+  },
+  {
+    path: "/student/flashcards", element: <StudentFlashcards />,
   },
   {
     path: "/lesson/:lessonId", element: <FlashActivity />
