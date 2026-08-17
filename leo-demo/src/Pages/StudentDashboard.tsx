@@ -23,7 +23,7 @@ const quickActions = [
   {
     label: "Take Quiz",
     shortLabel: "Quiz",
-    path: "/student/quiz",
+    path: "/quiz",
     icon: ClipboardDocumentCheckIcon,
     bg: "bg-rose-50",
     iconBg: "bg-rose-100",
