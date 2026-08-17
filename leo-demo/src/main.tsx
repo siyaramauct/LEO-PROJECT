@@ -15,48 +15,59 @@ import TeacherClassroom from './Pages/TeacherClassroom.tsx'
 import ClassroomDetail from './Pages/ClassroomDetail.tsx'
 import CreateClassroom from './Pages/CreateClassroom.tsx'
 import LearningHub from './Pages/LearningHub.tsx'
+import TeacherProfile from './Pages/TeacherProfile.tsx'
 import { AuthContextProvider } from '../context/AuthContext.tsx'
 
+import { GuardRoute } from "./Components/GuardRoute";
+
 const router = createBrowserRouter([
-  {
-    path: "/", element: <Home />,
-  },
-  {
-    path: "/lessons", element: <Lessons />,
-  },
-  {
-    path: "/lesson/:lessonId", element: <FlashActivity />
-  },
-  {
-    path: "/signup", element: <SignUp />
-  },
-  {
-    path: "/select-role", element: <RoleSelection />
-  },
-  {
-    path: "/login", element: <Login />
-  },
-  {
-    path: "/teacher-dashboard", element: <TeacherDashboard />
-  }, 
 
   {
-    path: "/TeacherClassroom", element: <TeacherClassroom />
+    path: "/",
+    element: <Home />,
   },
   {
-    path: "/teacher-classroom/:classroomId", element: <ClassroomDetail />
+    path: "/signup",
+    element: <SignUp />,
   },
   {
-    path: "/create-classroom", element: <CreateClassroom />
+    path: "/login",
+    element: <Login />,
   },
   {
-    path: "/learning-hub", element: <LearningHub />
+    path: "/select-role",
+    element: <RoleSelection />, // handles its own session check , not  in GuardRoute
   },
+
+  // Student Routes Only
   {
-    path: "/create-lesson", element: <CreateLesson />
+    element: <GuardRoute allowedRoles={["student"]} />,
+    children: [
+      { path: "/lessons", element: <Lessons /> },
+      { path: "/lesson/:lessonId", element: <FlashActivity /> },
+    ],
   },
+
+  // Teacher Routes Only 
   {
-    path: "/class-progress", element: <ClassProgress />
+    element: <GuardRoute allowedRoles={["teacher"]} />,
+    children: [
+      { path: "/teacher-dashboard", element: <TeacherDashboard /> },
+      { path: "/TeacherClassroom", element: <TeacherClassroom /> },
+      { path: "/teacher-classroom/:classroomId", element: <ClassroomDetail /> },
+      { path: "/create-classroom", element: <CreateClassroom /> },
+      { path: "/create-lesson", element: <CreateLesson /> },
+      { path: "/class-progress", element: <ClassProgress /> },
+      { path: "/teacher-profile", element: <TeacherProfile /> },
+    ],
+  },
+
+  //  either role 
+  {
+    element: <GuardRoute allowedRoles={["student", "teacher"]} />,
+    children: [
+      { path: "/learning-hub", element: <LearningHub /> },
+    ],
   },
 ]);
 

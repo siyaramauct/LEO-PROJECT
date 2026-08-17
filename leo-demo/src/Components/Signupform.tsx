@@ -26,6 +26,7 @@ export default function SignupForm() {
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [signupMessage, setSignupMessage] = useState<string | null>(null)
   const submitLock = useRef(false)
 
   const handleSignup: SubmitHandler<Inputs> = async (data) => {
@@ -33,12 +34,17 @@ export default function SignupForm() {
 
     submitLock.current = true
     setAuthError(null)
+    setSignupMessage(null)
     setSaving(true)
     console.log("[Signup] Attempting signup for:", data.email)
     try {
-      await signup(data.email, data.password, data.firstName, data.lastName)
+      const session = await signup(data.email, data.password, data.firstName, data.lastName)
       console.log("[Signup] ✓ User created successfully:", data.email)
-      navigate("/select-role")
+      if (session) {
+        navigate("/select-role")
+      } else {
+        setSignupMessage("Account created. Check your email to confirm your address, then sign in.")
+      }
     } catch (error: unknown) {
       console.error("[Signup] ✗ Signup failed:", error)
       setAuthError(error instanceof Error ? error.message : "Something went wrong. Please try again.")
@@ -135,6 +141,9 @@ export default function SignupForm() {
       {/* Submit */}
       {authError && (
         <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-[12px] text-red-600">{authError}</p>
+      )}
+      {signupMessage && (
+        <p className="rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[12px] text-emerald-700">{signupMessage}</p>
       )}
       <button
         type="submit"

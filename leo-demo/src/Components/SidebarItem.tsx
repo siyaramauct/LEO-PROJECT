@@ -7,6 +7,7 @@ type SidebarItemProps = {
   active?: boolean;
   inactiveClassName?: string;
   to?: string;
+  onClick?: () => void;
 };
 
 // Renders as a Link when a destination is provided, otherwise a static button.
@@ -16,6 +17,7 @@ export default function SidebarItem({
   active = false,
   inactiveClassName = "text-white hover:bg-white/10",
   to,
+  onClick,
 }: SidebarItemProps) {
   const className = `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
     active ? "bg-white/15 font-semibold text-white" : inactiveClassName
@@ -31,7 +33,7 @@ export default function SidebarItem({
   }
 
   return (
-    <button className={className}>
+    <button type="button" onClick={onClick} className={className}>
       {icon}
       <span>{label}</span>
     </button>

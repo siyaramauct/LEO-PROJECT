@@ -224,6 +224,7 @@ export default function TeacherClassrooms() {
           <NavItem
             icon={<User size={19} />}
             label="Profile"
+            to="/teacher-profile"
           />
 
         </nav>

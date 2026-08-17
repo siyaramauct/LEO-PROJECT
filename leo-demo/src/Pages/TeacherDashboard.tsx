@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
 import StatCard from "../Components/StatCard";
+import { useAuth } from "../../context/AuthContext.tsx";
 
 const classes = [
   {
@@ -44,12 +45,6 @@ const classes = [
 ];
 
 const activeClass = classes[0];
-
-const teacher = {
-  name: "Maryna",
-  role: "Teacher",
-  avatar: "T",
-};
 
 const recentLessons = [
   {
@@ -83,6 +78,10 @@ const recentLessons = [
 ];
 
 export default function TeacherDashboard() {
+  const { profile } = useAuth();
+  const teacher = profile;
+  const avatar = profile?.name[0];
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
 
@@ -99,7 +98,7 @@ export default function TeacherDashboard() {
             </p>
 
             <h1 className="mt-0.5 text-xl font-bold tracking-tight">
-              Hi, {teacher.name} 👋
+              Hi, {teacher?.name} 👋
             </h1>
 
             <p className="mt-0.5 text-[11px] text-slate-400">
@@ -412,6 +411,7 @@ export default function TeacherDashboard() {
           <NavItem
             icon={<User size={19} />}
             label="Profile"
+            to="/teacher-profile"
           />
 
         </nav>
@@ -524,16 +524,16 @@ export default function TeacherDashboard() {
               <div className="flex min-w-0 items-center gap-3">
 
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-700 font-bold text-white">
-                  {teacher.avatar}
+                  {avatar}
                 </div>
 
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">
-                    {teacher.name}
+                    {teacher?.name}
                   </p>
 
                   <p className="text-xs text-slate-400">
-                    {teacher.role}
+                    {teacher?.user_role}
                   </p>
                 </div>
 

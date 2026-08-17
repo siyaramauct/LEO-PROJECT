@@ -22,7 +22,7 @@ const roles: { value: RoleType; title: string; description: string; imageSrc: st
 ];
 
 export default function RoleSelection() {
-  const { session } = useAuth();
+  const { session, refreshProfile } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
@@ -43,9 +43,13 @@ export default function RoleSelection() {
         .update({ user_role: selectedRole })
         .eq("id", user.id);
       if (error) throw error;
-      console.log("[RoleSelection] ✓ Role saved successfully:", selectedRole);
-      console.log("");
-      navigate("/");
+      await refreshProfile();
+      if (selectedRole == "student"){
+        navigate("/lessons")
+      }
+      if (selectedRole == "teacher"){
+        navigate("/teacher-dashboard")
+      }
     } catch (error) {
       console.error("[RoleSelection] ✗ Failed to save role:", error);
     } finally {
