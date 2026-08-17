@@ -128,7 +128,7 @@ export default function ClassroomDetail() {
                 <h2 className="text-sm font-bold">Lessons</h2>
                 <p className="mt-1 text-xs text-slate-500">Latest learning content for this class.</p>
               </div>
-              <button className="flex items-center gap-1 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={14} /> Lesson</button>
+              <Link to="/create-lesson" className="flex items-center gap-1 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={14} /> Lesson</Link>
             </div>
             <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
           </section>
@@ -191,7 +191,7 @@ export default function ClassroomDetail() {
 
             {/* Classroom lesson catalogue */}
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
-              <div className="flex items-start justify-between"><div><h2 className="text-base font-bold">Lessons in this classroom</h2><p className="mt-1 text-sm text-slate-500">Published lessons and drafts available to your learners.</p></div><button className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create lesson</button></div>
+              <div className="flex items-start justify-between"><div><h2 className="text-base font-bold">Lessons in this classroom</h2><p className="mt-1 text-sm text-slate-500">Published lessons and drafts available to your learners.</p></div><Link to="/create-lesson" className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create lesson</Link></div>
               <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
             </section>
           </div>
