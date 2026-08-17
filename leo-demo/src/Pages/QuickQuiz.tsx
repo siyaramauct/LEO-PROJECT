@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import Navbar from "../Components/Navbar"
 
@@ -72,11 +72,37 @@ const questions: Question[] = [
   },
 ]
 
+function getSavedQuizProgress() {
+  const savedProgress = sessionStorage.getItem("quiz-progress")
+
+  if (!savedProgress) {
+    return {
+      currentQuestion: 0,
+      answers: [] as QuizAnswer[],
+    }
+  }
+
+  try {
+    const saved = JSON.parse(savedProgress)
+
+    return {
+      currentQuestion: saved.currentQuestion ?? 0,
+      answers: saved.answers ?? [],
+    }
+  } catch {
+    return {
+      currentQuestion: 0,
+      answers: [] as QuizAnswer[],
+    }
+  }
+}
+
 export default function QuickQuiz() {
   const navigate = useNavigate()
+  const savedProgress = getSavedQuizProgress()
 
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<QuizAnswer[]>([])
+  const [currentQuestion, setCurrentQuestion] = useState(savedProgress.currentQuestion)
+  const [answers, setAnswers] = useState<QuizAnswer[]>(savedProgress.answers)
   const [showReview, setShowReview] = useState(false)
 
   const question = questions[currentQuestion]
@@ -85,21 +111,6 @@ export default function QuickQuiz() {
     answers.find((answer) => answer.questionId === question.id)?.answer ?? ""
 
   const progress = ((currentQuestion + 1) / questions.length) * 100
-
-  /*
-    Restore unfinished quiz progress when the student comes back.
-    This is temporary browser storage for the UI prototype.
-  */
-  useEffect(() => {
-    const savedProgress = sessionStorage.getItem("quiz-progress")
-
-    if (savedProgress) {
-      const saved = JSON.parse(savedProgress)
-
-      setCurrentQuestion(saved.currentQuestion ?? 0)
-      setAnswers(saved.answers ?? [])
-    }
-  }, [])
 
   const saveProgress = (
     nextQuestion: number,
