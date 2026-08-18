@@ -40,15 +40,15 @@ type LessonRow = {
   id: string;
   title: string;
   description: string | null;
-  image_path: string | null;
+  lesson_image_path: string | null;
   status: string | null;
   word_count: number | null;
 };
 
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   title: row.title,
-  image: row.image_path
-    ? supabase.storage.from("images").getPublicUrl(row.image_path).data.publicUrl
+  image: row.lesson_image_path
+    ? supabase.storage.from("images").getPublicUrl(row.lesson_image_path).data.publicUrl
     : "/classRoomIllustration.png",
   imageAlt: row.title,
   status: row.status ?? "Draft",
@@ -208,7 +208,7 @@ export default function ClassroomDetail() {
                 <h2 className="text-sm font-bold">Lessons</h2>
                 <p className="mt-1 text-xs text-slate-500">{lessonCount} lesson{lessonCount !== 1 ? "s" : ""}</p>
               </div>
-              <Link to="/create-lesson" className="flex items-center gap-1 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800">
+              <Link to={`/create-lesson?classroomId=${classroomId}`} className="flex items-center gap-1 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800">
                 <Plus size={14} /> Lesson
               </Link>
             </div>
@@ -292,7 +292,7 @@ export default function ClassroomDetail() {
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
               <div className="flex items-start justify-between">
                 <div><h2 className="text-base font-bold">Lessons</h2><p className="mt-1 text-sm text-slate-500">{lessonCount} lesson{lessonCount !== 1 ? "s" : ""} in this classroom</p></div>
-                <Link to="/create-lesson" className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create lesson</Link>
+                <Link to={`/create-lesson?classroomId=${classroomId}`} className="flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create lesson</Link>
               </div>
               {lessons.length === 0 ? (
                 <EmptyLessons />

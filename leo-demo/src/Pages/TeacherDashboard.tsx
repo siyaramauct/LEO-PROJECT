@@ -15,10 +15,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
 import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
+import { supabase } from "../supabase-client";
 
 const classes = [
   {
@@ -44,7 +46,14 @@ const classes = [
   },
 ];
 
-const activeClass = classes[0];
+type ActiveClassroom = {
+  id: string;
+  name: string;
+  students: number;
+  lessons: number;
+  image: string;
+  imageAlt: string;
+};
 
 const recentLessons = [
   {
@@ -78,9 +87,45 @@ const recentLessons = [
 ];
 
 export default function TeacherDashboard() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const teacher = profile;
   const avatar = profile?.name[0];
+  const [activeClass, setActiveClass] = useState<ActiveClassroom | null>(null);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const loadActiveClassroom = async () => {
+      const { data, error } = await supabase
+        .from("classrooms")
+        .select("*")
+        .eq("teacher_id", session.user.id)
+        .order("created_date", { ascending: false });
+
+      if (error) {
+        console.error("Failed to load the active classroom:", error);
+        setActiveClass(null);
+        return;
+      }
+
+      const classroom = data?.[0];
+      if (!classroom) {
+        setActiveClass(null);
+        return;
+      }
+
+      setActiveClass({
+        id: classroom.classroom_id,
+        name: classroom.classroom_name,
+        students: classroom.student_count ?? 0,
+        lessons: classroom.lesson_count ?? 0,
+        image: classroom.cover_image_path ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl : "/classRoomIllustration.png",
+        imageAlt: `${classroom.classroom_name} classroom cover`,
+      });
+    };
+
+    void loadActiveClassroom();
+  }, [session?.user]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -137,27 +182,25 @@ export default function TeacherDashboard() {
 
                 <div className="min-w-0">
                   <h2 className="truncate text-lg font-bold">
-                    {activeClass.name}
+                    {activeClass?.name ?? "No classroom yet"}
                   </h2>
 
-                  <p className="mt-1 text-xs text-violet-100">
-                    {activeClass.students} students · {activeClass.lessons} lessons
-                  </p>
+                  <p className="mt-1 text-xs text-violet-100">                  </p>
                 </div>
 
                 <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
                   <img
-                    src={activeClass.image}
-                    alt={activeClass.imageAlt}
+                    src={activeClass?.image ?? "/classRoomIllustration.png"}
+                    alt={activeClass?.imageAlt ?? "Classroom illustration"}
                     className="h-full w-full object-contain"
                   />
                 </div>
               </div>
 
-              <button className="mt-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50">
+              <Link to={activeClass ? `/teacher-classroom/${activeClass.id}` : "/create-classroom"} className="mt-3 flex w-fit items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50">
                 View Classroom
                 <ChevronRight size={15} />
-              </button>
+              </Link>
 
             </div>
           </div>
@@ -171,7 +214,7 @@ export default function TeacherDashboard() {
 
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold">
-              Today's Overview
+              Account  Overview
             </h2>
 
             <button className="text-xs font-medium text-violet-700">
