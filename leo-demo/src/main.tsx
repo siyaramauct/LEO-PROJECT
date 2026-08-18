@@ -47,6 +47,8 @@ const router = createBrowserRouter([
     children: [
       { path: "/lessons", element: <Lessons /> },
       { path: "/lesson/:lessonId", element: <FlashActivity /> },
+      { path: "/quiz", element: <QuickQuiz /> },
+      { path: "/summary", element: <LessonSummary /> },
     ],
   },
 
