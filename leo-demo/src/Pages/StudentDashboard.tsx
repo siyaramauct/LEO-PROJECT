@@ -8,8 +8,16 @@ import {
   RectangleStackIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import StudentBottomNav from "../Components/StudentBottomNav"
+import { useAuth } from "../context/useAuth"
+import { supabase } from "../supabase-client"
+
+type StudentProfile = {
+  name: string | null
+  surname: string | null
+}
 
 const quickActions = [
   {
@@ -82,15 +90,53 @@ const recentLessons = [
 
 export default function StudentDashboard() {
   const navigate = useNavigate()
+  const { session } = useAuth()
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
+  const [profileError, setProfileError] = useState("")
+  const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there"
+  const studentName = studentProfile?.name ?? fallbackName
+
+  useEffect(() => {
+    const fetchStudentProfile = async () => {
+      if (!session?.user.id) {
+        setIsProfileLoading(false)
+        return
+      }
+
+      setIsProfileLoading(true)
+      setProfileError("")
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("name, surname")
+        .eq("id", session.user.id)
+        .single()
+
+      if (error) {
+        console.error("Error loading student profile:", error)
+        setProfileError("Could not load your profile name.")
+        setIsProfileLoading(false)
+        return
+      }
+
+      setStudentProfile(data)
+      setIsProfileLoading(false)
+    }
+
+    fetchStudentProfile()
+  }, [session?.user.id])
 
   return (
     <main className="min-h-dvh w-full overflow-x-hidden bg-slate-50 pb-24 text-slate-950 md:pb-10 md:pl-56">
       <section className="flex w-full flex-col gap-5 px-4 pt-5 min-[380px]:px-5 sm:px-6 md:px-8 md:py-8 xl:mx-auto xl:max-w-[1440px] xl:px-10">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-normal sm:text-3xl md:text-2xl">Hi, Arka 👋</h1>
+            <h1 className="text-2xl font-bold tracking-normal sm:text-3xl md:text-2xl">
+              Hi, {isProfileLoading ? "..." : studentName} 👋
+            </h1>
             <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm md:text-xs">
-              Ready to learn something new today?
+              {profileError || "Ready to learn something new today?"}
             </p>
           </div>
           <button
