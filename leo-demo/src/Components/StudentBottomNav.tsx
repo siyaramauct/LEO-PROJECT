@@ -2,11 +2,13 @@ import {
   BookOpenIcon,
   ChartBarIcon,
   HomeIcon,
+  ArrowLeftOnRectangleIcon,
   PlusIcon,
   UserGroupIcon,
   UserIcon,
 } from "@heroicons/react/24/outline"
-import { Link, NavLink } from "react-router-dom"
+import { Link, NavLink, useNavigate } from "react-router-dom"
+import { useAuth } from "../context/useAuth"
 
 const desktopNavItems = [
   { label: "Home", path: "/", icon: HomeIcon },
@@ -23,6 +25,14 @@ const mobileEndItems = [
 ]
 
 export default function StudentBottomNav() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
+  }
+
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col bg-violet-800 px-4 py-5 text-white shadow-xl md:flex">
@@ -63,6 +73,15 @@ export default function StudentBottomNav() {
             <PlusIcon className="h-5 w-5" />
             Practice
           </NavLink>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-auto flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-violet-50 transition hover:bg-white/10"
+          >
+            <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+            Log out
+          </button>
         </nav>
       </aside>
 
