@@ -6,6 +6,7 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/outline"
 import { useNavigate } from "react-router-dom"
+import StudentBottomNav from "../Components/StudentBottomNav"
 
 const classrooms = [
   {
@@ -144,6 +145,7 @@ export default function StudentClassrooms() {
           </div>
         </section>
       </section>
+      <StudentBottomNav />
     </main>
   )
 }

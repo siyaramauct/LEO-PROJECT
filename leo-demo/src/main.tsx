@@ -1,47 +1,34 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
-import Lessons from "./Pages/Lessons.tsx"
-import CreateLesson from "./Pages/CreateLesson"
-import ClassProgress from "./Pages/ClassProgress"
-import FlashActivity from "./Pages/FlashActivity.tsx"
-import SignUp from './Pages/Signup.tsx'
-import RoleSelection from './Pages/RoleSelection.tsx'
-import Login from './Pages/Login.tsx'
-import Home from './Pages/Home.tsx'
-import TeacherDashboard from './Pages/TeacherDashboard.tsx'
-import TeacherClassroom from './Pages/TeacherClassroom.tsx'
-import ClassroomDetail from './Pages/ClassroomDetail.tsx'
-import CreateClassroom from './Pages/CreateClassroom.tsx'
-import LearningHub from './Pages/LearningHub.tsx'
-import TeacherProfile from './Pages/TeacherProfile.tsx'
-import { AuthContextProvider } from '../context/AuthContext.tsx'
-
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import "./index.css";
+import { AuthContextProvider } from "../context/AuthContext.tsx";
 import { GuardRoute } from "./Components/GuardRoute";
-import QuickQuiz from "./Pages/QuickQuiz.tsx"
-import LessonSummary from "./Pages/LessonSummary.tsx" 
+import ClassroomDetail from "./Pages/ClassroomDetail.tsx";
+import ClassProgress from "./Pages/ClassProgress";
+import CreateClassroom from "./Pages/CreateClassroom.tsx";
+import CreateLesson from "./Pages/CreateLesson";
+import FlashActivity from "./Pages/FlashActivity.tsx";
+import Home from "./Pages/Home.tsx";
+import LearningHub from "./Pages/LearningHub.tsx";
+import Lessons from "./Pages/Lessons.tsx";
+import LessonSummary from "./Pages/LessonSummary.tsx";
+import Login from "./Pages/Login.tsx";
+import QuickQuiz from "./Pages/QuickQuiz.tsx";
+import RoleSelection from "./Pages/RoleSelection.tsx";
+import SignUp from "./Pages/Signup.tsx";
+import StudentClassrooms from "./Pages/StudentClassrooms.tsx";
+import StudentDashboard from "./Pages/StudentDashboard.tsx";
+import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
+import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
+import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
+import TeacherProfile from "./Pages/TeacherProfile.tsx";
 
 const router = createBrowserRouter([
-
-  {
-    path: "/",
-    element: <Home />,
-  },
-  {
-    path: "/signup",
-    element: <SignUp />,
-  },
-  {
-    path: "/login",
-    element: <Login />,
-  },
-  {
-    path: "/select-role",
-    element: <RoleSelection />, // handles its own session check , not  in GuardRoute
-  },
-
-  // Student Routes Only
+  { path: "/", element: <Home /> },
+  { path: "/signup", element: <SignUp /> },
+  { path: "/login", element: <Login /> },
+  { path: "/select-role", element: <RoleSelection /> },
   {
     element: <GuardRoute allowedRoles={["student"]} />,
     children: [
@@ -49,10 +36,11 @@ const router = createBrowserRouter([
       { path: "/lesson/:lessonId", element: <FlashActivity /> },
       { path: "/quiz", element: <QuickQuiz /> },
       { path: "/summary", element: <LessonSummary /> },
+      { path: "/student/dashboard", element: <StudentDashboard /> },
+      { path: "/student/classrooms", element: <StudentClassrooms /> },
+      { path: "/student/flashcards", element: <StudentFlashcards /> },
     ],
   },
-
-  // Teacher Routes Only 
   {
     element: <GuardRoute allowedRoles={["teacher"]} />,
     children: [
@@ -65,20 +53,16 @@ const router = createBrowserRouter([
       { path: "/teacher-profile", element: <TeacherProfile /> },
     ],
   },
-
-  //  either role 
   {
     element: <GuardRoute allowedRoles={["student", "teacher"]} />,
-    children: [
-      { path: "/learning-hub", element: <LearningHub /> },
-    ],
+    children: [{ path: "/learning-hub", element: <LearningHub /> }],
   },
 ]);
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthContextProvider>
       <RouterProvider router={router} />
     </AuthContextProvider>
   </StrictMode>,
-)
+);
