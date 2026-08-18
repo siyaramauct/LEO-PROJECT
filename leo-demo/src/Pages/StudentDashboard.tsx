@@ -12,6 +12,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import StudentBottomNav from "../Components/StudentBottomNav"
 import { useAuth } from "../context/useAuth"
+import { fetchStudentClassrooms, type StudentClassroom } from "../lib/studentClassrooms"
 import { supabase } from "../supabase-client"
 
 type StudentProfile = {
@@ -58,21 +59,6 @@ const quickActions = [
   },
 ]
 
-const studentClassrooms = [
-  {
-    name: "English for Everyday Life",
-    teacher: "Teacher Siya",
-    progress: "72%",
-    detail: "8 of 12 lessons done",
-  },
-  {
-    name: "Reading and Vocabulary",
-    teacher: "Teacher Arka",
-    progress: "58%",
-    detail: "7 of 14 lessons done",
-  },
-]
-
 const recentLessons = [
   {
     title: "Environmental Science",
@@ -92,8 +78,11 @@ export default function StudentDashboard() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null)
+  const [studentClassrooms, setStudentClassrooms] = useState<StudentClassroom[]>([])
   const [isProfileLoading, setIsProfileLoading] = useState(true)
+  const [isClassroomsLoading, setIsClassroomsLoading] = useState(true)
   const [profileError, setProfileError] = useState("")
+  const [classroomsError, setClassroomsError] = useState("")
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there"
   const studentName = studentProfile?.name ?? fallbackName
 
@@ -125,6 +114,30 @@ export default function StudentDashboard() {
     }
 
     fetchStudentProfile()
+  }, [session?.user.id])
+
+  useEffect(() => {
+    const fetchDashboardClassrooms = async () => {
+      if (!session?.user.id) {
+        setIsClassroomsLoading(false)
+        return
+      }
+
+      setIsClassroomsLoading(true)
+      setClassroomsError("")
+
+      try {
+        const classrooms = await fetchStudentClassrooms(session.user.id)
+        setStudentClassrooms(classrooms.slice(0, 2))
+      } catch (error) {
+        console.error("Error loading student classrooms:", error)
+        setClassroomsError("Could not load your classrooms.")
+      } finally {
+        setIsClassroomsLoading(false)
+      }
+    }
+
+    fetchDashboardClassrooms()
   }, [session?.user.id])
 
   return (
@@ -245,10 +258,26 @@ export default function StudentDashboard() {
               View all
             </button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {studentClassrooms.map((classroom) => (
+          {isClassroomsLoading && (
+            <p className="rounded-xl border border-slate-100 p-3 text-xs font-semibold text-slate-500">
+              Loading your classrooms...
+            </p>
+          )}
+          {!isClassroomsLoading && classroomsError && (
+            <p className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
+              {classroomsError}
+            </p>
+          )}
+          {!isClassroomsLoading && !classroomsError && studentClassrooms.length === 0 && (
+            <p className="rounded-xl border border-slate-100 p-3 text-xs font-semibold text-slate-500">
+              You have not been added to a classroom yet.
+            </p>
+          )}
+          {!isClassroomsLoading && !classroomsError && studentClassrooms.length > 0 && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {studentClassrooms.map((classroom) => (
               <button
-                key={classroom.name}
+                key={classroom.id}
                 onClick={() => navigate("/student/classrooms")}
                 className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-left transition hover:bg-slate-50"
               >
@@ -257,19 +286,17 @@ export default function StudentDashboard() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-bold text-slate-950">{classroom.name}</span>
-                  <span className="mt-1 block text-[11px] font-semibold text-slate-500">{classroom.teacher}</span>
-                  <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <span className="block h-full rounded-full bg-violet-700" style={{ width: classroom.progress }} />
-                  </span>
+                  <span className="mt-1 block text-[11px] font-semibold text-slate-500">{classroom.teacherName}</span>
+                  <span className="mt-1 block truncate text-[11px] text-slate-500">{classroom.description}</span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-xs font-black text-violet-700">{classroom.progress}</span>
-                  <span className="mt-1 block text-[10px] font-semibold text-slate-500">{classroom.detail}</span>
+                  <span className="block text-xs font-black text-violet-700">Open</span>
                 </span>
                 <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">

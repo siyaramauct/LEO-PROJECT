@@ -5,53 +5,47 @@ import {
   ClipboardDocumentListIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import StudentBottomNav from "../Components/StudentBottomNav"
-
-const classrooms = [
-  {
-    name: "English for Everyday Life",
-    teacher: "Teacher Siya",
-    members: 24,
-    progress: 72,
-    lessonsCompleted: 8,
-    totalLessons: 12,
-    nextLesson: "Ordering food and asking questions",
-    image: "/kidsSmilingLanguage.jpg",
-    accent: "bg-emerald-500",
-  },
-  {
-    name: "Reading and Vocabulary",
-    teacher: "Teacher Arka",
-    members: 18,
-    progress: 58,
-    lessonsCompleted: 7,
-    totalLessons: 14,
-    nextLesson: "Context clues in short stories",
-    image: "/fetchbook.jpg",
-    accent: "bg-violet-600",
-  },
-  {
-    name: "Digital English Lab",
-    teacher: "Teacher Maryna",
-    members: 16,
-    progress: 84,
-    lessonsCompleted: 10,
-    totalLessons: 12,
-    nextLesson: "Explaining a process clearly",
-    image: "/girlTypingLANG.png",
-    accent: "bg-sky-500",
-  },
-]
-
-const classroomStats = [
-  { label: "Classrooms", value: "3", icon: UserGroupIcon },
-  { label: "Assigned Lessons", value: "38", icon: ClipboardDocumentListIcon },
-  { label: "Completed", value: "25", icon: CheckCircleIcon },
-]
+import { useAuth } from "../context/useAuth"
+import { fetchStudentClassrooms, type StudentClassroom } from "../lib/studentClassrooms"
 
 export default function StudentClassrooms() {
   const navigate = useNavigate()
+  const { session } = useAuth()
+  const [classrooms, setClassrooms] = useState<StudentClassroom[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState("")
+  const classroomStats = [
+    { label: "Classrooms", value: String(classrooms.length), icon: UserGroupIcon },
+    { label: "Assigned Lessons", value: "0", icon: ClipboardDocumentListIcon },
+    { label: "Completed", value: "0", icon: CheckCircleIcon },
+  ]
+
+  useEffect(() => {
+    const fetchClassrooms = async () => {
+      if (!session?.user.id) {
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      setErrorMessage("")
+
+      try {
+        const studentClassrooms = await fetchStudentClassrooms(session.user.id)
+        setClassrooms(studentClassrooms)
+      } catch (error) {
+        console.error("Error loading student classrooms:", error)
+        setErrorMessage("Could not load your classrooms. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchClassrooms()
+  }, [session?.user.id])
 
   return (
     <main className="min-h-dvh w-full overflow-x-hidden bg-slate-50 pb-24 text-slate-950 md:pb-10 md:pl-56">
@@ -83,40 +77,64 @@ export default function StudentClassrooms() {
           ))}
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          {classrooms.map((classroom) => (
+        {isLoading && (
+          <section className="rounded-2xl bg-white p-5 text-sm font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 md:rounded-xl">
+            Loading your classrooms...
+          </section>
+        )}
+
+        {!isLoading && errorMessage && (
+          <section className="rounded-2xl bg-red-50 p-5 text-sm font-semibold text-red-600 ring-1 ring-red-100 md:rounded-xl">
+            {errorMessage}
+          </section>
+        )}
+
+        {!isLoading && !errorMessage && classrooms.length === 0 && (
+          <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200 md:rounded-xl">
+            <UserGroupIcon className="mx-auto h-8 w-8 text-violet-700" />
+            <h2 className="mt-3 text-base font-black text-slate-950">No classrooms yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">
+              You will see classrooms here once a teacher adds your student account to one.
+            </p>
+          </section>
+        )}
+
+        {!isLoading && !errorMessage && classrooms.length > 0 && (
+          <section className="grid gap-4 lg:grid-cols-3">
+            {classrooms.map((classroom, index) => (
             <article
-              key={classroom.name}
+              key={classroom.id}
               className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 md:rounded-xl"
             >
-              <img src={classroom.image} alt="" className="h-36 w-full object-cover" />
+              <img
+                src={["/kidsSmilingLanguage.jpg", "/fetchbook.jpg", "/girlTypingLANG.png"][index % 3]}
+                alt=""
+                className="h-36 w-full object-cover"
+              />
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-base font-black leading-snug text-slate-950">{classroom.name}</h2>
-                    <p className="mt-1 text-xs font-bold text-slate-500">{classroom.teacher}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{classroom.teacherName}</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
-                    {classroom.members} learners
+                    Enrolled
                   </span>
                 </div>
 
                 <div className="mt-5">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-500">Class progress</span>
-                    <span className="text-slate-950">{classroom.progress}%</span>
+                    <span className="text-slate-500">Classroom access</span>
+                    <span className="text-slate-950">Active</span>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className={`${classroom.accent} h-full rounded-full`} style={{ width: `${classroom.progress}%` }} />
+                    <div className="h-full w-full rounded-full bg-violet-700" />
                   </div>
                 </div>
 
                 <div className="mt-5 rounded-xl bg-slate-50 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-normal text-slate-500">Next lesson</p>
-                  <p className="mt-1 text-sm font-bold leading-snug text-slate-900">{classroom.nextLesson}</p>
-                  <p className="mt-2 text-xs font-semibold text-slate-500">
-                    {classroom.lessonsCompleted} of {classroom.totalLessons} lessons completed
-                  </p>
+                  <p className="text-[11px] font-bold uppercase tracking-normal text-slate-500">Description</p>
+                  <p className="mt-1 text-sm font-bold leading-snug text-slate-900">{classroom.description}</p>
                 </div>
 
                 <button
@@ -128,8 +146,9 @@ export default function StudentClassrooms() {
                 </button>
               </div>
             </article>
-          ))}
-        </section>
+            ))}
+          </section>
+        )}
 
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:rounded-xl">
           <div className="flex items-center gap-3">
