@@ -6,6 +6,7 @@ import {
   ClipboardDocumentCheckIcon,
   FireIcon,
   RectangleStackIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline"
 import { useNavigate } from "react-router-dom"
 import StudentBottomNav from "../Components/StudentBottomNav"
@@ -46,6 +47,21 @@ const quickActions = [
     bg: "bg-orange-50",
     iconBg: "bg-orange-100",
     text: "text-orange-700",
+  },
+]
+
+const studentClassrooms = [
+  {
+    name: "English for Everyday Life",
+    teacher: "Teacher Siya",
+    progress: "72%",
+    detail: "8 of 12 lessons done",
+  },
+  {
+    name: "Reading and Vocabulary",
+    teacher: "Teacher Arka",
+    progress: "58%",
+    detail: "7 of 14 lessons done",
   },
 ]
 
@@ -143,7 +159,12 @@ export default function StudentDashboard() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-bold">Quick Actions</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold">Quick Actions</h2>
+            <button onClick={() => navigate("/student/classrooms")} className="text-xs font-bold text-violet-700">
+              My classrooms
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:gap-4">
             {quickActions.map((action) => (
               <button
@@ -158,6 +179,48 @@ export default function StudentDashboard() {
                   <span className="md:hidden">{action.shortLabel}</span>
                   <span className="hidden md:inline">{action.label}</span>
                 </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:rounded-xl">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                <UserGroupIcon className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold">My Classrooms</h2>
+                <p className="mt-1 text-xs font-medium text-slate-500">Classes you are enrolled in</p>
+              </div>
+            </div>
+            <button onClick={() => navigate("/student/classrooms")} className="text-xs font-bold text-violet-700">
+              View all
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {studentClassrooms.map((classroom) => (
+              <button
+                key={classroom.name}
+                onClick={() => navigate("/student/classrooms")}
+                className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-left transition hover:bg-slate-50"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  <UserGroupIcon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-bold text-slate-950">{classroom.name}</span>
+                  <span className="mt-1 block text-[11px] font-semibold text-slate-500">{classroom.teacher}</span>
+                  <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <span className="block h-full rounded-full bg-violet-700" style={{ width: classroom.progress }} />
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-xs font-black text-violet-700">{classroom.progress}</span>
+                  <span className="mt-1 block text-[10px] font-semibold text-slate-500">{classroom.detail}</span>
+                </span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
               </button>
             ))}
           </div>

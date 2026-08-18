@@ -3,14 +3,22 @@ import {
   ChartBarIcon,
   HomeIcon,
   PlusIcon,
+  UserGroupIcon,
   UserIcon,
 } from "@heroicons/react/24/outline"
 import { Link, NavLink } from "react-router-dom"
 
-const navItems = [
+const desktopNavItems = [
   { label: "Home", path: "/", icon: HomeIcon },
+  { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
   { label: "Progress", path: "/student/progress", icon: ChartBarIcon },
+  { label: "Profile", path: "/student/profile", icon: UserIcon },
+]
+
+const mobileStartItems = desktopNavItems.slice(0, 2)
+const mobileEndItems = [
+  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
@@ -29,7 +37,7 @@ export default function StudentBottomNav() {
         </Link>
 
         <nav className="flex flex-1 flex-col gap-2">
-          {navItems.map((item) => (
+          {desktopNavItems.map((item) => (
             <NavLink
               key={item.label}
               to={item.path}
@@ -59,7 +67,7 @@ export default function StudentBottomNav() {
       </aside>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto flex h-18 max-w-md items-center justify-around border-t border-slate-200 bg-white px-3 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:hidden">
-        {navItems.slice(0, 2).map((item) => (
+        {mobileStartItems.map((item) => (
           <NavLink
             key={item.label}
             to={item.path}
@@ -82,7 +90,7 @@ export default function StudentBottomNav() {
           <PlusIcon className="h-6 w-6" />
         </NavLink>
 
-        {navItems.slice(2).map((item) => (
+        {mobileEndItems.map((item) => (
           <NavLink
             key={item.label}
             to={item.path}

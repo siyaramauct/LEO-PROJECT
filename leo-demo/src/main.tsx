@@ -6,6 +6,7 @@ import Lessons from "./Pages/Lessons.tsx"
 import FlashActivity from "./Pages/FlashActivity.tsx"
 import QuickQuiz from "./Pages/QuickQuiz.tsx"
 import LessonSummary from "./Pages/LessonSummary.tsx" 
+import StudentClassrooms from "./Pages/StudentClassrooms.tsx"
 import StudentDashboard from "./Pages/StudentDashboard.tsx"
 import StudentFlashcards from "./Pages/StudentFlashcards.tsx"
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx"
@@ -25,6 +26,9 @@ const router = createBrowserRouter([
   },
   {
     path: "/student/flashcards", element: <StudentFlashcards />,
+  },
+  {
+    path: "/student/classrooms", element: <StudentClassrooms />,
   },
   {
     path: "/teacher-dashboard", element: <TeacherDashboard />,
