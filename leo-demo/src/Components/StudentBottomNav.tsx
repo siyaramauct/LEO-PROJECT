@@ -1,27 +1,23 @@
 import {
   BookOpenIcon,
-  ChartBarIcon,
   HomeIcon,
   ArrowLeftOnRectangleIcon,
   PlusIcon,
   UserGroupIcon,
-  UserIcon,
 } from "@heroicons/react/24/outline"
 import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 
 const desktopNavItems = [
-  { label: "Home", path: "/", icon: HomeIcon },
+  { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
-  { label: "Progress", path: "/student/progress", icon: ChartBarIcon },
-  { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
 const mobileStartItems = desktopNavItems.slice(0, 2)
 const mobileEndItems = [
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
-  { label: "Profile", path: "/student/profile", icon: UserIcon },
+  { label: "Quiz", path: "/quiz", icon: BookOpenIcon },
 ]
 
 export default function StudentBottomNav() {
@@ -36,7 +32,7 @@ export default function StudentBottomNav() {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col bg-violet-800 px-4 py-5 text-white shadow-xl md:flex">
-        <Link to="/" className="mb-8 flex items-center gap-3 px-2">
+        <Link to="/student/dashboard" className="mb-8 flex items-center gap-3 px-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-sm font-black">
             L
           </span>

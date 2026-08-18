@@ -35,6 +35,7 @@ const router = createBrowserRouter([
       { path: "/lessons", element: <Lessons /> },
       { path: "/lesson/:lessonId", element: <FlashActivity /> },
       { path: "/quiz", element: <QuickQuiz /> },
+      { path: "/quiz/:lessonId", element: <QuickQuiz /> },
       { path: "/summary", element: <LessonSummary /> },
       { path: "/student/dashboard", element: <StudentDashboard /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },

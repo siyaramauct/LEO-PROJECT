@@ -21,8 +21,14 @@ const roles: { value: RoleType; title: string; description: string; imageSrc: st
   },
 ];
 
+function usernamePrefix(name: string, surname: string) {
+  const surnamePart = surname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toLowerCase().padEnd(3, "x");
+  const namePart = name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toLowerCase() || "x";
+  return `${surnamePart}${namePart}`;
+}
+
 export default function RoleSelection() {
-  const { session, refreshProfile } = useAuth();
+  const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
@@ -33,19 +39,57 @@ export default function RoleSelection() {
     return <Navigate to="/login" />;
   }
 
+  if (loading || profileLoading) {
+    return <main className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Loading profile...</p></main>;
+  }
+
+  if (profileError || !profile) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (profile?.user_role === "teacher") return <Navigate to="/teacher-dashboard" replace />;
+  if (profile?.user_role === "student") return <Navigate to="/student/dashboard" replace />;
+
   const handleContinue = async () => {
     if (!selectedRole) return;
     setSaving(true);
     console.log("[RoleSelection] Saving role:", selectedRole, "for user:", user.id);
     try {
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+      if (profileError) throw profileError;
+
+      let username = existingProfile.username;
+      if (!username) {
+        const prefix = usernamePrefix(user.user_metadata?.name ?? "", user.user_metadata?.surname ?? "");
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000).toString().padStart(3, "0");
+          const candidate = `${prefix}${randomDigits}`;
+          const { data: matchingProfile, error: usernameError } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("username", candidate)
+            .maybeSingle();
+          if (usernameError) throw usernameError;
+          if (!matchingProfile) {
+            username = candidate;
+            break;
+          }
+        }
+        if (!username) throw new Error("Could not generate a unique username. Please try again.");
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({ user_role: selectedRole })
+        .update({ user_role: selectedRole, username })
         .eq("id", user.id);
       if (error) throw error;
       await refreshProfile();
       if (selectedRole == "student"){
-        navigate("/lessons")
+        navigate("/student/dashboard")
       }
       if (selectedRole == "teacher"){
         navigate("/teacher-dashboard")

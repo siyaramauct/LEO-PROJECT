@@ -14,6 +14,7 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     profileLoading: boolean;
+    profileError: string | null;
     signup: (email: string, password: string, name: string, surname: string) => Promise<Session | null>;
     login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
@@ -27,6 +28,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
     const [profileLoading, setProfileLoading] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
 
     // Fetches the profile row. If it doesn't exist yet (e.g. a DB trigger
     // hasn't finished creating it right after signup), retries a few times
@@ -47,14 +49,17 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
             }
             console.error("Failed to fetch profile:", error);
             setProfile(null);
+            setProfileError(error.code === "PGRST116" ? "Your profile record could not be found. Please contact support." : "Your profile could not be loaded. Please refresh and try again.");
             return;
         }
 
         setProfile(data);
+        setProfileError(null);
     };
 
     const loadProfile = async (userId: string) => {
         setProfileLoading(true);
+        setProfileError(null);
         try {
             await fetchProfile(userId);
         } finally {
@@ -69,6 +74,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
                 const { data: { session } } = await supabase.auth.getSession();
                 setSession(session);
                 if (session?.user) {
+                    setProfile(null);
                     await loadProfile(session.user.id);
                 }
             } catch (error) {
@@ -87,6 +93,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
             setSession(session);
             setLoading(false);
             if (session?.user) {
+                setProfile(null);
                 setProfileLoading(true);
                 setTimeout(() => {
                     void loadProfile(session.user.id);
@@ -94,6 +101,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setProfile(null);
                 setProfileLoading(false);
+                setProfileError(null);
             }
         });
 
@@ -112,8 +120,9 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const login = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (data.user) await loadProfile(data.user.id);
         console.log("User logged in successfully");
     };
 
@@ -131,7 +140,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <AuthContext.Provider
-            value={{ session, profile, loading, profileLoading, signup, login, logout, refreshProfile }}
+            value={{ session, profile, loading, profileLoading, profileError, signup, login, logout, refreshProfile }}
         >
             {children}
         </AuthContext.Provider>

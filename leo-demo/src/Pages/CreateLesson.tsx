@@ -18,7 +18,6 @@ type GeneratedQuestion = {
 type GeneratedMcq = { title: string; questions: GeneratedQuestion[] };
 
 const lessonCoverOptions = [
-  { id: "corporate", alt: "Corporate style lesson illustration", path: "lessonImgs/corporateStyleLessonIllustration.avif" },
   { id: "typing", alt: "Learner typing illustration", path: "lessonImgs/girlTypingLANG.png" },
   { id: "level-one", alt: "Level one learning illustration", path: "lessonImgs/Level1.png" },
   { id: "travel", alt: "Travel vocabulary illustration", path: "lessonImgs/travel-illustration.avif" },
@@ -144,6 +143,13 @@ export default function CreateLesson() {
       }).select("lesson_id").single();
 
       if (lessonError || !lesson) throw new Error(lessonError?.message ?? "The lesson could not be created.");
+      const { error: flashcardError } = await supabase.from("flashcards").insert(flashcards.map((flashcard) => ({
+        lesson_id: lesson.lesson_id,
+        word: flashcard.term.trim(),
+        definition: flashcard.definition.trim(),
+      })));
+
+      if (flashcardError) throw new Error(flashcardError.message);
       const { data: mcq, error: mcqError } = await supabase.from("mcqs").insert({
         lesson_id: lesson.lesson_id,
         score_ceiling: generatedMcq.questions.length,

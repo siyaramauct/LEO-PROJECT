@@ -7,10 +7,11 @@ type Props = {
 }
 
 export function GuardRoute({ allowedRoles }: Props) {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, profileLoading, profileError } = useAuth()
 
-  if (loading) return <div>Loading...</div>
+  if (loading || profileLoading) return <div>Loading...</div>
   if (!session) return <Navigate to="/login" replace />
+  if (profileError) return <Navigate to="/" replace />
   if (!profile) return <div>Loading profile...</div>
   if (!profile.user_role) return <Navigate to="/select-role" replace />
 
