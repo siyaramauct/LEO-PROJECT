@@ -19,6 +19,8 @@ import TeacherProfile from './Pages/TeacherProfile.tsx'
 import { AuthContextProvider } from '../context/AuthContext.tsx'
 
 import { GuardRoute } from "./Components/GuardRoute";
+import QuickQuiz from "./Pages/QuickQuiz.tsx"
+import LessonSummary from "./Pages/LessonSummary.tsx" 
 
 const router = createBrowserRouter([
 
