@@ -8,7 +8,15 @@ type ClassroomRow = {
 }
 
 type ClassroomStudentRow = {
-  classroom_id: string
+  classroom_id?: string
+  classroomID?: string
+  classroomId?: string
+  student_id?: string
+  studentID?: string
+  studentId?: string
+  user_id?: string
+  userID?: string
+  userId?: string
 }
 
 type TeacherProfileRow = {
@@ -24,16 +32,29 @@ export type StudentClassroom = {
   teacherName: string
 }
 
+const studentColumnCandidates = ["student_id", "user_id", "studentID", "userID", "studentId", "userId"]
+
+function getClassroomId(row: ClassroomStudentRow) {
+  return row.classroom_id ?? row.classroomID ?? row.classroomId
+}
+
+async function fetchClassroomStudentRows(studentId: string) {
+  for (const columnName of studentColumnCandidates) {
+    const { data, error } = await supabase.from("classroom_students").select("*").eq(columnName, studentId)
+
+    if (!error && data && data.length > 0) {
+      return data as ClassroomStudentRow[]
+    }
+  }
+
+  return []
+}
+
 export async function fetchStudentClassrooms(studentId: string): Promise<StudentClassroom[]> {
-  const { data: classroomStudentRows, error: classroomStudentError } = await supabase
-    .from("classroom_students")
-    .select("classroom_id")
-    .eq("student_id", studentId)
+  const classroomStudentRows = await fetchClassroomStudentRows(studentId)
 
-  if (classroomStudentError) throw classroomStudentError
-
-  const classroomIds = ((classroomStudentRows ?? []) as ClassroomStudentRow[])
-    .map((classroomStudent) => classroomStudent.classroom_id)
+  const classroomIds = classroomStudentRows
+    .map((classroomStudent) => getClassroomId(classroomStudent))
     .filter(Boolean)
 
   if (classroomIds.length === 0) return []
@@ -47,6 +68,11 @@ export async function fetchStudentClassrooms(studentId: string): Promise<Student
   if (classroomError) throw classroomError
 
   const classrooms = (classroomRows ?? []) as ClassroomRow[]
+
+  if (classrooms.length === 0) {
+    throw new Error("Your classroom membership was found, but the classroom details are not readable yet.")
+  }
+
   const teacherIds = classrooms
     .map((classroom) => classroom.teacher_id)
     .filter((teacherId): teacherId is string => Boolean(teacherId))
