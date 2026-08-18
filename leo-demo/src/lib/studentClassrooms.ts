@@ -7,7 +7,7 @@ type ClassroomRow = {
   teacher_id: string | null
 }
 
-type ClassroomMemberRow = {
+type ClassroomStudentRow = {
   classroom_id: string
 }
 
@@ -25,15 +25,15 @@ export type StudentClassroom = {
 }
 
 export async function fetchStudentClassrooms(studentId: string): Promise<StudentClassroom[]> {
-  const { data: membershipRows, error: membershipError } = await supabase
-    .from("classroom_members")
+  const { data: classroomStudentRows, error: classroomStudentError } = await supabase
+    .from("classroom_students")
     .select("classroom_id")
     .eq("student_id", studentId)
 
-  if (membershipError) throw membershipError
+  if (classroomStudentError) throw classroomStudentError
 
-  const classroomIds = ((membershipRows ?? []) as ClassroomMemberRow[])
-    .map((membership) => membership.classroom_id)
+  const classroomIds = ((classroomStudentRows ?? []) as ClassroomStudentRow[])
+    .map((classroomStudent) => classroomStudent.classroom_id)
     .filter(Boolean)
 
   if (classroomIds.length === 0) return []
