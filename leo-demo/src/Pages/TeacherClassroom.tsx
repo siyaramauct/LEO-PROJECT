@@ -13,70 +13,64 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, {
   type Classroom,
 } from "../Components/ClassroomMobileCard";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
+import UserIdentity from "../Components/UserIdentity";
+import { supabase } from "../supabase-client";
 
+type ClassroomRow = {
+  classroom_id: string;
+  classroom_name: string;
+  description: string | null;
+  cover_image_path: string | null;
+  created_date: Date | null;
+  student_count?: number | null;
+  lesson_count?: number | null;
+  join_code?: string | null;
+};
 
-/* =========================================================
-   MOCK DATA
-   Replace this later with your Supabase data.
-========================================================= */
+const formatCreatedDate = (createdAt: Date | null) => {
+  if (!createdAt) return "recently";
+  return new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "long", year: "numeric" }).format(new Date(createdAt));
+};
 
-const classrooms: Classroom[] = [
-  {
-    id: "class-001",
-    name: "English for Everyday Life",
-    description: "Practical vocabulary and conversations for daily situations.",
-    studentCount: 24,
-    lessonCount: 12,
-    joinCode: "EVERY24",
-    createdDate: "12 February 2026",
-    image: "/fetchbook.jpg",
-    imageAlt: "Illustration of a learner reading and studying",
-    imageClassName: "object-cover object-right",
-  },
-  {
-    id: "class-002",
-    name: "Reading and Vocabulary",
-    description: "Build confidence through reading, word study and discussion.",
-    studentCount: 18,
-    lessonCount: 8,
-    joinCode: "READ18",
-    createdDate: "20 February 2026",
-    image: "/libIl.jpg",
-    imageAlt: "Illustration of a library with bookshelves",
-    imageClassName: "object-cover object-center",
-  },
-  {
-    id: "class-003",
-    name: "Digital English Lab",
-    description: "Interactive listening, speaking and vocabulary practice.",
-    studentCount: 20,
-    lessonCount: 6,
-    joinCode: "DIGI20",
-    createdDate: "5 March 2026",
-    image: "/Nerd-amico.png",
-    imageAlt: "Illustration of a learner using a laptop",
-    imageClassName: "object-contain p-1",
-  },
-  {
-    id: "class-004",
-    name: "Academic English",
-    description: "Develop academic vocabulary for study and presentations.",
-    studentCount: 16,
-    lessonCount: 10,
-    joinCode: "ACADEMY",
-    createdDate: "14 March 2026",
-    image: "/business-illustration.avif",
-    imageAlt: "Illustration for professional English learning",
-    imageClassName: "object-contain p-1",
-  },
-];
+const toClassroom = (classroom: ClassroomRow): Classroom => {
+  const { data } = supabase.storage
+    .from("images")
+    .getPublicUrl(classroom.cover_image_path ?? "");
+  const coverUrl = data.publicUrl;
+
+  return {
+    id: classroom.classroom_id,
+    name: classroom.classroom_name,
+    description: classroom.description ?? "No description has been added yet.",
+    studentCount: classroom.student_count ?? 0,
+    lessonCount: classroom.lesson_count ?? 0,
+    joinCode: classroom.join_code ?? "Not available",
+    createdDate: formatCreatedDate(classroom.created_date),
+    image: classroom.cover_image_path ? coverUrl : "",
+    imageAlt: `${classroom.classroom_name} classroom cover`,
+    imageClassName: "object-cover",
+  };
+};
+
+function EmptyClassrooms({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`flex flex-col items-center justify-center text-center ${compact ? "px-5 py-9" : "px-6 py-14"}`}>
+      <div className="flex h-11 w-11 items-center justify-center text-slate-400"><Users size={21} className="text-violet-500" /></div>
+      <h3 className="mt-3 text-sm font-bold text-slate-800">Start your first classroom</h3>
+      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">Create a dedicated space to organise lessons and invite your learners.</p>
+      <Link to="/create-classroom" className="mt-4 flex items-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={16} />Create Classroom</Link>
+    </div>
+  );
+}
 
 
 /* =========================================================
@@ -84,6 +78,35 @@ const classrooms: Classroom[] = [
 ========================================================= */
 
 export default function TeacherClassrooms() {
+  const { session } = useAuth();
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const loadClassrooms = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      const { data, error } = await supabase
+        .from("classrooms")
+        .select("*")
+        .eq("teacher_id", session.user.id)
+        .order("created_date", { ascending: false });
+
+      if (error) {
+        setLoadError("We could not load your classrooms. Please try again.");
+        setClassrooms([]);
+      } else {
+        setClassrooms((data as ClassroomRow[]).map(toClassroom));
+      }
+      setIsLoading(false);
+    };
+
+    void loadClassrooms();
+  }, [session?.user]);
+
   const totalStudents = classrooms.reduce(
     (total, classroom) => total + classroom.studentCount,
     0
@@ -177,16 +200,7 @@ export default function TeacherClassrooms() {
           </div>
 
 
-          <div className="space-y-2">
-
-            {classrooms.map((classroom) => (
-              <ClassroomMobileCard
-                key={classroom.id}
-                classroom={classroom}
-              />
-            ))}
-
-          </div>
+          {isLoading ? <p className="py-8 text-center text-xs text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms compact /> : <div className="space-y-2">{classrooms.map((classroom) => <ClassroomMobileCard key={classroom.id} classroom={classroom} />)}</div>}
 
         </section>
 
@@ -311,6 +325,7 @@ export default function TeacherClassrooms() {
             <SidebarItem
               icon={<Settings size={18} />}
               label="Settings"
+              to="/teacher-profile"
               inactiveClassName="text-white hover:bg-white/10"
             />
 
@@ -358,25 +373,7 @@ export default function TeacherClassrooms() {
               </button>
 
 
-              <div className="flex items-center gap-3">
-
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-700 font-bold text-white">
-                  T
-                </div>
-
-                <div>
-
-                  <p className="text-sm font-semibold">
-                    Teacher Siya
-                  </p>
-
-                  <p className="text-xs text-slate-400">
-                    Teacher
-                  </p>
-
-                </div>
-
-              </div>
+              <UserIdentity />
 
             </div>
 
@@ -439,15 +436,8 @@ export default function TeacherClassrooms() {
 
 
             {/* Classroom Grid */}
-            <section className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-
-              {classrooms.map((classroom) => (
-                <ClassroomDesktopCard
-                  key={classroom.id}
-                  classroom={classroom}
-                />
-              ))}
-
+            <section className="mt-3">
+              {isLoading ? <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms /> : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{classrooms.map((classroom) => <ClassroomDesktopCard key={classroom.id} classroom={classroom} />)}</div>}
             </section>
 
           </div>

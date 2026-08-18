@@ -72,7 +72,7 @@ export default function TeacherProfile() {
             <SidebarItem icon={<User size={18} />} label="Profile" to="/teacher-profile" active />
           </nav>
           <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" />
+            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
             <SidebarItem icon={<LogOut size={18} />} label={loggingOut ? "Logging out..." : "Logout"} onClick={() => void handleLogout()} />
           </div>
         </aside>

@@ -1,9 +1,5 @@
-import "./App.css"
-import CreateLesson from "./Pages/CreateLesson"
+import { Navigate } from "react-router-dom";
 
-
-function App() {
-  return <CreateLesson />
+export default function App() {
+  return <Navigate to="/" replace />;
 }
-
-export default App

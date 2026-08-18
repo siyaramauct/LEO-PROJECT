@@ -487,6 +487,7 @@ export default function TeacherDashboard() {
             <SidebarItem
               icon={<Settings size={18} />}
               label="Settings"
+              to="/teacher-profile"
             />
 
             <SidebarItem

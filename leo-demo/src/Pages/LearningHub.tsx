@@ -21,6 +21,7 @@ import { Link } from "react-router-dom";
 import ArticleLinkCard, { type ArticleLink } from "../Components/ArticleLinkCard";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
+import UserIdentity from "../Components/UserIdentity";
 
 // Free-to-use Unsplash photography — no project image assets used here.
 const articles: ArticleLink[] = [
@@ -170,7 +171,7 @@ export default function LearningHub() {
             <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
-          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
+          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
@@ -182,8 +183,7 @@ export default function LearningHub() {
             <div className="flex items-center gap-4">
               <button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button>
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-700 font-bold text-white">T</div>
-                <div><p className="text-sm font-semibold">Teacher Siya</p><p className="text-xs text-slate-400">Teacher</p></div>
+                <UserIdentity />
               </div>
             </div>
           </header>

@@ -13,19 +13,38 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../supabase-client";
 import ClassroomFormField from "../Components/ClassroomFormField";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
+import UserIdentity from "../Components/UserIdentity";
 
 const coverOptions = [
-  { id: "everyday", image: "/fetchbook.jpg", alt: "Learner studying from a book" },
-  { id: "reading", image: "/libIl.jpg", alt: "Library illustration" },
-  { id: "digital", image: "/Nerd-amico.png", alt: "Learner using a laptop" },
+  { id: "everyday", image: "/fetchbook.jpg", alt: "Learner studying from a book", path: "classroomImgs/fetchbook.jpg" },
+  { id: "reading", image: "libIl.jpg", alt: "Library illustration", path: "classroomImgs/libIl.jpg" },
+  { id: "digital", image: "Nerd-amico.png", alt: "Learner using a laptop", path: "classroomImgs/Nerd-amico.png" },
 ];
 
 const inputClassName = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100";
+
+const generateJoinCode = (classroomName: string) => {
+  const namePrefix = classroomName
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 4)
+    .padEnd(4, "CLASS");
+  const randomSuffix = crypto.getRandomValues(new Uint32Array(1))[0]
+    .toString(36)
+    .toUpperCase()
+    .slice(-4)
+    .padStart(4, "0");
+
+  return `${namePrefix}-${randomSuffix}`;
+};
 
 type ClassroomFormValues = {
   name: string;
@@ -41,6 +60,8 @@ type ClassroomFormProps = {
 };
 
 function ClassroomForm({ idPrefix }: ClassroomFormProps) {
+  const { session } = useAuth();
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -57,13 +78,41 @@ function ClassroomForm({ idPrefix }: ClassroomFormProps) {
       inviteOnly: true,
     },
   });
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedCover = watch("coverId");
   const isInviteOnly = watch("inviteOnly");
 
   const submitClassroom: SubmitHandler<ClassroomFormValues> = async (values) => {
-    // Replace this with the Supabase insert when classroom persistence is connected.
-    console.info("Create classroom", values);
+    if (!session?.user) {
+      setSubmitError("Your session has expired. Please sign in again.");
+      return;
+    }
+
+    setSubmitError(null);
+    const selectedCoverOption = coverOptions.find((cover) => cover.id === values.coverId);
+    if (!selectedCoverOption) {
+      setSubmitError("Choose a classroom cover.");
+      return;
+    }
+
+    const { error } = await supabase.from("classrooms").insert({
+      teacher_id: session.user.id,
+      classroom_name: values.name.trim(),
+      description: values.description.trim(),
+      proficiency_level: values.proficiencyLevel,
+      language: values.language,
+      cover_image_path: selectedCoverOption.path,
+      invite_only: values.inviteOnly,
+      join_code: generateJoinCode(values.name),
+    });
+
+    if (error) {
+      setSubmitError(error.message);
+      return;
+    }
+
+    navigate("/TeacherClassroom");
   };
 
   return (
@@ -139,6 +188,7 @@ function ClassroomForm({ idPrefix }: ClassroomFormProps) {
         </button>
       </div>
 
+      {submitError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
       <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
         <Link to="/TeacherClassroom" className="rounded-lg px-4 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Cancel</Link>
         <button type="submit" disabled={isSubmitting} className="flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300">
@@ -191,13 +241,13 @@ function ClassroomForm({ idPrefix }: ClassroomFormProps) {
             <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
-          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
+          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3">
             <div className="flex items-center gap-3"><Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><ArrowLeft size={19} /></Link><div><p className="text-xs font-medium text-violet-700">Teacher Portal</p><h1 className="mt-1 text-xl font-bold">Create a classroom</h1></div></div>
-            <div className="flex items-center gap-4"><button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-700 font-bold text-white">T</div><div><p className="text-sm font-semibold">Teacher Siya</p><p className="text-xs text-slate-400">Teacher</p></div></div></div>
+            <div className="flex items-center gap-4"><button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button><UserIdentity /></div>
           </header>
 
           <div className="mx-auto w-full max-w-5xl p-5">
