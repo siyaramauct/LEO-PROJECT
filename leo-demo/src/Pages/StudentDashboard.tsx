@@ -21,13 +21,12 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
-  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
   const studentName = studentProfile?.name ?? fallbackName;
 
   useEffect(() => {
     if (!session?.user) {
-      setIsProfileLoading(false);
       return;
     }
 

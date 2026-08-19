@@ -17,13 +17,12 @@ export default function QuickQuiz() {
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({});
   const [index, setIndex] = useState(0);
   const [startedAt] = useState(() => new Date().toISOString());
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => Boolean(lessonId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!lessonId) {
-      setIsLoading(false);
       return;
     }
     const loadQuiz = async () => {
