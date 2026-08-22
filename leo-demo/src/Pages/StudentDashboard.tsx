@@ -7,6 +7,16 @@ import { supabase } from "../supabase-client";
 
 type StudentProfile = { name: string | null; surname: string | null };
 
+type Classroom = {
+  classroom_id: string;
+  classroom_name: string;
+  description: string | null;
+  cover_image_path: string | null;
+  created_date: Date | null;
+  lesson_count?: number | null;
+  join_code?: string | null;
+};
+
 const classrooms = [
   { name: "English for Everyday Life", teacher: "Teacher Siya", progress: "72%", detail: "8 of 12 lessons done", image: "/kidsSmilingLanguage.jpg" },
   { name: "Reading and Vocabulary", teacher: "Teacher Arka", progress: "58%", detail: "7 of 14 lessons done", image: "/fetchbook.jpg" },
@@ -22,6 +32,7 @@ export default function StudentDashboard() {
   const { session } = useAuth();
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
+  const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
   const studentName = studentProfile?.name ?? fallbackName;
 
@@ -39,6 +50,26 @@ export default function StudentDashboard() {
     void loadProfile();
   }, [session?.user]);
 
+  useEffect(() => {
+    if (!session?.user) {
+      return;
+    }
+    const loadClassroom = async () => {
+      const { data } = await supabase.from("classroom_students").select("classroom_id").eq("student_id", session.user.id).maybeSingle();
+      if (data?.classroom_id) {
+        const { data: classroomData } = await supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path, created_date").eq("classroom_id", data.classroom_id).maybeSingle();
+        if (classroomData) {
+            const coverImageUrl = supabase.storage.from("images").getPublicUrl(classroomData.cover_image_path).data.publicUrl;
+            setStudentClassroom({ ...classroomData, cover_image_path: coverImageUrl });
+        }
+        else {
+          throw new Error("Classroom not found");
+        }
+      }
+    };
+    loadClassroom();
+  }, [session?.user]);
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
@@ -49,7 +80,7 @@ export default function StudentDashboard() {
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" /><img src="/corporateStyleLessonIlustration.avif" alt="Student learning" className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" /><div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">Biology: Cell Structure</h2><p className="mt-2 text-sm text-violet-100">Review 10 key words, then complete the quiz.</p><button type="button" onClick={() => navigate("/lesson/1")} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open lesson <ChevronRight size={16} /></button></div></article>
+            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" /><img src={studentClassroom?.cover_image_path ?? undefined} alt="Student learning" className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" /><div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom?.classroom_name}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom?.description}</p><button type="button" onClick={() => navigate(`/student/classrooms`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open Classroom <ChevronRight size={16} /></button></div></article>
             <article className="rounded-xl border border-slate-100 bg-white p-5"><h2 className="text-sm font-bold">Learning overview</h2><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">4 / 7</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">5 days</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[57%] rounded-full bg-violet-700" /></div><p className="mt-2 text-xs text-slate-500">57% of this week’s goal completed</p></article>
           </section>
 
