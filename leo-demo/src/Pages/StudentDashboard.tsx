@@ -59,7 +59,7 @@ export default function StudentDashboard() {
       if (data?.classroom_id) {
         const { data: classroomData } = await supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path, created_date").eq("classroom_id", data.classroom_id).maybeSingle();
         if (classroomData) {
-            const coverImageUrl = supabase.storage.from("images").getPublicUrl(classroomData.cover_image_path).data.publicUrl;
+            const coverImageUrl =  supabase.storage.from("images").getPublicUrl(classroomData.cover_image_path).data.publicUrl;
             setStudentClassroom({ ...classroomData, cover_image_path: coverImageUrl });
         }
         else {
