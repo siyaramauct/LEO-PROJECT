@@ -2,6 +2,7 @@ import {
   BookOpenIcon,
   HomeIcon,
   ArrowLeftOnRectangleIcon,
+  SparklesIcon,
   PlusIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline"
@@ -12,12 +13,13 @@ const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
 ]
 
 const mobileStartItems = desktopNavItems.slice(0, 2)
 const mobileEndItems = [
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
-  { label: "Quiz", path: "/quiz", icon: BookOpenIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
 ]
 
 export default function StudentBottomNav() {

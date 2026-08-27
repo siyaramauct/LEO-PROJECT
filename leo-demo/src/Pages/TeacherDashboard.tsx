@@ -27,14 +27,18 @@ type ActiveClassroom = {
   name: string;
   image: string;
   imageAlt: string;
+  studentCount: number; // calculated from classroom_students table
+  lessonCount: number; // calculated from lessons table
 };
 
 type Lesson = {
   lesson_id: string;
   classroom_id: string;
+  classroomName: string; // pulled from the related classroom row
   title: string;
   description: string;
   lesson_image_path: string;
+  wordCount: number; // count of matching rows in the flashcards table
   created_at: Date;
   imageAlt: string;
 };
@@ -70,14 +74,62 @@ export default function TeacherDashboard() {
         return;
       }
 
+      // Grab just the ids so we can look up students/lessons for these
+      // specific classrooms in the two queries below.
+      const classroomIds = data.map((c) => c.classroom_id);
+
+      // Count students per classroom: fetch every enrollment row for
+      // these classrooms (just the columns we need), then tally how many
+      // times each classroom_id shows up. That tally IS the student count.
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("classroom_students")
+        .select("classroom_id, student_id")
+        .in("classroom_id", classroomIds);
+
+      if (enrollmentsError) {
+        console.error("Failed to load classroom enrollments:", enrollmentsError);
+      }
+
+      // Count lessons per classroom the exact same simple way — fetch
+      // every lesson's classroom_id for these classrooms, then tally.
+      const { data: classroomLessons, error: classroomLessonsError } = await supabase
+        .from("lessons")
+        .select("lesson_id, classroom_id")
+        .in("classroom_id", classroomIds);
+
+      if (classroomLessonsError) {
+        console.error("Failed to load lesson counts:", classroomLessonsError);
+      }
+
+      // Turn a flat list like [{classroom_id:"a"},{classroom_id:"a"},{classroom_id:"b"}]
+      // into a simple lookup: { a: 2, b: 1 }
+      const studentCountByClassroom: Record<string, number> = {};
+      (enrollments ?? []).forEach((row) => {
+        studentCountByClassroom[row.classroom_id] =
+          (studentCountByClassroom[row.classroom_id] ?? 0) + 1;
+      });
+
+      const lessonCountByClassroom: Record<string, number> = {};
+      (classroomLessons ?? []).forEach((row) => {
+        lessonCountByClassroom[row.classroom_id] =
+          (lessonCountByClassroom[row.classroom_id] ?? 0) + 1;
+      });
+
       setClassrooms(
         data.map((classroom) => ({
           id: classroom.classroom_id,
           name: classroom.classroom_name,
-          image: supabase.storage
-            .from("images")
-            .getPublicUrl(classroom.cover_image_path).data.publicUrl,
+          // Guard: only call getPublicUrl if a path actually exists.
+          // Same issue as lessons — an unguarded call crashes on a
+          // missing/null cover_image_path and kills the whole list.
+          image: classroom.cover_image_path
+            ? supabase.storage
+                .from("images")
+                .getPublicUrl(classroom.cover_image_path).data.publicUrl
+            : "/classRoomIllustration.png",
           imageAlt: `${classroom.classroom_name} classroom cover`,
+          studentCount: studentCountByClassroom[classroom.classroom_id] ?? 0,
+          lessonCount: lessonCountByClassroom[classroom.classroom_id] ?? 0,
         }))
       );
     };
@@ -114,9 +166,12 @@ export default function TeacherDashboard() {
 
       // Step 3: fetch just a few recent lessons to preview on the dashboard.
       // We don't need every lesson here, only the most recent ones.
+      // The "classrooms(classroom_name)" part asks Supabase to also pull
+      // in the related classroom's name, using the classroom_id foreign
+      // key — this saves us a second manual lookup.
       const { data: recentLessons, error: lessonsError } = await supabase
         .from("lessons")
-        .select("*")
+        .select("*, classrooms(classroom_name)")
         .in("classroom_id", classroomIds)
         .order("created_at", { ascending: false })
         .limit(4); // only show 4 lessons in the dashboard preview
@@ -126,16 +181,39 @@ export default function TeacherDashboard() {
         return;
       }
 
+      // Step 3b: count words per lesson using the flashcards table — each
+      // flashcard row is one word, so counting rows per lesson_id gives us
+      // the word count for that lesson.
+      const lessonIds = recentLessons.map((lesson) => lesson.lesson_id);
+
+      const { data: flashcards, error: flashcardsError } = await supabase
+        .from("flashcards")
+        .select("flashcard_id, lesson_id")
+        .in("lesson_id", lessonIds);
+
+      if (flashcardsError) {
+        console.error("Failed to load flashcards for word count:", flashcardsError);
+      }
+
+      // Same simple tally trick as the student/lesson counts above:
+      // turn a flat list of rows into { lessonId: count }
+      const wordCountByLesson: Record<string, number> = {};
+      (flashcards ?? []).forEach((row) => {
+        wordCountByLesson[row.lesson_id] =
+          (wordCountByLesson[row.lesson_id] ?? 0) + 1;
+      });
+
       setLessons(
         recentLessons.map((lesson) => ({
           lesson_id: lesson.lesson_id,
           classroom_id: lesson.classroom_id,
+          // The embedded classrooms(...) select above gives us this as
+          // lesson.classrooms.classroom_name — fall back if it's missing.
+          classroomName: lesson.classrooms?.classroom_name ?? "Unknown classroom",
           title: lesson.title,
           description: lesson.description,
-          // Guard: only call getPublicUrl if a path actually exists.
-          // Without this, a lesson with a missing/null cover_image_path
-          // crashes getPublicUrl() and silently kills the whole list.
           lesson_image_path: supabase.storage .from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl,
+          wordCount: wordCountByLesson[lesson.lesson_id] ?? 0,
           imageAlt: `${lesson.title} lesson cover`,
           created_at: lesson.created_at,
         }))
@@ -208,7 +286,11 @@ export default function TeacherDashboard() {
                   <h2 className="truncate text-lg font-bold">
                     {classrooms?.[0]?.name ?? "No classroom yet"}
                   </h2>
-                  <p className="mt-1 text-xs text-violet-100"> </p>
+                  <p className="mt-1 text-xs text-violet-100">
+                    {classrooms?.[0]
+                      ? `${classrooms[0].studentCount} students · ${classrooms[0].lessonCount} lessons`
+                      : "Create your first classroom to get started"}
+                  </p>
                 </div>
 
                 <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
@@ -355,6 +437,9 @@ export default function TeacherDashboard() {
                     <p className="truncate text-[10px] font-bold">
                       {item.name}
                     </p>
+                    <p className="mt-0.5 truncate text-[9px] text-slate-500">
+                      {item.studentCount} students · {item.lessonCount} lessons
+                    </p>
                   </div>
                 </Link>
               ))}
@@ -398,7 +483,7 @@ export default function TeacherDashboard() {
                       {lesson.title}
                     </p>
                     <p className="mt-0.5 truncate text-[9px] text-slate-500">
-                      {lesson.description}
+                      {lesson.classroomName} · {lesson.wordCount} words
                     </p>
                   </div>
                 </Link>
@@ -491,9 +576,9 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Main Grid */}
-            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-3">
+            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] xl:items-stretch">
               {/* Classes */}
-              <section className="rounded-xl border border-slate-100 bg-white p-3 xl:col-span-2">
+              <section className="rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-bold">My Classes</h3>
@@ -533,6 +618,9 @@ export default function TeacherDashboard() {
 
                         <div className="ml-2 flex-1">
                           <h4 className="text-sm font-bold">{item.name}</h4>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {item.studentCount} students · {item.lessonCount} lessons
+                          </p>
                         </div>
 
                         <button className="rounded-lg p-2 hover:bg-slate-50">
@@ -545,21 +633,21 @@ export default function TeacherDashboard() {
               </section>
 
               {/* Create Lesson */}
-              <section className="rounded-xl bg-violet-700 p-3 text-white">
+              <section className="flex min-h-52 flex-col rounded-xl bg-violet-700 p-5 text-white xl:min-h-0">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
                   <Plus size={25} />
                 </div>
 
-                <h3 className="mt-3 text-base font-bold">Create a new lesson</h3>
+                <h3 className="mt-4 text-lg font-bold">Create a new lesson</h3>
 
-                <p className="mt-2 text-xs leading-5 text-violet-100">
+                <p className="mt-2 text-sm leading-6 text-violet-100">
                   Add vocabulary words, generate a quiz, and share the lesson
                   with your classroom.
                 </p>
 
                 <Link
                   to="/create-lesson"
-                  className="mt-3 block w-full rounded-lg bg-white py-2 text-center text-xs font-bold text-violet-700 transition hover:bg-violet-50"
+                  className="mt-auto block w-full rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-violet-700 transition hover:bg-violet-50"
                 >
                   Create Lesson
                 </Link>
@@ -604,7 +692,7 @@ export default function TeacherDashboard() {
                       <div className="ml-2 min-w-0 flex-1">
                         <h4 className="truncate text-sm font-bold">{lesson.title}</h4>
                         <p className="mt-1 truncate text-xs text-slate-500">
-                          {lesson.description}
+                          {lesson.classroomName} · {lesson.wordCount} words
                         </p>
                       </div>
 
