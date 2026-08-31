@@ -50,6 +50,17 @@ type LessonRow = {
   word_count: number | null;
 };
 
+type ResourceRow = {
+  resource_id: string;
+  title: string;
+  resource_type: "pdf" | "link";
+  resource_url: string;
+  storage_path: string | null;
+  created_at: string | null;
+};
+
+const RESOURCE_BUCKET = "learning-resources";
+
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   title: row.title,
   image: row.lesson_image_path
@@ -60,6 +71,21 @@ const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   words: row.word_count ?? 0,
   completion: 0,
 });
+
+const toMaterialDisplay = (row: ResourceRow): ClassroomMaterial => ({
+  id: row.resource_id,
+  title: row.title,
+  kind: row.resource_type === "link" ? "Link" : "Document",
+  detail: `${row.resource_type === "link" ? "External link" : "PDF"} · ${row.created_at ? new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short" }).format(new Date(row.created_at)) : "Added recently"}`,
+  url: row.resource_url,
+});
+
+const normaliseUrl = (url: string) => url.includes("://") ? url : `https://${url}`;
+
+const getPdfStoragePath = (classroomId: string, file: File) => {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  return `${classroomId}/${Date.now()}-${safeName}`;
+};
 
 export default function ClassroomDetail() {
   const { session } = useAuth();
@@ -76,6 +102,8 @@ export default function ClassroomDetail() {
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [isSavingMaterial, setIsSavingMaterial] = useState(false);
+  const [materialError, setMaterialError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -86,10 +114,11 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult] = await Promise.all([
+      const [classroomResult, lessonsResult, enrollmentResult, materialsResult] = await Promise.all([
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
+        supabase.from("classroom_resources").select("resource_id, title, resource_type, resource_url, storage_path, created_at").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
       ]);
 
       if (classroomResult.error) {
@@ -103,6 +132,13 @@ export default function ClassroomDetail() {
 
       if (!lessonsResult.error && lessonsResult.data) {
         setLessons((lessonsResult.data as LessonRow[]).map(toLessonDisplay));
+      }
+
+      if (materialsResult.error) {
+        console.error("Failed to load classroom resources:", materialsResult.error);
+        setMaterialError(`Could not load resources: ${materialsResult.error.message}`);
+      } else {
+        setMaterials(((materialsResult.data ?? []) as ResourceRow[]).map(toMaterialDisplay));
       }
 
       if (enrollmentResult.error) {
@@ -186,19 +222,69 @@ export default function ClassroomDetail() {
     setSelectedStudent(null);
   }
 
-  const addFile = (file: File) => {
-    setMaterials((prev) => [
-      { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
-      ...prev,
-    ]);
+  const addFile = async (file: File) => {
+    if (!classroomId || !teacherId) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setMaterialError("Only PDF files can be uploaded as learning resources.");
+      return;
+    }
+
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+
+    try {
+      const storagePath = getPdfStoragePath(classroomId, file);
+      const { error: uploadError } = await supabase.storage.from(RESOURCE_BUCKET).upload(storagePath, file, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+
+      if (uploadError) throw uploadError;
+
+      const publicUrl = supabase.storage.from(RESOURCE_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+      const { data, error } = await supabase.from("classroom_resources").insert({
+        classroom_id: classroomId,
+        title: file.name,
+        resource_type: "pdf",
+        resource_url: publicUrl,
+        storage_path: storagePath,
+        created_by: teacherId,
+      }).select("resource_id, title, resource_type, resource_url, storage_path, created_at").single();
+
+      if (error) throw error;
+      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
+    } catch (error) {
+      setMaterialError(error instanceof Error ? error.message : "The PDF could not be uploaded.");
+    } finally {
+      setIsSavingMaterial(false);
+    }
   };
 
-  const addLink = (url: string) => {
-    const linkTitle = new URL(url.includes("://") ? url : `https://${url}`).hostname;
-    setMaterials((prev) => [
-      { id: `${url}-${Date.now()}`, title: linkTitle, kind: "Link", detail: "External link · Added just now" },
-      ...prev,
-    ]);
+  const addLink = async (url: string) => {
+    if (!classroomId || !teacherId) return;
+
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+
+    try {
+      const resourceUrl = normaliseUrl(url);
+      const linkTitle = new URL(resourceUrl).hostname;
+      const { data, error } = await supabase.from("classroom_resources").insert({
+        classroom_id: classroomId,
+        title: linkTitle,
+        resource_type: "link",
+        resource_url: resourceUrl,
+        storage_path: null,
+        created_by: teacherId,
+      }).select("resource_id, title, resource_type, resource_url, storage_path, created_at").single();
+
+      if (error) throw error;
+      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
+    } catch (error) {
+      setMaterialError(error instanceof Error ? error.message : "The link could not be added.");
+    } finally {
+      setIsSavingMaterial(false);
+    }
   };
 
   const coverUrl = classroom?.cover_image_path
@@ -256,7 +342,7 @@ export default function ClassroomDetail() {
           </section>
 
           <div className="mt-3">
-            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
             {materials.length === 0 && <EmptyMaterials />}
           </div>
 
@@ -334,7 +420,7 @@ export default function ClassroomDetail() {
             </section>
 
             <div className="mt-4">
-              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
               {materials.length === 0 && <EmptyMaterials />}
             </div>
 
