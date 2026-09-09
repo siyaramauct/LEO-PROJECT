@@ -2,11 +2,7 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
-  BookOpen,
-  ClipboardList,
   Home,
-  Layers,
-  LogOut,
   Plus,
   Settings,
   Sparkles,
@@ -56,12 +52,9 @@ import UserIdentity from "../Components/UserIdentity";
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
             <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
-            <SidebarItem icon={<Layers size={18} />} label="Flashcards" />
-            <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
-          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
+          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">

@@ -1,9 +1,7 @@
 import {
   Bell,
-  BookOpen,
   BarChart3,
   Home,
-  LogOut,
   Settings,
   User,
   Users,
@@ -14,11 +12,13 @@ import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
 import TeacherProfileContent from "../Components/TeacherProfileContent";
 import { useAuth } from "../../context/AuthContext.tsx";
+import { supabase } from "../supabase-client";
 
 export default function TeacherProfile() {
-  const { profile, logout } = useAuth();
+  const { session, profile, logout } = useAuth();
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -27,6 +27,21 @@ export default function TeacherProfile() {
       navigate("/login", { replace: true });
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!session?.user) return;
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.from("profiles").delete().eq("id", session.user.id);
+      if (error) throw error;
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Failed to delete account:", error);
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -48,7 +63,7 @@ export default function TeacherProfile() {
         </header>
 
         <main className="flex-1 bg-slate-50 px-4 py-6 sm:px-6">
-          <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} />
+          <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} />
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-10 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
@@ -66,19 +81,17 @@ export default function TeacherProfile() {
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
             <SidebarItem icon={<User size={18} />} label="Profile" to="/teacher-profile" active />
           </nav>
           <div className="mt-auto space-y-2">
             <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-            <SidebarItem icon={<LogOut size={18} />} label={loggingOut ? "Logging out..." : "Logout"} onClick={() => void handleLogout()} />
           </div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="border-b border-slate-100 bg-white px-6 py-5"><h2 className="text-xl font-bold">Profile</h2><p className="mt-1 text-sm text-slate-500">Manage your teacher account and preferences.</p></header>
-          <div className="mx-auto w-full max-w-5xl p-6"><TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} /></div>
+          <div className="mx-auto w-full max-w-5xl p-6"><TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} /></div>
         </main>
       </div>
     </div>

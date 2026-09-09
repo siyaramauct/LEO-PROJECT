@@ -1,8 +1,6 @@
 
 import {
   Bell,
-  BookOpen,
-  ClipboardList,
   Plus,
   Search,
   Sparkles,
@@ -11,7 +9,6 @@ import {
   BarChart3,
   User,
   Settings,
-  LogOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -281,25 +278,6 @@ export default function TeacherClassrooms() {
             />
 
             <SidebarItem
-              icon={<BookOpen size={18} />}
-              label="Lessons"
-              to="/lessons"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<ClipboardList size={18} />}
-              label="Flashcards"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<ClipboardList size={18} />}
-              label="Quizzes"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
               icon={<BarChart3 size={18} />}
               label="Reports"
               to="/class-progress"
@@ -315,12 +293,6 @@ export default function TeacherClassrooms() {
               icon={<Settings size={18} />}
               label="Settings"
               to="/teacher-profile"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<LogOut size={18} />}
-              label="Logout"
               inactiveClassName="text-white hover:bg-white/10"
             />
 

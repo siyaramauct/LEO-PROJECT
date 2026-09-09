@@ -16,11 +16,14 @@ type Classroom = {
 };
 
 const DASHBOARD_CLASSROOM_LIMIT = 2;
+const RECENTLY_ADDED_LIMIT = 4;
 
-const recentLessons = [
-  { title: "Environmental Science", detail: "15 words · 20 min", progress: "60%", image: "/business-illustration.avif" },
-  { title: "Academic Vocabulary", detail: "12 words · 10 min", progress: "90%", image: "/girlTypingLANG.png" },
-];
+type RecentlyAddedLesson = {
+  lesson_id: string;
+  title: string;
+  classroomName: string;
+  lesson_image_path: string | null;
+};
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ export default function StudentDashboard() {
   const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [classroomError, setClassroomError] = useState<string | null>(null);
+  const [recentlyAddedLessons, setRecentlyAddedLessons] = useState<RecentlyAddedLesson[]>([]);
+  const [recentlyAddedError, setRecentlyAddedError] = useState<string | null>(null);
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
   const studentName = studentProfile?.name ?? fallbackName;
 
@@ -107,6 +112,62 @@ export default function StudentDashboard() {
     return () => { isCurrent = false; };
   }, [session?.user]);
 
+  useEffect(() => {
+    if (!session?.user) return;
+
+    let isCurrent = true;
+
+    const loadRecentlyAdded = async () => {
+      setRecentlyAddedError(null);
+      const { data: enrolments, error: enrolmentError } = await supabase
+        .from("classroom_students")
+        .select("classroom_id")
+        .eq("student_id", session.user.id);
+
+      if (enrolmentError) {
+        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        return;
+      }
+
+      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
+      if (!classroomIds.length) {
+        if (isCurrent) setRecentlyAddedLessons([]);
+        return;
+      }
+
+      const { data: lessonData, error: lessonsError } = await supabase
+        .from("lessons")
+        .select("lesson_id, title, lesson_image_path, classrooms(classroom_name)")
+        .in("classroom_id", classroomIds)
+        .order("created_at", { ascending: false })
+        .limit(RECENTLY_ADDED_LIMIT);
+
+      if (lessonsError) {
+        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        return;
+      }
+
+      if (isCurrent) {
+        setRecentlyAddedLessons(
+          (lessonData ?? []).map((lesson) => {
+            const classroom = Array.isArray(lesson.classrooms) ? lesson.classrooms[0] : lesson.classrooms;
+            return {
+              lesson_id: lesson.lesson_id,
+              title: lesson.title,
+              classroomName: classroom?.classroom_name ?? "Classroom",
+              lesson_image_path: lesson.lesson_image_path
+                ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
+                : null,
+            };
+          })
+        );
+      }
+    };
+
+    void loadRecentlyAdded();
+    return () => { isCurrent = false; };
+  }, [session?.user]);
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
@@ -144,7 +205,7 @@ export default function StudentDashboard() {
             </button>
           </section>
 
-          <section className="mt-5 grid gap-4 lg:grid-cols-2"><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">My classrooms</h2><p className="mt-1 text-sm text-slate-500">Your {DASHBOARD_CLASSROOM_LIMIT} most recent enrolments.</p></div><button type="button" onClick={() => navigate("/student/classrooms")} className="text-sm font-semibold text-violet-700">View all</button></div>{classroomError ? <p role="alert" className="mt-4 text-sm text-red-700">{classroomError}</p> : classrooms.length === 0 ? <p className="mt-4 text-sm text-slate-500">You have not been enrolled in a classroom yet.</p> : <div className="mt-4 space-y-2">{classrooms.map((classroom) => <button key={classroom.classroom_id} type="button" onClick={() => navigate("/student/classrooms")} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50">{classroom.cover_image_path ? <img src={classroom.cover_image_path} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /> : <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{classroom.classroom_name}</span><span className="mt-1 block truncate text-xs text-slate-500">{classroom.description ?? "Classroom"}</span></span><ChevronRight size={16} className="text-slate-400" /></button>)}</div>}</article><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">Recent lessons</h2><p className="mt-1 text-sm text-slate-500">Pick up a recent learning activity.</p></div><button type="button" onClick={() => navigate("/lessons")} className="text-sm font-semibold text-violet-700">View all</button></div><div className="mt-4 space-y-2">{recentLessons.map((lesson) => <button key={lesson.title} type="button" onClick={() => navigate("/lessons")} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50"><img src={lesson.image} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{lesson.title}</span><span className="mt-1 block text-xs text-slate-500">{lesson.detail}</span></span><span className="text-xs font-semibold text-violet-700">{lesson.progress}</span><ChevronRight size={16} className="text-slate-400" /></button>)}</div></article></section>
+          <section className="mt-5 grid gap-4 lg:grid-cols-2"><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">My classrooms</h2><p className="mt-1 text-sm text-slate-500">Your {DASHBOARD_CLASSROOM_LIMIT} most recent enrolments.</p></div><button type="button" onClick={() => navigate("/student/classrooms")} className="text-sm font-semibold text-violet-700">View all</button></div>{classroomError ? <p role="alert" className="mt-4 text-sm text-red-700">{classroomError}</p> : classrooms.length === 0 ? <p className="mt-4 text-sm text-slate-500">You have not been enrolled in a classroom yet.</p> : <div className="mt-4 space-y-2">{classrooms.map((classroom) => <button key={classroom.classroom_id} type="button" onClick={() => navigate("/student/classrooms")} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50">{classroom.cover_image_path ? <img src={classroom.cover_image_path} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /> : <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{classroom.classroom_name}</span><span className="mt-1 block truncate text-xs text-slate-500">{classroom.description ?? "Classroom"}</span></span><ChevronRight size={16} className="text-slate-400" /></button>)}</div>}</article><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">Recently added</h2><p className="mt-1 text-sm text-slate-500">Newest lessons added to your classrooms.</p></div><button type="button" onClick={() => navigate("/lessons")} className="text-sm font-semibold text-violet-700">View all</button></div>{recentlyAddedError ? <p role="alert" className="mt-4 text-sm text-red-700">{recentlyAddedError}</p> : recentlyAddedLessons.length === 0 ? <p className="mt-4 text-sm text-slate-500">No lessons have been added to your classrooms yet.</p> : <div className="mt-4 space-y-2">{recentlyAddedLessons.map((lesson) => <button key={lesson.lesson_id} type="button" onClick={() => navigate(`/lessons/${lesson.lesson_id}`)} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50">{lesson.lesson_image_path ? <img src={lesson.lesson_image_path} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /> : <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{lesson.title}</span><span className="mt-1 block truncate text-xs text-slate-500">{lesson.classroomName}</span></span><ChevronRight size={16} className="text-slate-400" /></button>)}</div>}</article></section>
         </div>
       </main>
     </div>

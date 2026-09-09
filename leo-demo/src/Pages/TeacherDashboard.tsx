@@ -7,14 +7,13 @@ import {
   ChevronRight,
   ClipboardCheck,
   Home,
-  Layers,
   User,
   Settings,
   LogOut,
   MoreHorizontal,
   Sparkles,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
@@ -44,13 +43,25 @@ type Lesson = {
 };
 
 export default function TeacherDashboard() {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   const { session } = useAuth();
   const teacher = profile;
   const avatar = profile?.name[0];
+  const navigate = useNavigate();
   const [classrooms, setClassrooms] = useState<ActiveClassroom[] | null>(null);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [lessonCount, setLessonCount] = useState<number>(0);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   useEffect(() => {
     if (!session?.user) return;
@@ -525,15 +536,11 @@ export default function TeacherDashboard() {
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" active />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
             <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
-            <SidebarItem icon={<Layers size={18} />} label="Flashcards" />
-            <SidebarItem icon={<ClipboardCheck size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
 
           <div className="mt-auto space-y-2">
             <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-            <SidebarItem icon={<LogOut size={18} />} label="Logout" />
           </div>
         </aside>
 
@@ -551,6 +558,17 @@ export default function TeacherDashboard() {
             <div className="flex shrink-0 items-center gap-4 self-end sm:self-auto">
               <button className="rounded-xl p-2 hover:bg-slate-100">
                 <Bell size={19} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                disabled={loggingOut}
+                aria-label={loggingOut ? "Logging out" : "Log out"}
+                title="Log out"
+                className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <LogOut size={19} />
               </button>
 
               <div className="flex min-w-0 items-center gap-3">
