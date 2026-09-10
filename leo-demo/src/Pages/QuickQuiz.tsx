@@ -64,6 +64,15 @@ export default function QuickQuiz() {
       setError(attemptError.message);
       return;
     }
+    // Record today's learning activity for the streak. Best-effort: a failure here
+    // must never block the student from seeing their quiz result.
+    const { error: activityError } = await supabase
+      .from("student_activity")
+      .upsert(
+        { student_id: session.user.id, source: "lesson_quiz" },
+        { onConflict: "student_id,activity_date", ignoreDuplicates: true },
+      );
+    if (activityError) console.error("Could not record learning activity:", activityError);
     sessionStorage.setItem("quiz-result", JSON.stringify({ score, totalQuestions: scoreCeiling, correct: correctCount, incorrect: questions.length - correctCount, results: questions.map((item) => ({ questionId: item.question_id, question: item.question_text, studentAnswer: answers[item.question_id] ?? "Not answered", correctAnswer: item[`option_${item.correct_option.toLowerCase()}` as "option_a" | "option_b" | "option_c" | "option_d"], isCorrect: answers[item.question_id] === item.correct_option })) }));
     navigate("/summary");
   }
