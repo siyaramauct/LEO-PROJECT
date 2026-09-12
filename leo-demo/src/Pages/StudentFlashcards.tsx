@@ -18,6 +18,14 @@ export default function StudentFlashcards() {
   const navigate = useNavigate()
   const [flipped, setFlipped] = useState(false)
 
+  const speak = (text: string) => {
+    window.speechSynthesis.cancel()
+
+    const speech = new SpeechSynthesisUtterance(text)
+
+    window.speechSynthesis.speak(speech)
+  }
+
   return (
     <main className="min-h-dvh w-full overflow-x-hidden bg-slate-50 pb-24 text-slate-950 md:pb-10 md:pl-56">
       <section className="flex w-full flex-col px-4 pt-5 min-[380px]:px-5 sm:px-6 md:px-8 md:pt-8 lg:mx-auto lg:max-w-5xl xl:max-w-6xl">
@@ -76,8 +84,11 @@ export default function StudentFlashcards() {
                   </h2>
                   <button
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-700 transition active:scale-95"
-                    aria-label="Play pronunciation"
-                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`Read ${currentCard.word} aloud`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      speak(currentCard.word)
+                    }}
                   >
                     <SpeakerWaveIcon className="h-5 w-5" />
                   </button>
