@@ -7,10 +7,17 @@ import { supabase } from "../supabase-client";
 import ClassroomFormField from "./ClassroomFormField";
 
 const coverOptions = [
-  { id: "everyday", image: "/fetchbook.jpg", alt: "Learner studying from a book", path: "classroomImgs/fetchbook.jpg" },
-  { id: "reading", image: "libIl.jpg", alt: "Library illustration", path: "classroomImgs/libIl.jpg" },
-  { id: "digital", image: "Nerd-amico.png", alt: "Learner using a laptop", path: "classroomImgs/Nerd-amico.png" },
-];
+  { id: "everyday", alt: "Learner studying from a book", path: "classroomImgs/fetchbook.jpg" },
+  { id: "reading", alt: "Library illustration", path: "classroomImgs/libIl.jpg" },
+  { id: "digital", alt: "Learner using a laptop", path: "classroomImgs/Nerd-amico.png" },
+  { id: "desktop-windows", alt: "People working across desktop windows", path: "classroomImgs/desktopwindowspeople.avif" },
+  { id: "dinosaur", alt: "Dinosaur classroom illustration", path: "classroomImgs/dinosaurpeople.png" },
+  { id: "kid-letters", alt: "Kids drawing letters", path: "classroomImgs/kidletterdrawings.jpg" },
+  { id: "guy-patch", alt: "Guy patched into a classroom", path: "classroomImgs/guypatchclassroom.avif" },
+].map((cover) => ({
+  ...cover,
+  image: supabase.storage.from("images").getPublicUrl(cover.path).data.publicUrl,
+}));
 
 const inputClassName = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100";
 

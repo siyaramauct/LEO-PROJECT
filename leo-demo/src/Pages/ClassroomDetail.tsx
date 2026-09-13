@@ -16,6 +16,7 @@ import ClassroomLessonRow, { type ClassroomLesson } from "../Components/Classroo
 import ClassroomMaterialsPanel, {
   type ClassroomMaterial,
 } from "../Components/ClassroomMaterialsPanel";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
@@ -38,7 +39,7 @@ type ClassroomRow = {
 };
 
 type LessonRow = {
-  id: string;
+  lesson_id: string;
   title: string;
   description: string | null;
   lesson_image_path: string | null;
@@ -47,6 +48,7 @@ type LessonRow = {
 };
 
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
+  id: row.lesson_id,
   title: row.title,
   image: row.lesson_image_path
     ? supabase.storage.from("images").getPublicUrl(row.lesson_image_path).data.publicUrl
@@ -74,6 +76,8 @@ export default function ClassroomDetail() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<ClassroomLesson | null>(null);
+  const [isDeletingLesson, setIsDeletingLesson] = useState(false);
 
   useEffect(() => {
     if (!classroomId || !teacherId) return;
@@ -182,6 +186,20 @@ export default function ClassroomDetail() {
     setSelectedStudent(null);
   }
 
+  async function deleteLesson() {
+    if (!lessonToDelete || isDeletingLesson) return;
+    setIsDeletingLesson(true);
+    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonToDelete.id);
+    setIsDeletingLesson(false);
+    if (error) {
+      console.error("Failed to delete lesson:", error);
+      window.alert("The lesson could not be deleted. Please try again.");
+      return;
+    }
+    setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonToDelete.id));
+    setLessonToDelete(null);
+  }
+
   const addFile = (file: File) => {
     setMaterials((prev) => [
       { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
@@ -273,7 +291,7 @@ export default function ClassroomDetail() {
             {lessons.length === 0 ? (
               <EmptyLessons />
             ) : (
-              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
+              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
             )}
           </section>
         </main>
@@ -289,7 +307,7 @@ export default function ClassroomDetail() {
 
       {/* Desktop */}
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-white">Teacher Portal</p></div>
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
@@ -343,12 +361,24 @@ export default function ClassroomDetail() {
               {lessons.length === 0 ? (
                 <EmptyLessons />
               ) : (
-                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
+                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
               )}
             </section>
+
           </div>
         </main>
       </div>
+
+      <DeleteAccountDialog
+        open={Boolean(lessonToDelete)}
+        isDeleting={isDeletingLesson}
+        onCancel={() => setLessonToDelete(null)}
+        onConfirm={() => void deleteLesson()}
+        title={`Delete ${lessonToDelete?.title ?? "this lesson"}?`}
+        description="This will permanently remove this lesson from the classroom. This action cannot be undone."
+        confirmLabel="Delete lesson"
+        deletingLabel="Deleting lesson..."
+      />
     </div>
   );
 }

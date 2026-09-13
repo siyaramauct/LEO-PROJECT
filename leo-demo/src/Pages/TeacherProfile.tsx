@@ -4,6 +4,7 @@ import {
   Home,
   Settings,
   User,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -76,22 +77,40 @@ export default function TeacherProfile() {
       </div>
 
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-violet-200">Teacher Portal</p></div>
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
+            <SidebarItem icon={<Sparkles size={18} />}
+              label="Explore"
+              to="/learning-hub"
+              inactiveClassName="text-white hover:bg-white/10"
+            />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
-            <SidebarItem icon={<User size={18} />} label="Profile" to="/teacher-profile" active />
+
           </nav>
           <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
+            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" active />
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          <header className="border-b border-slate-100 bg-white px-6 py-5"><h2 className="text-xl font-bold">Profile</h2><p className="mt-1 text-sm text-slate-500">Manage your teacher account and preferences.</p></header>
-          <div className="mx-auto w-full max-w-5xl p-6"><TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} /></div>
+        <main className="min-h-dvh min-w-0 flex-1 bg-slate-50">
+          <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium text-violet-700">Teacher portal</p>
+                <h1 className="mt-1 text-xl font-bold">Profile</h1>
+              </div>
+              <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
+                <Bell size={19} />
+              </button>
+            </div>
+          </header>
+
+          <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
+            <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} />
+          </div>
         </main>
       </div>
     </div>

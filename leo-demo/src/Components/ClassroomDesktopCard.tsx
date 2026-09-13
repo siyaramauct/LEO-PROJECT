@@ -1,17 +1,32 @@
-import { BookOpen, ChevronRight, MoreHorizontal, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BookOpen, ChevronRight, Trash2, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import type { Classroom } from "./ClassroomMobileCard";
 
 type ClassroomDesktopCardProps = {
   classroom: Classroom;
+  onDelete: (classroom: Classroom) => void;
 };
 
 export default function ClassroomDesktopCard({
   classroom,
+  onDelete,
 }: ClassroomDesktopCardProps) {
+  const navigate = useNavigate();
+
   return (
-    <div className="group rounded-xl border border-slate-100 bg-white p-3 transition hover:border-violet-200 hover:shadow-md">
-      <div className="flex items-start justify-between">
+    <article
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(`/teacher-classroom/${classroom.id}`)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          navigate(`/teacher-classroom/${classroom.id}`);
+        }
+      }}
+      className="group cursor-pointer rounded-xl border border-slate-100 bg-white p-3 transition hover:border-violet-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-200"
+    >
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 shadow-inner">
             <img
@@ -28,12 +43,17 @@ export default function ClassroomDesktopCard({
             </p>
           </div>
         </div>
-
         <button
-          aria-label={`More options for ${classroom.name}`}
-          className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+          type="button"
+          aria-label={`Delete ${classroom.name}`}
+          title="Delete classroom"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(classroom);
+          }}
+          className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50"
         >
-          <MoreHorizontal size={17} />
+          <Trash2 size={15} />
         </button>
       </div>
 
@@ -74,6 +94,6 @@ export default function ClassroomDesktopCard({
           <ChevronRight size={14} />
         </Link>
       </div>
-    </div>
+    </article>
   );
 }

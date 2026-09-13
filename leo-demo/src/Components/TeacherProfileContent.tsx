@@ -40,7 +40,7 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         </div>
       </section>
 
-      <section className="rounded-xl border border-rose-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <h3 className="font-bold text-rose-700">Danger zone</h3>
         <p className="mt-1 text-sm text-slate-500">Permanently delete your account and profile data.</p>
         <button
@@ -60,6 +60,10 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         isDeleting={deletingAccount}
         onCancel={() => setShowDeleteDialog(false)}
         onConfirm={() => void onDeleteAccount()}
+        title="Delete your account?"
+        description="This will permanently remove your account and profile data. This action cannot be undone."
+        confirmLabel="Delete account"
+        deletingLabel="Deleting..."
       />
     </div>
   );

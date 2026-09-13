@@ -62,6 +62,10 @@ export default function StudentProfileContent({ fullName, username, initials, lo
         isDeleting={deletingAccount}
         onCancel={() => setShowDeleteDialog(false)}
         onConfirm={() => void onDeleteAccount()}
+        title="Delete your account?"
+        description="This will permanently remove your account and profile data. This action cannot be undone."
+        confirmLabel="Delete account"
+        deletingLabel="Deleting..."
       />
     </div>
   );
