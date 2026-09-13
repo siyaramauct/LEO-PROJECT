@@ -1,14 +1,19 @@
-import { Bell, Languages, LockKeyhole, LogOut, User } from "lucide-react";
-import type { ReactNode } from "react";
+import { Bell, Languages, LockKeyhole, LogOut, Trash2, User } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import DeleteAccountDialog from "./DeleteAccountDialog";
 
 type TeacherProfileContentProps = {
   fullName: string;
   initials: string;
   loggingOut: boolean;
   onLogout: () => Promise<void>;
+  deletingAccount: boolean;
+  onDeleteAccount: () => Promise<void>;
 };
 
-export default function TeacherProfileContent({ fullName, initials, loggingOut, onLogout }: TeacherProfileContentProps) {
+export default function TeacherProfileContent({ fullName, initials, loggingOut, onLogout, deletingAccount, onDeleteAccount }: TeacherProfileContentProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   return (
     <div className="space-y-5">
       <section className="rounded-xl bg-violet-700 p-5 text-white shadow-lg shadow-violet-100 sm:p-6">
@@ -35,7 +40,31 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         </div>
       </section>
 
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="font-bold text-rose-700">Danger zone</h3>
+        <p className="mt-1 text-sm text-slate-500">Permanently delete your account and profile data.</p>
+        <button
+          type="button"
+          onClick={() => setShowDeleteDialog(true)}
+          className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+        >
+          <Trash2 size={18} />
+          Delete account
+        </button>
+      </section>
+
       <button type="button" onClick={() => void onLogout()} disabled={loggingOut} className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"><LogOut size={18} />{loggingOut ? "Logging out..." : "Log out"}</button>
+
+      <DeleteAccountDialog
+        open={showDeleteDialog}
+        isDeleting={deletingAccount}
+        onCancel={() => setShowDeleteDialog(false)}
+        onConfirm={() => void onDeleteAccount()}
+        title="Delete your account?"
+        description="This will permanently remove your account and profile data. This action cannot be undone."
+        confirmLabel="Delete account"
+        deletingLabel="Deleting..."
+      />
     </div>
   );
 }

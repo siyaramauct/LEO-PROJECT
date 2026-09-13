@@ -2,11 +2,7 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
-  BookOpen,
-  ClipboardList,
   Home,
-  Layers,
-  LogOut,
   Plus,
   Settings,
   Sparkles,
@@ -50,18 +46,15 @@ import UserIdentity from "../Components/UserIdentity";
       </div>
 
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-white">Teacher Portal</p></div>
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
             <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
-            <SidebarItem icon={<Layers size={18} />} label="Flashcards" />
-            <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
-          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
+          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
