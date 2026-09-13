@@ -29,12 +29,43 @@ import LoadingScreen from "./Components/LoadingScreen.tsx";
 import NotFound from "./Pages/NotFound.tsx";
 
 const router = createBrowserRouter([
+  { path: "/", element: <Home /> },
+  { path: "/signup", element: <SignUp /> },
+  { path: "/login", element: <Login /> },
+  { path: "/loading", element: <LoadingScreen /> },
+  { path: "/select-role", element: <RoleSelection /> },
   {
-    path: "/", element: <Lessons />,
+    element: <GuardRoute allowedRoles={["student"]} />,
+    children: [
+      { path: "/lessons", element: <Lessons /> },
+      { path: "/lesson/:lessonId", element: <FlashActivity /> },
+      { path: "/quiz", element: <QuickQuiz /> },
+      { path: "/quiz/:lessonId", element: <QuickQuiz /> },
+      { path: "/summary", element: <LessonSummary /> },
+      { path: "/student/dashboard", element: <StudentDashboard /> },
+      { path: "/student/classrooms", element: <StudentClassrooms /> },
+      { path: "/student/flashcards", element: <StudentFlashcards /> },
+      { path: "/student/hub", element: <StudentLearningHub /> },
+      { path: "/student/profile", element: <StudentProfile /> },
+    ],
   },
   {
-    path: "/lesson/:lessonId", element: <FlashActivity />
+    element: <GuardRoute allowedRoles={["teacher"]} />,
+    children: [
+      { path: "/teacher-dashboard", element: <TeacherDashboard /> },
+      { path: "/TeacherClassroom", element: <TeacherClassroom /> },
+      { path: "/teacher-classroom/:classroomId", element: <ClassroomDetail /> },
+      { path: "/create-classroom", element: <CreateClassroom /> },
+      { path: "/create-lesson", element: <CreateLesson /> },
+      { path: "/class-progress", element: <ClassProgress /> },
+      { path: "/teacher-profile", element: <TeacherProfile /> },
+    ],
   },
+  {
+    element: <GuardRoute allowedRoles={["student", "teacher"]} />,
+    children: [{ path: "/learning-hub", element: <LearningHub /> }],
+  },
+  { path: "*", element: <NotFound /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(
