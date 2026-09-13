@@ -5,7 +5,8 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
 
-type StudentProfile = { name: string | null; surname: string | null ; student_id: string | null , username: string | null };
+type StudentProfile = { name: string | null; surname: string | null };
+type StudentProgress = { current_streak: number; longest_streak: number; weekly_lessons_completed: number; weekly_goal: number };
 
 type Classroom = {
   classroom_id: string;
@@ -29,6 +30,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
   const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -37,6 +39,7 @@ export default function StudentDashboard() {
   const [recentlyAddedError, setRecentlyAddedError] = useState<string | null>(null);
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
   const studentName = studentProfile?.name ?? fallbackName;
+  const weeklyPct = progress ? Math.min(100, Math.round((progress.weekly_lessons_completed / Math.max(progress.weekly_goal, 1)) * 100)) : 0;
 
   useEffect(() => {
     if (!session?.user) {
@@ -44,8 +47,12 @@ export default function StudentDashboard() {
     }
 
     const loadProfile = async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle();
+      const [{ data }, { data: progressData }] = await Promise.all([
+        supabase.from("profiles").select("name, surname").eq("id", session.user.id).maybeSingle(),
+        supabase.rpc("get_student_progress"),
+      ]);
       setStudentProfile(data);
+      setProgress((progressData?.[0] as StudentProgress) ?? null);
       setIsProfileLoading(false);
     };
 
@@ -178,8 +185,8 @@ export default function StudentDashboard() {
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />{studentClassroom?.cover_image_path && <img src={studentClassroom.cover_image_path} alt={studentClassroom.classroom_name} className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" />}<div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom?.classroom_name ?? "No classroom yet"}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom?.description ?? "You will see your newest classroom here when your teacher enrols you."}</p><button type="button" onClick={() => navigate(`/student/classrooms`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open Classroom <ChevronRight size={16} /></button></div></article>
-            <article className="rounded-xl border border-slate-100 bg-white p-5"><h2 className="text-sm font-bold">Learning overview</h2><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">4 / 7</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">5 days</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[57%] rounded-full bg-violet-700" /></div><p className="mt-2 text-xs text-slate-500">57% of this week’s goal completed</p></article>
+            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" /><img src={studentClassroom?.cover_image_path ?? undefined} alt="Student learning" className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" /><div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom?.classroom_name}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom?.description}</p><button type="button" onClick={() => navigate(`/student/classrooms`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open Classroom <ChevronRight size={16} /></button></div></article>
+            <article className="rounded-xl border border-slate-100 bg-white p-5"><h2 className="text-sm font-bold">Learning overview</h2><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">{progress ? `${progress.weekly_lessons_completed} / ${progress.weekly_goal}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">{progress ? `${progress.current_streak} day${progress.current_streak === 1 ? "" : "s"}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-700" style={{ width: `${weeklyPct}%` }} /></div><p className="mt-2 text-xs text-slate-500">{weeklyPct}% of this week’s goal completed</p></article>
           </section>
 
           <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
