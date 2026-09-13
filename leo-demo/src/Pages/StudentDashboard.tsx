@@ -1,213 +1,213 @@
-import {
-  BellIcon,
-  BookOpenIcon,
-  ChartBarIcon,
-  ChevronRightIcon,
-  ClipboardDocumentCheckIcon,
-  FireIcon,
-  RectangleStackIcon,
-} from "@heroicons/react/24/outline"
-import { useNavigate } from "react-router-dom"
-import StudentBottomNav from "../Components/StudentBottomNav"
+import { Bell, ChevronRight, Layers } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import StudentBottomNav from "../Components/StudentBottomNav";
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../supabase-client";
 
-const quickActions = [
-  {
-    label: "Study Flashcards",
-    shortLabel: "Study",
-    path: "/student/flashcards",
-    icon: RectangleStackIcon,
-    bg: "bg-emerald-50",
-    iconBg: "bg-emerald-100",
-    text: "text-emerald-700",
-  },
-  {
-    label: "Take Quiz",
-    shortLabel: "Quiz",
-    path: "/student/quiz",
-    icon: ClipboardDocumentCheckIcon,
-    bg: "bg-rose-50",
-    iconBg: "bg-rose-100",
-    text: "text-rose-700",
-  },
-  {
-    label: "Dictionary",
-    shortLabel: "Dictionary",
-    path: "/student/dictionary",
-    icon: BookOpenIcon,
-    bg: "bg-blue-50",
-    iconBg: "bg-blue-100",
-    text: "text-blue-700",
-  },
-  {
-    label: "My Progress",
-    shortLabel: "Progress",
-    path: "/student/progress",
-    icon: ChartBarIcon,
-    bg: "bg-orange-50",
-    iconBg: "bg-orange-100",
-    text: "text-orange-700",
-  },
-]
+type StudentProfile = { name: string | null; surname: string | null ; student_id: string | null , username: string | null };
 
-const recentLessons = [
-  {
-    title: "Environmental Science",
-    detail: "15 words · 20 min",
-    progress: "60%",
-    icon: "🌱",
-  },
-  {
-    title: "Academic Vocabulary",
-    detail: "12 words · 10 min",
-    progress: "90%",
-    icon: "🎓",
-  },
-]
+type Classroom = {
+  classroom_id: string;
+  classroom_name: string;
+  description: string | null;
+  cover_image_path: string | null;
+  created_date: string | null;
+};
+
+const DASHBOARD_CLASSROOM_LIMIT = 2;
+const RECENTLY_ADDED_LIMIT = 4;
+
+type RecentlyAddedLesson = {
+  lesson_id: string;
+  title: string;
+  classroomName: string;
+  lesson_image_path: string | null;
+};
 
 export default function StudentDashboard() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
+  const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [classroomError, setClassroomError] = useState<string | null>(null);
+  const [recentlyAddedLessons, setRecentlyAddedLessons] = useState<RecentlyAddedLesson[]>([]);
+  const [recentlyAddedError, setRecentlyAddedError] = useState<string | null>(null);
+  const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
+  const studentName = studentProfile?.name ?? fallbackName;
+
+  useEffect(() => {
+    if (!session?.user) {
+      return;
+    }
+
+    const loadProfile = async () => {
+      const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle();
+      setStudentProfile(data);
+      setIsProfileLoading(false);
+    };
+
+    void loadProfile();
+  }, [session?.user]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    let isCurrent = true;
+
+    const loadClassroom = async () => {
+      setClassroomError(null);
+      const { data: enrolments, error: enrolmentError } = await supabase
+        .from("classroom_students")
+        .select("classroom_id, enrolled_at")
+        .eq("student_id", session.user.id)
+        .order("enrolled_at", { ascending: false, nullsFirst: false })
+        .limit(DASHBOARD_CLASSROOM_LIMIT);
+
+      if (enrolmentError) {
+        if (isCurrent) setClassroomError("Your classrooms could not be loaded right now.");
+        return;
+      }
+
+      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
+      if (!classroomIds.length) {
+        if (isCurrent) {
+          setClassrooms([]);
+          setStudentClassroom(null);
+        }
+        return;
+      }
+
+      const { data: classroomData, error: classroomsError } = await supabase
+        .from("classrooms")
+        .select("classroom_id, classroom_name, description, cover_image_path, created_date")
+        .in("classroom_id", classroomIds);
+
+      if (classroomsError) {
+        if (isCurrent) setClassroomError("Your classroom details could not be loaded right now.");
+        return;
+      }
+
+      const classroomsById = new Map((classroomData ?? []).map((classroom) => [classroom.classroom_id, classroom]));
+      const orderedClassrooms = classroomIds
+        .map((classroomId) => classroomsById.get(classroomId))
+        .filter((classroom): classroom is Classroom => Boolean(classroom))
+        .map((classroom) => ({
+          ...classroom,
+          cover_image_path: classroom.cover_image_path
+            ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
+            : null,
+        }));
+
+      if (isCurrent) {
+        setClassrooms(orderedClassrooms);
+        // Enrolments are newest-first, so the mobile/desktop banner always shows the latest class.
+        setStudentClassroom(orderedClassrooms[0] ?? null);
+      }
+    };
+
+    void loadClassroom();
+    return () => { isCurrent = false; };
+  }, [session?.user]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    let isCurrent = true;
+
+    const loadRecentlyAdded = async () => {
+      setRecentlyAddedError(null);
+      const { data: enrolments, error: enrolmentError } = await supabase
+        .from("classroom_students")
+        .select("classroom_id")
+        .eq("student_id", session.user.id);
+
+      if (enrolmentError) {
+        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        return;
+      }
+
+      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
+      if (!classroomIds.length) {
+        if (isCurrent) setRecentlyAddedLessons([]);
+        return;
+      }
+
+      const { data: lessonData, error: lessonsError } = await supabase
+        .from("lessons")
+        .select("lesson_id, title, lesson_image_path, classrooms(classroom_name)")
+        .in("classroom_id", classroomIds)
+        .order("created_at", { ascending: false })
+        .limit(RECENTLY_ADDED_LIMIT);
+
+      if (lessonsError) {
+        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        return;
+      }
+
+      if (isCurrent) {
+        setRecentlyAddedLessons(
+          (lessonData ?? []).map((lesson) => {
+            const classroom = Array.isArray(lesson.classrooms) ? lesson.classrooms[0] : lesson.classrooms;
+            return {
+              lesson_id: lesson.lesson_id,
+              title: lesson.title,
+              classroomName: classroom?.classroom_name ?? "Classroom",
+              lesson_image_path: lesson.lesson_image_path
+                ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
+                : null,
+            };
+          })
+        );
+      }
+    };
+
+    void loadRecentlyAdded();
+    return () => { isCurrent = false; };
+  }, [session?.user]);
 
   return (
-    <main className="min-h-dvh w-full overflow-x-hidden bg-slate-50 pb-24 text-slate-950 md:pb-10 md:pl-56">
-      <section className="flex w-full flex-col gap-5 px-4 pt-5 min-[380px]:px-5 sm:px-6 md:px-8 md:py-8 xl:mx-auto xl:max-w-[1440px] xl:px-10">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-normal sm:text-3xl md:text-2xl">Hi, Arka 👋</h1>
-            <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm md:text-xs">
-              Ready to learn something new today?
-            </p>
-          </div>
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 transition active:scale-95"
-            aria-label="Notifications"
-          >
-            <BellIcon className="h-5 w-5" />
-          </button>
+    <div className="min-h-screen bg-white text-slate-900">
+      <StudentBottomNav />
+      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+        <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-medium text-violet-700">Student portal</p><h1 className="mt-1 text-xl font-bold">Hi, {isProfileLoading ? "..." : studentName}</h1><p className="mt-1 text-xs text-slate-500">Continue building your English skills.</p></div><button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><Bell size={19} /></button></div>
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-[1.1fr_1fr] xl:grid-cols-[1.1fr_1fr_1fr]">
-          <article className="overflow-hidden rounded-2xl bg-violet-700 p-4 text-white shadow-lg shadow-violet-200 min-[380px]:p-5 sm:col-span-2 md:col-span-1 md:rounded-xl">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold text-violet-100">Today's Lesson</p>
-                <h2 className="mt-3 text-sm font-bold leading-snug">Biology: Cell Structure</h2>
-                <p className="mt-2 text-xs text-violet-100">10 words · 15 min</p>
-              </div>
-              <img
-                src="/business-illustration.avif"
-                alt="Colorful lesson illustration"
-                className="h-16 w-16 shrink-0 rounded-full object-cover ring-4 ring-white/20 min-[380px]:h-20 min-[380px]:w-20"
-              />
-            </div>
-            <button
-              onClick={() => navigate("/lesson/1")}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-50 active:scale-95"
-            >
-              Continue Lesson
-              <ChevronRightIcon className="h-4 w-4" />
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+          <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />{studentClassroom?.cover_image_path && <img src={studentClassroom.cover_image_path} alt={studentClassroom.classroom_name} className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" />}<div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom?.classroom_name ?? "No classroom yet"}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom?.description ?? "You will see your newest classroom here when your teacher enrols you."}</p><button type="button" onClick={() => navigate(`/student/classrooms`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open Classroom <ChevronRight size={16} /></button></div></article>
+            <article className="rounded-xl border border-slate-100 bg-white p-5"><h2 className="text-sm font-bold">Learning overview</h2><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">4 / 7</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">5 days</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[57%] rounded-full bg-violet-700" /></div><p className="mt-2 text-xs text-slate-500">57% of this week’s goal completed</p></article>
+          </section>
+
+          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <button type="button" onClick={() => navigate("/student/flashcards")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><Layers size={18} /></span>
+              <span><span className="block text-sm font-semibold">Practice</span><span className="mt-1 block text-xs text-slate-500">Flashcards</span></span>
             </button>
-          </article>
+            <button type="button" onClick={() => navigate("/quiz")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-violet-50"><img src="/girlMagnifyingGlass.png" alt="" className="h-full w-full object-contain p-0.5" /></span>
+              <span><span className="block text-sm font-semibold">Quiz</span><span className="mt-1 block text-xs text-slate-500">Check learning</span></span>
+            </button>
+            <button type="button" onClick={() => navigate("/lessons")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-violet-50"><img src="/Level1.png" alt="" className="h-full w-full object-contain p-0.5" /></span>
+              <span><span className="block text-sm font-semibold">Lessons</span><span className="mt-1 block text-xs text-slate-500">Browse all</span></span>
+            </button>
+            <button type="button" onClick={() => navigate("/student/classrooms")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-violet-50"><img src="/classRoomIllustration.png" alt="" className="h-full w-full object-contain p-0.5" /></span>
+              <span><span className="block text-sm font-semibold">Classes</span><span className="mt-1 block text-xs text-slate-500">View enrolments</span></span>
+            </button>
+            <button type="button" onClick={() => navigate("/student/hub")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-violet-50"><img src="/Nerd-amico.png" alt="" className="h-full w-full object-contain p-0.5" /></span>
+              <span><span className="block text-sm font-semibold">Hub</span><span className="mt-1 block text-xs text-slate-500">Free resources</span></span>
+            </button>
+          </section>
 
-          <article className="grid grid-cols-1 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 min-[360px]:grid-cols-2 md:rounded-xl">
-            <h2 className="text-sm font-bold min-[360px]:col-span-2">Your Progress</h2>
-            <div className="rounded-xl border border-slate-100 p-3">
-              <BookOpenIcon className="h-5 w-5 text-violet-700" />
-              <p className="mt-3 text-[11px] font-semibold text-slate-500">Weekly Goal</p>
-              <p className="mt-1 text-xs font-bold text-slate-900">4 / 7 lessons</p>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-[57%] rounded-full bg-violet-700" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-100 p-3">
-              <FireIcon className="h-5 w-5 text-orange-500" />
-              <p className="mt-3 text-[11px] font-semibold text-slate-500">Streak</p>
-              <p className="mt-1 text-xs font-bold text-slate-900">5 days</p>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-[72%] rounded-full bg-orange-400" />
-              </div>
-            </div>
-          </article>
-
-          <article className="hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 xl:block">
-            <h2 className="text-sm font-bold">Overall Progress</h2>
-            <div className="mt-5 flex items-center gap-5">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-violet-700 bg-white text-xl font-bold text-violet-700">
-                67%
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Lessons Completed</p>
-                <p className="mt-1 text-lg font-bold">24 / 36</p>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-sm font-bold">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                onClick={() => navigate(action.path)}
-                className={`${action.bg} flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl p-3 text-center transition hover:-translate-y-0.5 hover:shadow-md active:scale-95 sm:min-h-24 md:min-h-16 md:flex-row md:justify-start md:px-4`}
-              >
-                <span className={`${action.iconBg} ${action.text} flex h-8 w-8 items-center justify-center rounded-lg`}>
-                  <action.icon className="h-5 w-5" />
-                </span>
-                <span className="text-[10px] font-bold leading-tight text-slate-800 md:text-xs">
-                  <span className="md:hidden">{action.shortLabel}</span>
-                  <span className="hidden md:inline">{action.label}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <article className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:rounded-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold">Recent Lessons</h2>
-              <button onClick={() => navigate("/lessons")} className="text-xs font-bold text-violet-700">
-                View all
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {recentLessons.map((lesson) => (
-                <button
-                  key={lesson.title}
-                  onClick={() => navigate("/lessons")}
-                  className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 text-left transition hover:bg-slate-50"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-lg">
-                    {lesson.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold">{lesson.title}</span>
-                    <span className="mt-1 block text-[11px] text-slate-500">{lesson.detail}</span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                    {lesson.progress}
-                  </span>
-                  <ChevronRightIcon className="h-4 w-4 text-slate-400" />
-                </button>
-              ))}
-            </div>
-          </article>
-
-          <article className="hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 lg:block">
-            <h2 className="text-sm font-bold">Activity Overview</h2>
-            <div className="mt-5 flex h-48 items-end gap-3 border-b border-l border-slate-200 px-3 pb-3">
-              {[38, 46, 35, 68, 28, 44, 34].map((height, index) => (
-                <div key={index} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="w-full rounded-t-lg bg-violet-600" style={{ height: `${height * 2}px` }} />
-                  <span className="text-[10px] text-slate-500">{["M", "T", "W", "T", "F", "S", "S"][index]}</span>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-      </section>
-      <StudentBottomNav />
-    </main>
-  )
+          <section className="mt-5 grid gap-4 lg:grid-cols-2"><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">My classrooms</h2><p className="mt-1 text-sm text-slate-500">Your {DASHBOARD_CLASSROOM_LIMIT} most recent enrolments.</p></div><button type="button" onClick={() => navigate("/student/classrooms")} className="text-sm font-semibold text-violet-700">View all</button></div>{classroomError ? <p role="alert" className="mt-4 text-sm text-red-700">{classroomError}</p> : classrooms.length === 0 ? <p className="mt-4 text-sm text-slate-500">You have not been enrolled in a classroom yet.</p> : <div className="mt-4 space-y-2">{classrooms.map((classroom) => <button key={classroom.classroom_id} type="button" onClick={() => navigate("/student/classrooms")} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50">{classroom.cover_image_path ? <img src={classroom.cover_image_path} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /> : <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{classroom.classroom_name}</span><span className="mt-1 block truncate text-xs text-slate-500">{classroom.description ?? "Classroom"}</span></span><ChevronRight size={16} className="text-slate-400" /></button>)}</div>}</article><article className="rounded-xl border border-slate-100 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-base font-bold">Recently added</h2><p className="mt-1 text-sm text-slate-500">Newest lessons added to your classrooms.</p></div><button type="button" onClick={() => navigate("/lessons")} className="text-sm font-semibold text-violet-700">View all</button></div>{recentlyAddedError ? <p role="alert" className="mt-4 text-sm text-red-700">{recentlyAddedError}</p> : recentlyAddedLessons.length === 0 ? <p className="mt-4 text-sm text-slate-500">No lessons have been added to your classrooms yet.</p> : <div className="mt-4 space-y-2">{recentlyAddedLessons.map((lesson) => <button key={lesson.lesson_id} type="button" onClick={() => navigate(`/lessons/${lesson.lesson_id}`)} className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50">{lesson.lesson_image_path ? <img src={lesson.lesson_image_path} alt="" className="h-11 w-14 shrink-0 rounded-lg object-cover" /> : <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{lesson.title}</span><span className="mt-1 block truncate text-xs text-slate-500">{lesson.classroomName}</span></span><ChevronRight size={16} className="text-slate-400" /></button>)}</div>}</article></section>
+        </div>
+      </main>
+    </div>
+  );
 }

@@ -1,24 +1,43 @@
 import {
   BookOpenIcon,
-  ChartBarIcon,
   HomeIcon,
+  ArrowLeftOnRectangleIcon,
+  SparklesIcon,
   PlusIcon,
+  UserGroupIcon,
   UserIcon,
 } from "@heroicons/react/24/outline"
-import { Link, NavLink } from "react-router-dom"
+import { Link, NavLink, useNavigate } from "react-router-dom"
+import { useAuth } from "../../context/AuthContext"
 
-const navItems = [
-  { label: "Home", path: "/", icon: HomeIcon },
+const desktopNavItems = [
+  { label: "Home", path: "/student/dashboard", icon: HomeIcon },
+  { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
-  { label: "Progress", path: "/student/progress", icon: ChartBarIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
+  { label: "Profile", path: "/student/profile", icon: UserIcon },
+]
+
+const mobileStartItems = desktopNavItems.slice(0, 2)
+const mobileEndItems = [
+  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
 export default function StudentBottomNav() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
+  }
+
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col bg-violet-800 px-4 py-5 text-white shadow-xl md:flex">
-        <Link to="/" className="mb-8 flex items-center gap-3 px-2">
+        <Link to="/student/dashboard" className="mb-8 flex items-center gap-3 px-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-sm font-black">
             L
           </span>
@@ -29,7 +48,7 @@ export default function StudentBottomNav() {
         </Link>
 
         <nav className="flex flex-1 flex-col gap-2">
-          {navItems.map((item) => (
+          {desktopNavItems.map((item) => (
             <NavLink
               key={item.label}
               to={item.path}
@@ -55,11 +74,20 @@ export default function StudentBottomNav() {
             <PlusIcon className="h-5 w-5" />
             Practice
           </NavLink>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-auto flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-violet-50 transition hover:bg-white/10"
+          >
+            <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+            Log out
+          </button>
         </nav>
       </aside>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto flex h-18 max-w-md items-center justify-around border-t border-slate-200 bg-white px-3 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] md:hidden">
-        {navItems.slice(0, 2).map((item) => (
+        {mobileStartItems.map((item) => (
           <NavLink
             key={item.label}
             to={item.path}
@@ -82,7 +110,7 @@ export default function StudentBottomNav() {
           <PlusIcon className="h-6 w-6" />
         </NavLink>
 
-        {navItems.slice(2).map((item) => (
+        {mobileEndItems.map((item) => (
           <NavLink
             key={item.label}
             to={item.path}

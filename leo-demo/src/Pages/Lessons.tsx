@@ -1,61 +1,38 @@
-
-import { useEffect } from "react"
-import { useState } from "react"
-import LessonCard from "../Components/LessonCard"
-import Navbar from "../Components/Navbar"
-import { supabase } from "../supabase-client"
+import { Bell, BookOpen, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import StudentBottomNav from "../Components/StudentBottomNav";
+import { supabase } from "../supabase-client";
 
 interface Lesson {
-  id: number
-  title: string
-  description: string
-  image_url: string | null
-  image_alt: string | null
+  id: number;
+  title: string;
+  description: string;
+  image_url: string | null;
+  image_alt: string | null;
 }
 
 export default function Lessons() {
-  const [lessons, setLessons] = useState<Lesson[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState("")
+  const navigate = useNavigate();
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const fetchLessons = async () => {
-      setIsLoading(true)
-      setErrorMessage("")
-      const { data, error } = await supabase.from("Lesson").select("*").order("id", { ascending: true })
-
+      const { data, error } = await supabase.from("Lesson").select("*").order("id", { ascending: true });
       if (error) {
-        console.error("Error fetching lessons:", error)
-        setErrorMessage("Could not load lessons. Please try again.")
-        setIsLoading(false)
-        return
+        setErrorMessage("Could not load lessons. Please try again.");
+      } else {
+        setLessons(data ?? []);
       }
+      setIsLoading(false);
+    };
 
-      setLessons(data ?? [])
-      setIsLoading(false)
-    }
-
-    fetchLessons()
-  }, [])
+    void fetchLessons();
+  }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center ">
-      <Navbar />
-      <h2 className="text-lg text-center font-bold mt-5">Lessons</h2>
-      {isLoading && <p className="mt-5 text-sm text-gray-500">Loading lessons...</p>}
-      {errorMessage && <p className="mt-5 text-sm font-semibold text-red-600">{errorMessage}</p>}
-      <div className="w-full flex flex-row flex-wrap gap-5 justify-center mt-5">
-        {!isLoading && !errorMessage && lessons.map((lesson) => (
-          <LessonCard
-            key={lesson.id}
-            title={lesson.title}
-            description={lesson.description}
-            imageSrc={lesson.image_url ?? "/business-illustration.avif"}
-            imageAlt={lesson.image_alt ?? lesson.title}
-            number={lesson.id}
-          />
-        ))}
-      </div>
-    </div>
-  )
+    <div className="min-h-screen bg-white text-slate-900"><StudentBottomNav /><main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0"><header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between"><div><p className="text-xs font-medium text-violet-700">Student portal</p><h1 className="mt-1 text-xl font-bold">Lessons</h1><p className="mt-1 text-xs text-slate-500">Choose a lesson to review its vocabulary.</p></div><button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><Bell size={19} /></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8"><section className="rounded-xl bg-violet-700 p-5 text-white sm:flex sm:items-center sm:justify-between sm:p-6"><div><p className="text-xs font-medium text-violet-100">Learning library</p><h2 className="mt-2 text-xl font-bold">Build confidence one lesson at a time.</h2><p className="mt-2 max-w-xl text-sm text-violet-100">Review core vocabulary, practise with flashcards, and complete a quiz when you are ready.</p></div><img src="/businessEng.avif" alt="English language study" className="mt-4 h-24 w-full rounded-lg object-cover sm:mt-0 sm:h-28 sm:w-40" /></section>{isLoading && <p className="py-12 text-center text-sm text-slate-500">Loading lessons...</p>}{errorMessage && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</p>}{!isLoading && !errorMessage && <section className="mt-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold">Available lessons</h2><span className="text-sm text-slate-500">{lessons.length} lessons</span></div>{lessons.length === 0 ? <div className="rounded-xl border border-slate-100 bg-white px-4 py-12 text-center"><BookOpen size={24} className="mx-auto text-slate-300" /><p className="mt-3 text-sm font-semibold">No lessons are available yet</p><p className="mt-1 text-xs text-slate-500">Your teacher’s lessons will appear here when they are ready.</p></div> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{lessons.map((lesson) => <button key={lesson.id} type="button" onClick={() => navigate(`/lesson/${lesson.id}`)} className="overflow-hidden rounded-xl border border-slate-100 bg-white text-left transition hover:border-violet-200 hover:shadow-sm"><img src={lesson.image_url ?? "/business-illustration.avif"} alt={lesson.image_alt ?? lesson.title} className="h-36 w-full object-cover" /><div className="p-4"><h3 className="truncate text-base font-bold">{lesson.title}</h3><p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">{lesson.description}</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">Open lesson <ChevronRight size={16} /></span></div></button>)}</div>}</section>}</div></main></div>
+  );
 }
