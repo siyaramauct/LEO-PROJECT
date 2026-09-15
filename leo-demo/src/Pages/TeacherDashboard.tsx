@@ -3,6 +3,7 @@ import {
   BookOpen,
   Users,
   BarChart3,
+  Calendar,
   Plus,
   ChevronRight,
   ClipboardCheck,
@@ -250,6 +251,16 @@ export default function TeacherDashboard() {
 
     void loadLessons();
   }, [session?.user]);
+
+  const today = new Date();
+  const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const mondayOffset = (today.getDay() + 6) % 7; // Sunday is 0, so shift the week to start on Monday
+  const weekDays = weekdayLabels.map((label, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - mondayOffset + index);
+    return { label, day: date.getDate(), isToday: date.toDateString() === today.toDateString() };
+  });
+  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -594,7 +605,7 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Main Grid */}
-            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] xl:items-stretch">
+            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
               {/* Classes */}
               <section className="rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">
@@ -650,24 +661,40 @@ export default function TeacherDashboard() {
                 </div>
               </section>
 
-              {/* Create Lesson */}
-              <section className="flex min-h-52 flex-col rounded-xl bg-violet-700 p-5 text-white xl:min-h-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
-                  <Plus size={25} />
+              {/* Calendar */}
+              <section className="flex min-h-[17rem] flex-col rounded-xl border border-slate-100 bg-white p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-violet-700">This week</p>
+                    <h3 className="mt-1 text-lg font-bold">{monthLabel}</h3>
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg  text-violet-700">
+                    <Calendar size={20} />
+                  </span>
                 </div>
 
-                <h3 className="mt-4 text-lg font-bold">Create a new lesson</h3>
-
-                <p className="mt-2 text-sm leading-6 text-violet-100">
-                  Add vocabulary words, generate a quiz, and share the lesson
-                  with your classroom.
-                </p>
+                <div className="mt-5 grid grid-cols-7 gap-2">
+                  {weekDays.map((weekDay) => (
+                    <div
+                      key={weekDay.label}
+                      className={`flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 ${
+                        weekDay.isToday ? "bg-violet-700 text-white" : "border border-slate-100 bg-white text-slate-700"
+                      }`}
+                    >
+                      <span className={`text-[10px] font-semibold uppercase tracking-wide ${weekDay.isToday ? "text-violet-100" : "text-slate-400"}`}>
+                        {weekDay.label}
+                      </span>
+                      <span className="text-sm font-bold">{weekDay.day}</span>
+                    </div>
+                  ))}
+                </div>
 
                 <Link
                   to="/create-lesson"
-                  className="mt-auto block w-full rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-violet-700 transition hover:bg-violet-50"
+                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
                 >
-                  Create Lesson
+                  Create lesson
+                  <ChevronRight size={17} />
                 </Link>
               </section>
             </div>

@@ -47,6 +47,29 @@ type LessonRow = {
   word_count: number | null;
 };
 
+type MaterialRow = {
+  resource_id: string;
+  resource_type: "document" | "link";
+  resource_url: string;
+  uploaded_date: string;
+};
+
+// Documents have no title column, so the display name is derived from the stored path or link.
+const materialTitle = (row: MaterialRow) => {
+  if (row.resource_type === "link") {
+    try { return new URL(row.resource_url).hostname; } catch { return row.resource_url; }
+  }
+  const segments = row.resource_url.split("/");
+  return decodeURIComponent(segments[segments.length - 1] || row.resource_url);
+};
+
+const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
+  id: row.resource_id,
+  title: materialTitle(row),
+  kind: row.resource_type === "link" ? "Link" : "Document",
+  detail: row.resource_type === "link" ? "External link" : "Shared document",
+});
+
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   id: row.lesson_id,
   title: row.title,
@@ -86,10 +109,11 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult] = await Promise.all([
+      const [classroomResult, lessonsResult, enrollmentResult, materialsResult] = await Promise.all([
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
+        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
       ]);
 
       if (classroomResult.error) {
@@ -103,6 +127,10 @@ export default function ClassroomDetail() {
 
       if (!lessonsResult.error && lessonsResult.data) {
         setLessons((lessonsResult.data as LessonRow[]).map(toLessonDisplay));
+      }
+
+      if (!materialsResult.error) {
+        setMaterials(((materialsResult.data ?? []) as MaterialRow[]).map(toMaterialDisplay));
       }
 
       if (enrollmentResult.error) {
@@ -200,19 +228,49 @@ export default function ClassroomDetail() {
     setLessonToDelete(null);
   }
 
-  const addFile = (file: File) => {
-    setMaterials((prev) => [
-      { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
-      ...prev,
-    ]);
+  const addFile = async (file: File) => {
+    if (!classroomId || !teacherId) return;
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    // Supabase Storage has no real folders; this prefix auto-creates a per-classroom folder on upload.
+    const storagePath = `classroom_documents/${classroomId}/${safeFileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, file, {
+        contentType: file.type || "application/pdf",
+        upsert: true,
+      });
+    if (uploadError) {
+      console.error("Document storage upload failed:", uploadError);
+      window.alert(`The document could not be uploaded: ${uploadError.message}`);
+      return;
+    }
+    const { data, error } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      resource_type: "document",
+      resource_url: storagePath,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    if (error || !data) {
+      console.error("Learning resource insert failed:", error);
+      window.alert(`The document was uploaded but could not be shared: ${error?.message ?? "No resource was returned."}`);
+      return;
+    }
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
-  const addLink = (url: string) => {
-    const linkTitle = new URL(url.includes("://") ? url : `https://${url}`).hostname;
-    setMaterials((prev) => [
-      { id: `${url}-${Date.now()}`, title: linkTitle, kind: "Link", detail: "External link · Added just now" },
-      ...prev,
-    ]);
+  const addLink = async (url: string) => {
+    if (!classroomId || !teacherId) return;
+    const externalUrl = url.includes("://") ? url : `https://${url}`;
+    new URL(externalUrl); // validates the link before it is shared with learners
+    const { data, error } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      resource_type: "link",
+      resource_url: externalUrl,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    if (error || !data) {
+      window.alert("The link could not be shared with learners. Please try again.");
+      return;
+    }
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
   const coverUrl = classroom?.cover_image_path

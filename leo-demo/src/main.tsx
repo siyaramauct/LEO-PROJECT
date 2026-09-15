@@ -18,6 +18,7 @@ import QuickQuiz from "./Pages/QuickQuiz.tsx";
 import RoleSelection from "./Pages/RoleSelection.tsx";
 import SignUp from "./Pages/Signup.tsx";
 import StudentClassrooms from "./Pages/StudentClassrooms.tsx";
+import StudentClassroomDetail from "./Pages/StudentClassroomDetail.tsx";
 import StudentDashboard from "./Pages/StudentDashboard.tsx";
 import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
 import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
       { path: "/summary", element: <LessonSummary /> },
       { path: "/student/dashboard", element: <StudentDashboard /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },
+      { path: "/student/classrooms/:classroomId", element: <StudentClassroomDetail /> },
       { path: "/student/flashcards", element: <StudentFlashcards /> },
       { path: "/student/hub", element: <StudentLearningHub /> },
       { path: "/student/profile", element: <StudentProfile /> },
