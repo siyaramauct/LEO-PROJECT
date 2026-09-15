@@ -82,34 +82,6 @@ const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   completion: 0,
 });
 
-const getResourceTitle = (row: ResourceRow) => {
-  if (row.resource_type === "link") {
-    try {
-      return new URL(row.resource_url).hostname;
-    } catch {
-      return row.resource_url;
-    }
-  }
-
-  const fileName = decodeURIComponent(row.resource_url.split("/").pop()?.split("?")[0] ?? "");
-  return fileName.replace(/^\d+-/, "") || "PDF resource";
-};
-
-const toMaterialDisplay = (row: ResourceRow): ClassroomMaterial => ({
-  id: row.resource_id,
-  title: getResourceTitle(row),
-  kind: row.resource_type === "link" ? "Link" : "Document",
-  detail: `${row.resource_type === "link" ? "External link" : "PDF"} · ${row.uploaded_date ? new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short" }).format(new Date(row.uploaded_date)) : "Added recently"}`,
-  url: row.resource_url,
-});
-
-const normaliseUrl = (url: string) => url.includes("://") ? url : `https://${url}`;
-
-const getPdfStoragePath = (classroomId: string, file: File) => {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  return `${classroomId}/${Date.now()}-${safeName}`;
-};
-
 export default function ClassroomDetail() {
   const { session } = useAuth();
   const { classroomId } = useParams<{ classroomId: string }>();
@@ -246,62 +218,54 @@ export default function ClassroomDetail() {
 
   const addFile = async (file: File) => {
     if (!classroomId || !teacherId) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setMaterialError("Only PDF files can be uploaded as learning resources.");
-      return;
-    }
-
     setIsSavingMaterial(true);
     setMaterialError(null);
-
-    try {
-      const storagePath = getPdfStoragePath(classroomId, file);
-      const { error: uploadError } = await supabase.storage.from(RESOURCE_BUCKET).upload(storagePath, file, {
-        contentType: "application/pdf",
-        upsert: false,
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    // Supabase Storage has no real folders; this prefix auto-creates a per-classroom folder on upload.
+    const storagePath = `classroom_documents/${classroomId}/${safeFileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, file, {
+        contentType: file.type || "application/pdf",
+        upsert: true,
       });
-
-      if (uploadError) throw uploadError;
-
-      const publicUrl = supabase.storage.from(RESOURCE_BUCKET).getPublicUrl(storagePath).data.publicUrl;
-      const { data, error } = await supabase.from("learning_resources").insert({
-        classroom_id: classroomId,
-        resource_type: "pdf",
-        resource_url: publicUrl,
-        uploaded_date: new Date().toISOString(),
-      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
-
-      if (error) throw error;
-      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
-    } catch (error) {
-      setMaterialError(error instanceof Error ? error.message : "The PDF could not be uploaded.");
-    } finally {
+    if (uploadError) {
+      console.error("Document storage upload failed:", uploadError);
+      setMaterialError(`The document could not be uploaded: ${uploadError.message}`);
       setIsSavingMaterial(false);
+      return;
     }
+    const { data, error } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      resource_type: "document",
+      resource_url: storagePath,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    setIsSavingMaterial(false);
+    if (error || !data) {
+      console.error("Learning resource insert failed:", error);
+      setMaterialError(`The document was uploaded but could not be shared: ${error?.message ?? "No resource was returned."}`);
+      return;
+    }
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
   const addLink = async (url: string) => {
     if (!classroomId || !teacherId) return;
-
     setIsSavingMaterial(true);
     setMaterialError(null);
-
-    try {
-      const resourceUrl = normaliseUrl(url);
-      const { data, error } = await supabase.from("learning_resources").insert({
-        classroom_id: classroomId,
-        resource_type: "link",
-        resource_url: resourceUrl,
-        uploaded_date: new Date().toISOString(),
-      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
-
-      if (error) throw error;
-      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
-    } catch (error) {
-      setMaterialError(error instanceof Error ? error.message : "The link could not be added.");
-    } finally {
-      setIsSavingMaterial(false);
+    const externalUrl = url.includes("://") ? url : `https://${url}`;
+    new URL(externalUrl); // validates the link before it is shared with learners
+    const { data, error } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      resource_type: "link",
+      resource_url: externalUrl,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    setIsSavingMaterial(false);
+    if (error || !data) {
+      setMaterialError("The link could not be shared with learners. Please try again.");
+      return;
     }
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
   const deleteLesson = async () => {
@@ -320,51 +284,6 @@ export default function ClassroomDetail() {
 
     setLessons((currentLessons) => currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id));
     setLessonToDelete(null);
-  }
-
-  const addFile = async (file: File) => {
-    if (!classroomId || !teacherId) return;
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    // Supabase Storage has no real folders; this prefix auto-creates a per-classroom folder on upload.
-    const storagePath = `classroom_documents/${classroomId}/${safeFileName}`;
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(storagePath, file, {
-        contentType: file.type || "application/pdf",
-        upsert: true,
-      });
-    if (uploadError) {
-      console.error("Document storage upload failed:", uploadError);
-      window.alert(`The document could not be uploaded: ${uploadError.message}`);
-      return;
-    }
-    const { data, error } = await supabase.from("learning_resources").insert({
-      classroom_id: classroomId,
-      resource_type: "document",
-      resource_url: storagePath,
-    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
-    if (error || !data) {
-      console.error("Learning resource insert failed:", error);
-      window.alert(`The document was uploaded but could not be shared: ${error?.message ?? "No resource was returned."}`);
-      return;
-    }
-    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
-  };
-
-  const addLink = async (url: string) => {
-    if (!classroomId || !teacherId) return;
-    const externalUrl = url.includes("://") ? url : `https://${url}`;
-    new URL(externalUrl); // validates the link before it is shared with learners
-    const { data, error } = await supabase.from("learning_resources").insert({
-      classroom_id: classroomId,
-      resource_type: "link",
-      resource_url: externalUrl,
-    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
-    if (error || !data) {
-      window.alert("The link could not be shared with learners. Please try again.");
-      return;
-    }
-    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
   const coverUrl = classroom?.cover_image_path
