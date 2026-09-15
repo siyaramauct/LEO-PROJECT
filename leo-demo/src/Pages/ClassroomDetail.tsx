@@ -265,6 +265,24 @@ export default function ClassroomDetail() {
     }
   };
 
+  const deleteLesson = async () => {
+    if (!lessonToDelete) return;
+
+    setIsDeletingLesson(true);
+    setLoadError(null);
+
+    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonToDelete.id);
+
+    setIsDeletingLesson(false);
+    if (error) {
+      setLoadError(`Could not delete lesson: ${error.message}`);
+      return;
+    }
+
+    setLessons((currentLessons) => currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id));
+    setLessonToDelete(null);
+  };
+
   const coverUrl = classroom?.cover_image_path
     ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
     : "/classRoomIllustration.png";
