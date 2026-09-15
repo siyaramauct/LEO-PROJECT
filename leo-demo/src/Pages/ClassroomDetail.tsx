@@ -47,6 +47,16 @@ type LessonRow = {
   word_count: number | null;
 };
 
+type ResourceRow = {
+  resource_id: string;
+  classroom_id: string;
+  resource_type: "pdf" | "link";
+  resource_url: string;
+  uploaded_date: string | null;
+};
+
+const RESOURCE_BUCKET = "documents";
+
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   id: row.lesson_id,
   title: row.title,
@@ -58,6 +68,34 @@ const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   words: row.word_count ?? 0,
   completion: 0,
 });
+
+const getResourceTitle = (row: ResourceRow) => {
+  if (row.resource_type === "link") {
+    try {
+      return new URL(row.resource_url).hostname;
+    } catch {
+      return row.resource_url;
+    }
+  }
+
+  const fileName = decodeURIComponent(row.resource_url.split("/").pop()?.split("?")[0] ?? "");
+  return fileName.replace(/^\d+-/, "") || "PDF resource";
+};
+
+const toMaterialDisplay = (row: ResourceRow): ClassroomMaterial => ({
+  id: row.resource_id,
+  title: getResourceTitle(row),
+  kind: row.resource_type === "link" ? "Link" : "Document",
+  detail: `${row.resource_type === "link" ? "External link" : "PDF"} · ${row.uploaded_date ? new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short" }).format(new Date(row.uploaded_date)) : "Added recently"}`,
+  url: row.resource_url,
+});
+
+const normaliseUrl = (url: string) => url.includes("://") ? url : `https://${url}`;
+
+const getPdfStoragePath = (classroomId: string, file: File) => {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  return `${classroomId}/${Date.now()}-${safeName}`;
+};
 
 export default function ClassroomDetail() {
   const { session } = useAuth();
@@ -74,6 +112,8 @@ export default function ClassroomDetail() {
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [isSavingMaterial, setIsSavingMaterial] = useState(false);
+  const [materialError, setMaterialError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<ClassroomLesson | null>(null);
@@ -86,10 +126,11 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult] = await Promise.all([
+      const [classroomResult, lessonsResult, enrollmentResult, materialsResult] = await Promise.all([
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
+        supabase.from("learning_resources").select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
       ]);
 
       if (classroomResult.error) {
@@ -103,6 +144,13 @@ export default function ClassroomDetail() {
 
       if (!lessonsResult.error && lessonsResult.data) {
         setLessons((lessonsResult.data as LessonRow[]).map(toLessonDisplay));
+      }
+
+      if (materialsResult.error) {
+        console.error("Failed to load classroom resources:", materialsResult.error);
+        setMaterialError(`Could not load resources: ${materialsResult.error.message}`);
+      } else {
+        setMaterials(((materialsResult.data ?? []) as ResourceRow[]).map(toMaterialDisplay));
       }
 
       if (enrollmentResult.error) {
@@ -186,20 +234,6 @@ export default function ClassroomDetail() {
     setSelectedStudent(null);
   }
 
-  async function deleteLesson() {
-    if (!lessonToDelete || isDeletingLesson) return;
-    setIsDeletingLesson(true);
-    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonToDelete.id);
-    setIsDeletingLesson(false);
-    if (error) {
-      console.error("Failed to delete lesson:", error);
-      window.alert("The lesson could not be deleted. Please try again.");
-      return;
-    }
-    setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonToDelete.id));
-    setLessonToDelete(null);
-  }
-
   const addFile = (file: File) => {
     setMaterials((prev) => [
       { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
@@ -207,12 +241,28 @@ export default function ClassroomDetail() {
     ]);
   };
 
-  const addLink = (url: string) => {
-    const linkTitle = new URL(url.includes("://") ? url : `https://${url}`).hostname;
-    setMaterials((prev) => [
-      { id: `${url}-${Date.now()}`, title: linkTitle, kind: "Link", detail: "External link · Added just now" },
-      ...prev,
-    ]);
+  const addLink = async (url: string) => {
+    if (!classroomId || !teacherId) return;
+
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+
+    try {
+      const resourceUrl = normaliseUrl(url);
+      const { data, error } = await supabase.from("learning_resources").insert({
+        classroom_id: classroomId,
+        resource_type: "link",
+        resource_url: resourceUrl,
+        uploaded_date: new Date().toISOString(),
+      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
+
+      if (error) throw error;
+      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
+    } catch (error) {
+      setMaterialError(error instanceof Error ? error.message : "The link could not be added.");
+    } finally {
+      setIsSavingMaterial(false);
+    }
   };
 
   const coverUrl = classroom?.cover_image_path
@@ -270,7 +320,7 @@ export default function ClassroomDetail() {
           </section>
 
           <div className="mt-3">
-            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
             {materials.length === 0 && <EmptyMaterials />}
           </div>
 
@@ -345,7 +395,7 @@ export default function ClassroomDetail() {
             </section>
 
             <div className="mt-4">
-              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
               {materials.length === 0 && <EmptyMaterials />}
             </div>
 

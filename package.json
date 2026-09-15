@@ -1,0 +1,9 @@
+{
+  "name": "leo-project",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix leo-demo run dev --",
+    "build": "npm --prefix leo-demo run build",
+    "lint": "npm --prefix leo-demo run lint"
+  }
+}
