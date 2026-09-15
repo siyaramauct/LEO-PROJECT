@@ -234,11 +234,40 @@ export default function ClassroomDetail() {
     setSelectedStudent(null);
   }
 
-  const addFile = (file: File) => {
-    setMaterials((prev) => [
-      { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
-      ...prev,
-    ]);
+  const addFile = async (file: File) => {
+    if (!classroomId || !teacherId) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setMaterialError("Only PDF files can be uploaded as learning resources.");
+      return;
+    }
+
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+
+    try {
+      const storagePath = getPdfStoragePath(classroomId, file);
+      const { error: uploadError } = await supabase.storage.from(RESOURCE_BUCKET).upload(storagePath, file, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+
+      if (uploadError) throw uploadError;
+
+      const publicUrl = supabase.storage.from(RESOURCE_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+      const { data, error } = await supabase.from("learning_resources").insert({
+        classroom_id: classroomId,
+        resource_type: "pdf",
+        resource_url: publicUrl,
+        uploaded_date: new Date().toISOString(),
+      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
+
+      if (error) throw error;
+      setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
+    } catch (error) {
+      setMaterialError(error instanceof Error ? error.message : "The PDF could not be uploaded.");
+    } finally {
+      setIsSavingMaterial(false);
+    }
   };
 
   const addLink = async (url: string) => {
