@@ -59,7 +59,7 @@ type ResourceRow = {
   uploaded_date: string | null;
 };
 
-const RESOURCE_BUCKET = "learning-resources";
+const RESOURCE_BUCKET = "documents";
 
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   title: row.title,
