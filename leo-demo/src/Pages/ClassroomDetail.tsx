@@ -53,7 +53,6 @@ type LessonRow = {
 type ResourceRow = {
   resource_id: string;
   classroom_id: string;
-  uploaded_by: string;
   resource_type: "pdf" | "link";
   resource_url: string;
   uploaded_date: string | null;
@@ -131,7 +130,7 @@ export default function ClassroomDetail() {
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
-        supabase.from("learning_resources").select("resource_id, classroom_id, uploaded_by, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
+        supabase.from("learning_resources").select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
       ]);
 
       if (classroomResult.error) {
@@ -257,11 +256,10 @@ export default function ClassroomDetail() {
       const publicUrl = supabase.storage.from(RESOURCE_BUCKET).getPublicUrl(storagePath).data.publicUrl;
       const { data, error } = await supabase.from("learning_resources").insert({
         classroom_id: classroomId,
-        uploaded_by: teacherId,
         resource_type: "pdf",
         resource_url: publicUrl,
         uploaded_date: new Date().toISOString(),
-      }).select("resource_id, classroom_id, uploaded_by, resource_type, resource_url, uploaded_date").single();
+      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
 
       if (error) throw error;
       setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
@@ -282,11 +280,10 @@ export default function ClassroomDetail() {
       const resourceUrl = normaliseUrl(url);
       const { data, error } = await supabase.from("learning_resources").insert({
         classroom_id: classroomId,
-        uploaded_by: teacherId,
         resource_type: "link",
         resource_url: resourceUrl,
         uploaded_date: new Date().toISOString(),
-      }).select("resource_id, classroom_id, uploaded_by, resource_type, resource_url, uploaded_date").single();
+      }).select("resource_id, classroom_id, resource_type, resource_url, uploaded_date").single();
 
       if (error) throw error;
       setMaterials((prev) => [toMaterialDisplay(data as ResourceRow), ...prev]);
