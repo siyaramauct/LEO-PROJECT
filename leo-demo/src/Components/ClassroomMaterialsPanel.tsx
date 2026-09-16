@@ -1,4 +1,4 @@
-import { FileText, Link as LinkIcon, Paperclip, Plus } from "lucide-react";
+import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export type ClassroomMaterial = {
@@ -7,6 +7,8 @@ export type ClassroomMaterial = {
   kind: "Document" | "Link";
   detail: string;
   url?: string;
+  resourceType: "document" | "link";
+  resourcePath: string;
 };
 
 // Parent-owned callbacks keep this panel reusable with any materials store.
@@ -14,6 +16,7 @@ type ClassroomMaterialsPanelProps = {
   materials: ClassroomMaterial[];
   onFileUpload: (file: File) => Promise<void>;
   onAddLink: (url: string) => Promise<void>;
+  onDeleteMaterial: (material: ClassroomMaterial) => void;
   isSaving?: boolean;
   error?: string | null;
 };
@@ -22,6 +25,7 @@ export default function ClassroomMaterialsPanel({
   materials,
   onFileUpload,
   onAddLink,
+  onDeleteMaterial,
   isSaving = false,
   error,
 }: ClassroomMaterialsPanelProps) {
@@ -124,20 +128,30 @@ export default function ClassroomMaterialsPanel({
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-violet-700">
                 <Icon size={15} />
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold text-slate-700">{material.title}</p>
                 <p className="mt-0.5 truncate text-[10px] text-slate-400">{material.detail}</p>
               </div>
             </>
           );
 
-          return material.url ? (
-            <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 py-2.5 transition hover:bg-slate-50">
-              {content}
-            </a>
-          ) : (
+          return (
             <div key={material.id} className="flex items-center gap-2 py-2.5">
-              {content}
+              {material.url ? (
+                <a href={material.url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2 transition hover:bg-slate-50">
+                  {content}
+                </a>
+              ) : (
+                <div className="flex min-w-0 flex-1 items-center gap-2">{content}</div>
+              )}
+              <button
+                type="button"
+                aria-label={`Delete ${material.title}`}
+                onClick={() => onDeleteMaterial(material)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-600 text-white transition hover:bg-rose-700"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           );
         })}

@@ -68,6 +68,8 @@ const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
   title: materialTitle(row),
   kind: row.resource_type === "link" ? "Link" : "Document",
   detail: row.resource_type === "link" ? "External link" : "Shared document",
+  resourceType: row.resource_type,
+  resourcePath: row.resource_url,
 });
 
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
@@ -103,6 +105,10 @@ export default function ClassroomDetail() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<ClassroomLesson | null>(null);
   const [isDeletingLesson, setIsDeletingLesson] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<StudentProfile | null>(null);
+  const [isRemovingStudent, setIsRemovingStudent] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<ClassroomMaterial | null>(null);
+  const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
 
   useEffect(() => {
     if (!classroomId || !teacherId) return;
@@ -286,6 +292,52 @@ export default function ClassroomDetail() {
     setLessonToDelete(null);
   };
 
+  const removeStudent = async () => {
+    if (!classroomId || !studentToRemove) return;
+
+    setIsRemovingStudent(true);
+    setEnrollmentError(null);
+
+    const { error } = await supabase
+      .from("classroom_students")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("student_id", studentToRemove.id);
+
+    setIsRemovingStudent(false);
+    if (error) {
+      setEnrollmentError(`Could not remove this student: ${error.message}`);
+      return;
+    }
+
+    setStudentProfiles((students) => students.filter((student) => student.id !== studentToRemove.id));
+    setEnrolledStudentIds((studentIds) => studentIds.filter((id) => id !== studentToRemove.id));
+    setStudentToRemove(null);
+  };
+
+  const deleteMaterial = async () => {
+    if (!materialToDelete) return;
+
+    setIsDeletingMaterial(true);
+    setMaterialError(null);
+
+    if (materialToDelete.resourceType === "document") {
+      const { error: storageError } = await supabase.storage.from("documents").remove([materialToDelete.resourcePath]);
+      if (storageError) console.error("Failed to delete document from storage:", storageError);
+    }
+
+    const { error } = await supabase.from("learning_resources").delete().eq("resource_id", materialToDelete.id);
+
+    setIsDeletingMaterial(false);
+    if (error) {
+      setMaterialError(`Could not delete this material: ${error.message}`);
+      return;
+    }
+
+    setMaterials((prev) => prev.filter((material) => material.id !== materialToDelete.id));
+    setMaterialToDelete(null);
+  };
+
   const coverUrl = classroom?.cover_image_path
     ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
     : "/classRoomIllustration.png";
@@ -341,12 +393,12 @@ export default function ClassroomDetail() {
           </section>
 
           <div className="mt-3">
-            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
+            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} onDeleteMaterial={setMaterialToDelete} isSaving={isSavingMaterial} error={materialError} />
             {materials.length === 0 && <EmptyMaterials />}
           </div>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-            <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+            <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} onRemoveStudent={setStudentToRemove} />
           </section>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
@@ -416,12 +468,12 @@ export default function ClassroomDetail() {
             </section>
 
             <div className="mt-4">
-              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
+              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} onDeleteMaterial={setMaterialToDelete} isSaving={isSavingMaterial} error={materialError} />
               {materials.length === 0 && <EmptyMaterials />}
             </div>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
-              <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+              <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} onRemoveStudent={setStudentToRemove} />
             </section>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
@@ -449,6 +501,28 @@ export default function ClassroomDetail() {
         description="This will permanently remove this lesson from the classroom. This action cannot be undone."
         confirmLabel="Delete lesson"
         deletingLabel="Deleting lesson..."
+      />
+
+      <DeleteAccountDialog
+        open={Boolean(studentToRemove)}
+        isDeleting={isRemovingStudent}
+        onCancel={() => setStudentToRemove(null)}
+        onConfirm={() => void removeStudent()}
+        title={`Remove ${[studentToRemove?.name, studentToRemove?.surname].filter(Boolean).join(" ") || "this student"}?`}
+        description="This will unenrol the student from this classroom. They can be re-added later by searching their username."
+        confirmLabel="Remove student"
+        deletingLabel="Removing..."
+      />
+
+      <DeleteAccountDialog
+        open={Boolean(materialToDelete)}
+        isDeleting={isDeletingMaterial}
+        onCancel={() => setMaterialToDelete(null)}
+        onConfirm={() => void deleteMaterial()}
+        title={`Delete ${materialToDelete?.title ?? "this material"}?`}
+        description="This will permanently remove this material from the classroom and its stored file, if any. This action cannot be undone."
+        confirmLabel="Delete material"
+        deletingLabel="Deleting..."
       />
     </div>
   );

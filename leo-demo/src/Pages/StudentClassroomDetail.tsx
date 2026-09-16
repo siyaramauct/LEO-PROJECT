@@ -1,6 +1,7 @@
-import { ArrowLeft, Bell, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, Bell, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon, LogOut } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
@@ -41,12 +42,15 @@ const materialTitle = (material: Material) => {
 export default function StudentClassroomDetail() {
   const { classroomId } = useParams<{ classroomId: string }>();
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
 
   useEffect(() => {
     if (!session?.user || !classroomId) return;
@@ -112,6 +116,27 @@ export default function StudentClassroomDetail() {
   const completedLessons = lessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id));
   const coverUrl = imageUrl(classroom?.cover_image_path ?? null, "/classRoomIllustration.png");
 
+  // Removes the calling student's enrolment row so the classroom no longer appears for them.
+  async function leaveClassroom() {
+    if (!classroomId || !session?.user || isLeavingClassroom) return;
+    setIsLeavingClassroom(true);
+    const { error: leaveError } = await supabase
+      .from("classroom_students")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("student_id", session.user.id);
+
+    setIsLeavingClassroom(false);
+    if (leaveError) {
+      console.error("Failed to leave classroom:", leaveError);
+      window.alert("You could not be removed from this classroom. Please try again.");
+      return;
+    }
+
+    setIsLeaveDialogOpen(false);
+    navigate("/student/classrooms");
+  }
+
   if (isLoading) return <main className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Loading classroom...</p></main>;
   if (error) return <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-center"><p className="text-sm text-red-700">{error}</p></main>;
 
@@ -166,9 +191,18 @@ export default function StudentClassroomDetail() {
                 <h1 className="mt-1 text-xl font-bold">Classroom overview</h1>
               </div>
             </div>
-            <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-              <Bell size={19} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsLeaveDialogOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+              >
+                <LogOut size={15} /> Leave classroom
+              </button>
+              <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
+                <Bell size={19} />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -233,6 +267,17 @@ export default function StudentClassroomDetail() {
           </div>
         </div>
       </main>
+
+      <DeleteAccountDialog
+        open={isLeaveDialogOpen}
+        isDeleting={isLeavingClassroom}
+        onCancel={() => setIsLeaveDialogOpen(false)}
+        onConfirm={() => void leaveClassroom()}
+        title={`Leave ${classroom?.classroom_name ?? "this classroom"}?`}
+        description="You will lose access to its lessons and materials. Your teacher can re-add you later using your username."
+        confirmLabel="Leave classroom"
+        deletingLabel="Leaving..."
+      />
     </div>
   );
 }
