@@ -1,6 +1,7 @@
-import { Bell, ChevronRight, Layers } from "lucide-react";
+import { ChevronRight, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
@@ -180,7 +181,7 @@ export default function StudentDashboard() {
       <StudentBottomNav />
       <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-medium text-violet-700">Student portal</p><h1 className="mt-1 text-xl font-bold">Hi, {isProfileLoading ? "..." : studentName}</h1><p className="mt-1 text-xs text-slate-500">Continue building your English skills.</p></div><button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><Bell size={19} /></button></div>
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-medium text-violet-700">Student portal</p><h1 className="mt-1 text-xl font-bold">Hi, {isProfileLoading ? "..." : studentName}</h1><p className="mt-1 text-xs text-slate-500">Continue building your English skills.</p></div><NotificationBell /></div>
         </header>
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">

@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   BarChart3,
-  Bell,
   Home,
   Plus,
   Settings,
@@ -19,6 +18,7 @@ import ClassroomMaterialsPanel, {
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import StudentEnrollmentPanel, {
   type StudentProfile,
@@ -372,10 +372,7 @@ export default function ClassroomDetail() {
           <Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
             <ArrowLeft size={19} />
           </Link>
-          <button aria-label="Notifications" className="relative rounded-full p-2 transition hover:bg-slate-100">
-            <Bell size={20} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" />
-          </button>
+          <NotificationBell />
         </header>
 
         <main className="px-4 pb-5 sm:px-6">
@@ -447,7 +444,7 @@ export default function ClassroomDetail() {
               <Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><ArrowLeft size={19} /></Link>
               <div><p className="text-xs font-medium text-violet-700">Teacher Portal</p><h1 className="mt-1 text-xl font-bold">Classroom overview</h1></div>
             </div>
-            <div className="flex items-center gap-4"><button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button><UserIdentity /></div>
+            <div className="flex items-center gap-4"><NotificationBell /><UserIdentity /></div>
           </header>
 
           <div className="mx-auto w-full max-w-7xl p-5">

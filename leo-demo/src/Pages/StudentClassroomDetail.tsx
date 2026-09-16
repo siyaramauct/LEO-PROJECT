@@ -1,7 +1,8 @@
-import { ArrowLeft, Bell, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon, LogOut } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon, LogOut } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
@@ -199,9 +200,7 @@ export default function StudentClassroomDetail() {
               >
                 <LogOut size={15} /> Leave classroom
               </button>
-              <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-                <Bell size={19} />
-              </button>
+              <NotificationBell />
             </div>
           </div>
         </header>

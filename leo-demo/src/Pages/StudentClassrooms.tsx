@@ -1,7 +1,8 @@
-import { Bell, BookOpen, Check, Search, Users, X } from "lucide-react";
+import { BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
 import { supabase } from "../supabase-client";
@@ -126,9 +127,7 @@ export default function StudentClassrooms() {
               <h1 className="mt-1 text-xl font-bold">My classrooms</h1>
               <p className="mt-1 text-xs text-slate-500">Open a classroom to see lessons and teacher resources.</p>
             </div>
-            <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-              <Bell size={19} />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

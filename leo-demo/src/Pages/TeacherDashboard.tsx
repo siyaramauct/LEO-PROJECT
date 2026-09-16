@@ -1,5 +1,4 @@
 import {
-  Bell,
   BookOpen,
   Users,
   BarChart3,
@@ -17,6 +16,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
@@ -282,10 +282,7 @@ export default function TeacherDashboard() {
             </p>
           </div>
 
-          <button className="relative rounded-full p-2 hover:bg-slate-100">
-            <Bell size={21} strokeWidth={1.8} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" />
-          </button>
+          <NotificationBell />
         </header>
 
         {/* =========================
@@ -567,9 +564,7 @@ export default function TeacherDashboard() {
             </div>
 
             <div className="flex shrink-0 items-center gap-4 self-end sm:self-auto">
-              <button className="rounded-xl p-2 hover:bg-slate-100">
-                <Bell size={19} />
-              </button>
+              <NotificationBell />
 
               <button
                 type="button"

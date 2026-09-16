@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   BarChart3,
-  Bell,
   Home,
   Plus,
   Settings,
@@ -12,6 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import ClassroomForm from "../Components/ClassroomForm";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import UserIdentity from "../Components/UserIdentity";
   
@@ -22,7 +22,7 @@ import UserIdentity from "../Components/UserIdentity";
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
           <Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><ArrowLeft size={19} /></Link>
-          <button aria-label="Notifications" className="relative rounded-full p-2 transition hover:bg-slate-100"><Bell size={20} /><span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" /></button>
+          <NotificationBell />
         </header>
 
         <main className="flex-1 px-4 pb-5 sm:px-6">
@@ -60,7 +60,7 @@ import UserIdentity from "../Components/UserIdentity";
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3">
             <div className="flex items-center gap-3"><Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><ArrowLeft size={19} /></Link><div><p className="text-xs font-medium text-violet-700">Teacher Portal</p><h1 className="mt-1 text-xl font-bold">Create a classroom</h1></div></div>
-            <div className="flex items-center gap-4"><button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button><UserIdentity /></div>
+            <div className="flex items-center gap-4"><NotificationBell /><UserIdentity /></div>
           </header>
 
           <div className="mx-auto w-full max-w-5xl p-5">
