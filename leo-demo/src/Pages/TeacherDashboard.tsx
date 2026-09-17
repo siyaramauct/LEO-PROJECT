@@ -478,7 +478,7 @@ export default function TeacherDashboard() {
               {lessons.map((lesson) => (
                 <Link
                   key={lesson.lesson_id}
-                  to={`/lessons/${lesson.lesson_id}`}
+                  to={`/teacher-classroom/${lesson.classroom_id}/lesson/${lesson.lesson_id}`}
                   className="flex min-w-0 items-center rounded-xl border border-slate-100 bg-white p-2 text-left transition hover:border-violet-200"
                 >
                   <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-slate-50">
@@ -696,7 +696,7 @@ export default function TeacherDashboard() {
                   lessons.slice(0, 2).map((lesson) => (
                     <Link
                       key={lesson.lesson_id}
-                      to={`/lessons/${lesson.lesson_id}`}
+                      to={`/teacher-classroom/${lesson.classroom_id}/lesson/${lesson.lesson_id}`}
                       className="flex items-center rounded-lg border border-slate-100 p-2"
                     >
                       <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-50">

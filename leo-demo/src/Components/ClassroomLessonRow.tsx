@@ -14,15 +14,15 @@ type ClassroomLesson = {
 type ClassroomLessonRowProps = {
   lesson: ClassroomLesson;
   onDelete?: (lesson: ClassroomLesson) => void;
+  onOpen?: (lesson: ClassroomLesson) => void;
 };
 
 export type { ClassroomLesson };
 
-export default function ClassroomLessonRow({ lesson, onDelete }: ClassroomLessonRowProps) {
+export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: ClassroomLessonRowProps) {
   return (
-    // The complete row acts as the future entry point to a lesson detail view.
     <div className="flex w-full items-center gap-3 border-b border-slate-100 py-3 text-left transition last:border-b-0 hover:bg-slate-50">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <button type="button" onClick={() => onOpen?.(lesson)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
           <img
             src={lesson.image}

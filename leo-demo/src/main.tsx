@@ -24,6 +24,7 @@ import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
 import StudentProfile from "./Pages/StudentProfile.tsx";
 import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
+import TeacherLessonReport from "./Pages/TeacherLessonReport.tsx";
 import TeacherProfile from "./Pages/TeacherProfile.tsx";
 import LoadingScreen from "./Components/LoadingScreen.tsx";
 import NotFound from "./Pages/NotFound.tsx";
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
       { path: "/teacher-dashboard", element: <TeacherDashboard /> },
       { path: "/TeacherClassroom", element: <TeacherClassroom /> },
       { path: "/teacher-classroom/:classroomId", element: <ClassroomDetail /> },
+      { path: "/teacher-classroom/:classroomId/lesson/:lessonId", element: <TeacherLessonReport /> },
       { path: "/create-classroom", element: <CreateClassroom /> },
       { path: "/create-lesson", element: <CreateLesson /> },
       { path: "/class-progress", element: <ClassProgress /> },

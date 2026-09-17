@@ -9,7 +9,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ClassroomLessonRow, { type ClassroomLesson } from "../Components/ClassroomLessonRow";
@@ -61,6 +61,7 @@ const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
 
 export default function ClassroomDetail() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const { classroomId } = useParams<{ classroomId: string }>();
   const teacherId = session?.user?.id;
   const [classroom, setClassroom] = useState<ClassroomRow | null>(null);
@@ -291,7 +292,7 @@ export default function ClassroomDetail() {
             {lessons.length === 0 ? (
               <EmptyLessons />
             ) : (
-              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
+              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} onOpen={(openedLesson) => navigate(`/teacher-classroom/${classroomId}/lesson/${openedLesson.id}`)} />)}</div>
             )}
           </section>
         </main>
@@ -361,7 +362,7 @@ export default function ClassroomDetail() {
               {lessons.length === 0 ? (
                 <EmptyLessons />
               ) : (
-                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
+                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} onOpen={(openedLesson) => navigate(`/teacher-classroom/${classroomId}/lesson/${openedLesson.id}`)} />)}</div>
               )}
             </section>
 
