@@ -20,7 +20,7 @@ export default function Lessons() {
 
   useEffect(() => {
     const fetchLessons = async () => {
-      const { data, error } = await supabase.from("Lesson").select("*").order("id", { ascending: true });
+      const { data, error } = await supabase.from("lessons").select("*").order("id", { ascending: true });
       if (error) {
         setErrorMessage("Could not load lessons. Please try again.");
       } else {
