@@ -1,9 +1,10 @@
 import {
-  BookOpenIcon,
   HomeIcon,
   ArrowLeftOnRectangleIcon,
+  SparklesIcon,
   PlusIcon,
   UserGroupIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline"
 import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
@@ -11,13 +12,14 @@ import { useAuth } from "../../context/AuthContext"
 const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
-  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
+  { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
 const mobileStartItems = desktopNavItems.slice(0, 2)
 const mobileEndItems = [
-  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
-  { label: "Quiz", path: "/quiz", icon: BookOpenIcon },
+  { label: "Hub", path: "/student/hub", icon: SparklesIcon },
+  { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
 export default function StudentBottomNav() {
@@ -59,7 +61,7 @@ export default function StudentBottomNav() {
           ))}
 
           <NavLink
-            to="/student/flashcards"
+            to="/student/practice"
             className={({ isActive }) =>
               `mt-4 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
                 isActive ? "bg-white text-violet-800" : "bg-white/10 text-violet-50 hover:bg-white/15"

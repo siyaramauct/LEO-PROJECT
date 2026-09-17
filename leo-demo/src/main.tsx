@@ -6,6 +6,7 @@ import { AuthContextProvider } from "../context/AuthContext.tsx";
 import { GuardRoute } from "./Components/GuardRoute";
 import ClassroomDetail from "./Pages/ClassroomDetail.tsx";
 import ClassProgress from "./Pages/ClassProgress";
+import ClassroomReport from "./Pages/ClassroomReport";
 import CreateClassroom from "./Pages/CreateClassroom.tsx";
 import CreateLesson from "./Pages/CreateLesson";
 import FlashActivity from "./Pages/FlashActivity.tsx";
@@ -23,6 +24,8 @@ import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
 import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
 import TeacherProfile from "./Pages/TeacherProfile.tsx";
+import StudentPractice from "./Pages/StudentPractice.tsx";
+
 
 const router = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -38,6 +41,7 @@ const router = createBrowserRouter([
       { path: "/quiz/:lessonId", element: <QuickQuiz /> },
       { path: "/summary", element: <LessonSummary /> },
       { path: "/student/dashboard", element: <StudentDashboard /> },
+      { path: "/student/practice", element: <StudentPractice /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },
       { path: "/student/flashcards", element: <StudentFlashcards /> },
     ],
@@ -51,6 +55,7 @@ const router = createBrowserRouter([
       { path: "/create-classroom", element: <CreateClassroom /> },
       { path: "/create-lesson", element: <CreateLesson /> },
       { path: "/class-progress", element: <ClassProgress /> },
+      { path: "/class-progress/:classroomId", element: <ClassroomReport /> },
       { path: "/teacher-profile", element: <TeacherProfile /> },
     ],
   },
