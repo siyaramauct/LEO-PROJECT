@@ -4,11 +4,21 @@ import { useEffect, useState } from "react";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { notifyUser } from "../notifications";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
-type Lesson = { lesson_id: string; title: string; description: string | null; lesson_image_path: string | null; created_at: string | null };
+type Lesson = {
+  lesson_id: string;
+  title: string;
+  description: string | null;
+  lesson_image_path: string | null;
+  created_at: string | null;
+  score: number | null;
+  totalQuestions: number | null;
+  percentage: number | null;
+};
 type Material = { resource_id: string; resource_type: "document" | "link"; resource_url: string; uploaded_date: string | null };
 
 const imageUrl = (path: string | null, fallback: string) => path ? supabase.storage.from("images").getPublicUrl(path).data.publicUrl : fallback;
@@ -42,7 +52,7 @@ const materialTitle = (material: Material) => {
 
 export default function StudentClassroomDetail() {
   const { classroomId } = useParams<{ classroomId: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const navigate = useNavigate();
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -91,20 +101,57 @@ export default function StudentClassroomDetail() {
         return;
       }
 
-      const classroomLessons = (lessonsResult.data ?? []) as Lesson[];
+      const classroomLessons = (lessonsResult.data ?? []).map((lesson) => ({
+        ...(lesson as Omit<Lesson, "score" | "totalQuestions" | "percentage">),
+        score: null,
+        totalQuestions: null,
+        percentage: null,
+      }));
       const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
-      const { data: attempts, error: attemptsError } = lessonIds.length
-        ? await supabase.from("lesson_attempts").select("lesson_id").eq("student_id", session.user.id).in("lesson_id", lessonIds).not("completed_at", "is", null)
-        : { data: [], error: null };
+      const [attemptsResult, mcqsResult] = lessonIds.length
+        ? await Promise.all([
+            supabase
+              .from("lesson_attempts")
+              .select("lesson_id, score, completed_at")
+              .eq("student_id", session.user.id)
+              .in("lesson_id", lessonIds)
+              .not("completed_at", "is", null)
+              .order("completed_at", { ascending: false }),
+            supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", lessonIds),
+          ])
+        : [
+            { data: [], error: null },
+            { data: [], error: null },
+          ];
+      const attempts = attemptsResult.data ?? [];
+      const attemptsError = attemptsResult.error;
 
       if (attemptsError) {
         console.error("Failed to load lesson progress:", attemptsError);
         if (isCurrent) setError("Lesson progress could not be loaded right now.");
       } else if (isCurrent) {
+        const latestAttemptByLesson = new Map<string, { score: number | null }>();
+        attempts.forEach((attempt) => {
+          if (!latestAttemptByLesson.has(attempt.lesson_id)) {
+            latestAttemptByLesson.set(attempt.lesson_id, { score: attempt.score });
+          }
+        });
+        const totalQuestionsByLesson = new Map((mcqsResult.data ?? []).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]));
+        const lessonsWithScores = classroomLessons.map((lesson) => {
+          const attempt = latestAttemptByLesson.get(lesson.lesson_id);
+          const totalQuestions = totalQuestionsByLesson.get(lesson.lesson_id) ?? null;
+          const score = attempt?.score ?? null;
+          return {
+            ...lesson,
+            score,
+            totalQuestions,
+            percentage: score !== null && totalQuestions ? Math.round((score / totalQuestions) * 100) : null,
+          };
+        });
         setClassroom(classroomResult.data as Classroom);
-        setLessons(classroomLessons);
+        setLessons(lessonsWithScores);
         setMaterials(materialsResult.error ? [] : ((materialsResult.data ?? []) as Material[]));
-        setCompletedLessonIds([...new Set((attempts ?? []).map((attempt) => attempt.lesson_id))]);
+        setCompletedLessonIds([...new Set(attempts.map((attempt) => attempt.lesson_id))]);
       }
       if (isCurrent) setIsLoading(false);
     };
@@ -121,20 +168,43 @@ export default function StudentClassroomDetail() {
   async function leaveClassroom() {
     if (!classroomId || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
+    const teacher = await supabase
+      .from("classrooms")
+      .select("teacher_id")
+      .eq("classroom_id", classroomId)
+      .single();
+
+    if (teacher.error) {
+      console.error("Failed to fetch classroom teacher:", teacher.error);
+      setIsLeavingClassroom(false);
+      window.alert("Could not verify classroom teacher. Please try again.");
+      return;
+    }
+
     const { error: leaveError } = await supabase
       .from("classroom_students")
       .delete()
       .eq("classroom_id", classroomId)
       .eq("student_id", session.user.id);
 
-    setIsLeavingClassroom(false);
     if (leaveError) {
       console.error("Failed to leave classroom:", leaveError);
+      setIsLeavingClassroom(false);
       window.alert("You could not be removed from this classroom. Please try again.");
       return;
     }
 
+    const studentName = [profile?.name, profile?.surname].filter(Boolean).join(" ") || session.user.email || "A student";
+    await notifyUser({
+      recipient_id: teacher.data.teacher_id,
+      type: "student_left_classroom",
+      title: "Student left classroom",
+      body: `${studentName} left \"${classroom?.classroom_name ?? "this classroom"}\".`,
+      link_url: `/teacher/classrooms/${classroomId}`,
+    });
+
     setIsLeaveDialogOpen(false);
+    setIsLeavingClassroom(false);
     navigate("/student/classrooms");
   }
 
@@ -148,9 +218,6 @@ export default function StudentClassroomDetail() {
           <h2 className="text-base font-bold">{title}</h2>
           <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${completed ? "bg-emerald-50 text-emerald-700" : "bg-violet-50 text-violet-700"}`}>
-          {items.length}
-        </span>
       </div>
       {items.length === 0 ? (
         <p className="py-7 text-center text-sm text-slate-500">
@@ -167,7 +234,7 @@ export default function StudentClassroomDetail() {
               <img src={imageUrl(lesson.lesson_image_path, "/Level1.png")} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
-                <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
+                <span className="mt-1 block truncate text-xs text-slate-500">{completed && lesson.score !== null && lesson.totalQuestions ? `${lesson.score} / ${lesson.totalQuestions} questions · ${lesson.percentage}%` : lesson.description ?? "Vocabulary practice"}</span>
               </span>
               {completed ? <CheckCircle2 size={18} className="shrink-0 text-emerald-600" /> : <ChevronRight size={18} className="shrink-0 text-slate-400" />}
             </Link>

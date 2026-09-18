@@ -5,13 +5,14 @@ import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
+import { notifyUser } from "../notifications";
 import { supabase } from "../supabase-client";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
 type Lesson = { lesson_id: string; classroom_id: string; title: string; description: string | null; lesson_image_path: string | null };
 
 export default function StudentClassrooms() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
@@ -66,11 +67,26 @@ export default function StudentClassrooms() {
   async function leaveClassroom() {
     if (!classroomToLeave || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
+    const teacher = await supabase
+      .from("classrooms")
+      .select("teacher_id")
+      .eq("classroom_id", classroomToLeave.id)
+      .single();
+    if (teacher.error) {
+      console.error("Failed to fetch classroom teacher:", teacher.error);
+      setIsLeavingClassroom(false);
+      window.alert("Could not verify classroom teacher. Please try again.");
+      return;
+    }
     const { error: leaveError } = await supabase
       .from("classroom_students")
       .delete()
       .eq("classroom_id", classroomToLeave.id)
       .eq("student_id", session.user.id);
+
+      
+
+
 
     if (leaveError) {
       console.error("Failed to leave classroom:", leaveError);
@@ -78,6 +94,15 @@ export default function StudentClassrooms() {
       window.alert("You could not be removed from this classroom. Please try again.");
       return;
     }
+
+    const studentName = [profile?.name, profile?.surname].filter(Boolean).join(" ") || session.user.email || "A student";
+    await notifyUser({
+      recipient_id: teacher.data.teacher_id,
+      type: "student_left_classroom",
+      title: "Student left classroom",
+      body: `${studentName} left \"${classroomToLeave.name}\".`,
+      link_url: `/teacher/classrooms/${classroomToLeave.id}`,
+    });
 
     const remainingLessonIds = lessons
       .filter((lesson) => lesson.classroom_id !== classroomToLeave.id)

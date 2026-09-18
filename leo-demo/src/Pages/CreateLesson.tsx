@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { notifyClassroomStudents } from "../notifications";
 import { supabase } from "../supabase-client";
 
 /* ------------------------------------------------------------------------ */
@@ -106,32 +107,6 @@ function findIncompleteQuestion(title: string, questions: EditableQuestion[]): b
     || !question.option_d.trim()
     || !correctOptions.includes(question.correct_option),
   );
-}
-
-// Notifies every student enrolled in the classroom that a new lesson was added.
-// Failures here are logged only — they must never block lesson creation.
-async function notifyClassroomOfNewLesson(classroomId: string, lessonId: number, lessonTitle: string) {
-  const { data: students, error: studentsError } = await supabase
-    .from("classroom_students")
-    .select("student_id")
-    .eq("classroom_id", classroomId);
-
-  if (studentsError) {
-    console.error("Error loading classroom students for notifications:", studentsError);
-    return;
-  }
-  if (!students?.length) return;
-
-  const notifications = students.map((student) => ({
-    recipient_id: student.student_id,
-    type: "new_lesson",
-    title: "New lesson available",
-    body: `Your teacher added "${lessonTitle}".`,
-    link_url: `/lesson/${lessonId}`,
-  }));
-
-  const { error: notificationError } = await supabase.from("notifications").insert(notifications);
-  if (notificationError) console.error("Error creating notifications:", notificationError);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -322,7 +297,12 @@ export default function CreateLesson() {
       if (questionError) throw new Error(questionError.message);
 
       // Best-effort: notification delivery should never block lesson creation.
-      await notifyClassroomOfNewLesson(classroomId, lesson.lesson_id, title.trim());
+      await notifyClassroomStudents(classroomId, {
+        type: "new_lesson",
+        title: "New lesson available",
+        body: `Your teacher added "${title.trim()}".`,
+        link_url: `/lesson/${lesson.lesson_id}`,
+      });
 
       navigate(`/teacher-classroom/${classroomId}`);
     } catch (creationError) {

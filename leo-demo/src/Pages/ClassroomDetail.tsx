@@ -23,6 +23,7 @@ import SidebarItem from "../Components/SidebarItem";
 import StudentEnrollmentPanel, {
   type StudentProfile,
 } from "../Components/StudentEnrollmentPanel";
+import { notifyClassroomStudents, notifyUser } from "../notifications";
 import UserIdentity from "../Components/UserIdentity";
 import { supabase } from "../supabase-client";
 
@@ -220,6 +221,13 @@ export default function ClassroomDetail() {
     setUsernameSearch("");
     setStudentSearchResults([]);
     setSelectedStudent(null);
+    await notifyUser({
+      recipient_id: selectedStudent.id,
+      type: "added_to_classroom",
+      title: "You joined a new classroom",
+      body: `Your teacher added you to "${classroom?.classroom_name ?? "a classroom"}".`,
+      link_url: `/student/classrooms/${classroomId}`,
+    });
   }
 
   const addFile = async (file: File) => {
@@ -253,6 +261,12 @@ export default function ClassroomDetail() {
       return;
     }
     setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
+    await notifyClassroomStudents(classroomId, {
+      type: "new_material",
+      title: "New classroom material",
+      body: `Your teacher shared "${file.name}" in "${classroom?.classroom_name ?? "your classroom"}".`,
+      link_url: `/student/classrooms/${classroomId}`,
+    });
   };
 
   const addLink = async (url: string) => {
@@ -272,6 +286,12 @@ export default function ClassroomDetail() {
       return;
     }
     setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
+    await notifyClassroomStudents(classroomId, {
+      type: "new_material",
+      title: "New classroom material",
+      body: `Your teacher shared a link in "${classroom?.classroom_name ?? "your classroom"}".`,
+      link_url: `/student/classrooms/${classroomId}`,
+    });
   };
 
   const deleteLesson = async () => {
@@ -312,6 +332,13 @@ export default function ClassroomDetail() {
 
     setStudentProfiles((students) => students.filter((student) => student.id !== studentToRemove.id));
     setEnrolledStudentIds((studentIds) => studentIds.filter((id) => id !== studentToRemove.id));
+    await notifyUser({
+      recipient_id: studentToRemove.id,
+      type: "removed_from_classroom",
+      title: "You were removed from a classroom",
+      body: `You were removed from "${classroom?.classroom_name ?? "a classroom"}".`,
+      link_url: "/student/classrooms",
+    });
     setStudentToRemove(null);
   };
 
