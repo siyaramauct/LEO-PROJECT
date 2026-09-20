@@ -1,5 +1,6 @@
 import {
   BookOpenIcon,
+  ChartBarIcon,
   HomeIcon,
   ArrowLeftOnRectangleIcon,
   SparklesIcon,
@@ -14,6 +15,7 @@ const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
+  { label: "Report", path: "/student/report", icon: ChartBarIcon },
   { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]

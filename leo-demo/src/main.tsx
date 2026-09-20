@@ -21,6 +21,7 @@ import StudentClassrooms from "./Pages/StudentClassrooms.tsx";
 import StudentDashboard from "./Pages/StudentDashboard.tsx";
 import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
 import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
+import StudentLearningReport from "./Pages/StudentLearningReport.tsx";
 import StudentProfile from "./Pages/StudentProfile.tsx";
 import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
       { path: "/summary", element: <LessonSummary /> },
       { path: "/student/dashboard", element: <StudentDashboard /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },
+      { path: "/student/report", element: <StudentLearningReport /> },
       { path: "/student/flashcards", element: <StudentFlashcards /> },
       { path: "/student/hub", element: <StudentLearningHub /> },
       { path: "/student/profile", element: <StudentProfile /> },
