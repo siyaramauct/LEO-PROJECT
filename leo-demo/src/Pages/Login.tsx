@@ -1,7 +1,13 @@
 import LoginForm from "../Components/Loginform";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
+import { oauthErrorFromUrl } from "../auth/oauthError";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
+  const { session, loading } = useAuth();
+  const oauthError = oauthErrorFromUrl();
+  if (!loading && session) return <Navigate to="/" replace />;
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col lg:flex-row bg-white">
 
@@ -64,6 +70,7 @@ export default function Login() {
           </div>
 
           {/* Google button */}
+          {oauthError && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Google sign-in failed: {oauthError}</p>}
           <GoogleSignInButton />
 
           {/* Divider */}

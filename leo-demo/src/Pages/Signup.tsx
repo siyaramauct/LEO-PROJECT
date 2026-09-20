@@ -1,9 +1,13 @@
 import SignupForm from "../Components/Signupform";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 
 
 export default function SignUp() {
+  const { session, loading } = useAuth();
+  if (!loading && session) return <Navigate to="/" replace />;
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col lg:flex-row bg-white">
 
