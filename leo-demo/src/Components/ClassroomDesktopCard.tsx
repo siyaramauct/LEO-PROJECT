@@ -82,10 +82,10 @@ export default function ClassroomDesktopCard({
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
         <div>
           <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
-            Classroom Join Code
+            Invite students
           </p>
-          <p className="mt-1 font-mono text-xs font-bold text-violet-700">
-            {classroom.joinCode}
+          <p className="mt-1 text-xs font-semibold text-violet-700">
+            Open classroom to share a code
           </p>
         </div>
 

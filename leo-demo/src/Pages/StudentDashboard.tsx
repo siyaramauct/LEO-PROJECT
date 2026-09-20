@@ -2,6 +2,7 @@ import { Bell, ChevronRight, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import JoinClassroomForm from "../Components/JoinClassroomForm";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
 
@@ -188,6 +189,8 @@ export default function StudentDashboard() {
             <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" /><img src={studentClassroom?.cover_image_path ?? undefined} alt="Student learning" className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" /><div className="relative max-w-md pr-24 sm:pr-32"><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom?.classroom_name}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom?.description}</p><button type="button" disabled={!studentClassroom} onClick={() => studentClassroom && navigate(`/student/classrooms/${studentClassroom.classroom_id}`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60">Open Classroom <ChevronRight size={16} /></button></div></article>
             <article className="rounded-xl border border-slate-100 bg-white p-5"><h2 className="text-sm font-bold">Learning overview</h2><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">{progress ? `${progress.weekly_lessons_completed} / ${progress.weekly_goal}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">{progress ? `${progress.current_streak} day${progress.current_streak === 1 ? "" : "s"}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-700" style={{ width: `${weeklyPct}%` }} /></div><p className="mt-2 text-xs text-slate-500">{weeklyPct}% of this week’s goal completed</p></article>
           </section>
+
+          <JoinClassroomForm inputId="dashboard-classroom-code" className="mt-4 border-b border-slate-200 bg-white px-4 py-5 sm:px-6" />
 
           <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             <button type="button" onClick={() => navigate("/student/flashcards")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">

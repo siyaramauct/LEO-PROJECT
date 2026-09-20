@@ -20,9 +20,9 @@ import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
-import StudentEnrollmentPanel, {
+import ClassroomInvitePanel, {
   type StudentProfile,
-} from "../Components/StudentEnrollmentPanel";
+} from "../Components/ClassroomInvitePanel";
 import UserIdentity from "../Components/UserIdentity";
 import { supabase } from "../supabase-client";
 
@@ -31,7 +31,6 @@ type ClassroomRow = {
   classroom_name: string;
   description: string | null;
   cover_image_path: string | null;
-  join_code: string | null;
   proficiency_level: string | null;
   language: string | null;
   student_count: number | null;
@@ -91,11 +90,9 @@ export default function ClassroomDetail() {
   const [materials, setMaterials] = useState<ClassroomMaterial[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [enrolledStudentIds, setEnrolledStudentIds] = useState<string[]>([]);
-  const [usernameSearch, setUsernameSearch] = useState("");
-  const [studentSearchResults, setStudentSearchResults] = useState<StudentProfile[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
-  const [isSearchingStudents, setIsSearchingStudents] = useState(false);
-  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
+  const [isRotatingCode, setIsRotatingCode] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [isSavingMaterial, setIsSavingMaterial] = useState(false);
   const [materialError, setMaterialError] = useState<string | null>(null);
@@ -111,12 +108,16 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult, materialsResult] = await Promise.all([
+      const [classroomResult, lessonsResult, enrollmentResult, materialsResult, inviteResult] = await Promise.all([
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
         supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
+        supabase.rpc("get_classroom_invite_code", { p_classroom_id: classroomId }),
       ]);
+
+      setInviteCode(inviteResult.data ?? null);
+      setInviteCodeError(inviteResult.error ? `Could not load invitation code: ${inviteResult.error.message}` : null);
 
       if (classroomResult.error) {
         console.error("Failed to load classroom:", classroomResult.error);
@@ -166,54 +167,17 @@ export default function ClassroomDetail() {
 
   const enrolledStudents = studentProfiles.filter((student) => enrolledStudentIds.includes(student.id));
 
-  async function searchStudents() {
-    const searchTerm = usernameSearch.trim();
-    if (!searchTerm || isSearchingStudents) return;
-    setIsSearchingStudents(true);
-    setEnrollmentError(null);
-    setSelectedStudent(null);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name, surname, username, user_role")
-      .ilike("username", `${searchTerm}%`)
-      .order("username")
-      .limit(10);
-    setIsSearchingStudents(false);
-    if (error) {
-      setEnrollmentError(error.message);
+  async function rotateInviteCode() {
+    if (!classroomId || isRotatingCode || !window.confirm("Create a new classroom code? The old code will stop working.")) return;
+    setIsRotatingCode(true);
+    setInviteCodeError(null);
+    const { data, error } = await supabase.rpc("rotate_classroom_invite_code", { p_classroom_id: classroomId });
+    setIsRotatingCode(false);
+    if (error || !data) {
+      setInviteCodeError(error?.message ?? "Could not create a new code.");
       return;
     }
-    const matchingProfiles = (data ?? []) as StudentProfile[];
-    const matchingStudents = matchingProfiles.filter((student) => student.user_role === "student" && !enrolledStudentIds.includes(student.id));
-    setStudentSearchResults(matchingStudents);
-    const exactMatch = matchingStudents.find((student) => student.username?.toLowerCase() === searchTerm.toLowerCase());
-    if (exactMatch) setSelectedStudent(exactMatch);
-    if (!matchingStudents.length) {
-      const matchingProfile = matchingProfiles.find((profile) => profile.username?.toLowerCase() === searchTerm.toLowerCase());
-      const isAlreadyEnrolled = Boolean(matchingProfile && enrolledStudentIds.includes(matchingProfile.id));
-      setEnrollmentError(isAlreadyEnrolled ? "This student is already enrolled in the classroom." : matchingProfile ? "This username belongs to a profile that is not marked as a student." : "No profile was found with that username.");
-    }
-  }
-
-  async function enrollStudent() {
-    if (!classroomId || !selectedStudent || !session?.user) return;
-    setIsEnrolling(true);
-    setEnrollmentError(null);
-    const { error } = await supabase.from("classroom_students").insert({
-      student_id: selectedStudent.id,
-      classroom_id: classroomId,
-      enrolled_at: new Date().toISOString(),
-    });
-    setIsEnrolling(false);
-    if (error) {
-      setEnrollmentError(error.code === "23505" ? "This student is already enrolled in the classroom." : error.message);
-      return;
-    }
-    setStudentProfiles((students) => students.some((student) => student.id === selectedStudent.id) ? students : [...students, selectedStudent]);
-    setEnrolledStudentIds((studentIds) => [...studentIds, selectedStudent.id]);
-    setUsernameSearch("");
-    setStudentSearchResults([]);
-    setSelectedStudent(null);
+    setInviteCode(data);
   }
 
   const addFile = async (file: File) => {
@@ -292,7 +256,6 @@ export default function ClassroomDetail() {
 
   const classroomName = classroom?.classroom_name ?? "Classroom";
   const description = classroom?.description ?? "";
-  const joinCode = classroom?.join_code ?? "—";
   const studentCount = enrolledStudentIds.length;
   const lessonCount = lessons.length;
 
@@ -346,7 +309,7 @@ export default function ClassroomDetail() {
           </div>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-            <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+            <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
           </section>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
@@ -407,7 +370,7 @@ export default function ClassroomDetail() {
                 <h2 className="mt-2 text-2xl font-bold">{classroomName}</h2>
                 {description && <p className="mt-2 max-w-2xl text-sm text-white/80">{description}</p>}
                 <p className="mt-4 text-xs font-semibold text-white">
-                  {studentCount} students · {lessonCount} lessons · Join code {joinCode}
+                  {studentCount} students · {lessonCount} lessons
                 </p>
               </div>
               <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-lg bg-white shadow-sm">
@@ -421,7 +384,7 @@ export default function ClassroomDetail() {
             </div>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
-              <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+              <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
             </section>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">

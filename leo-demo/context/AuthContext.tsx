@@ -148,7 +148,10 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { name, surname } },
+            options: {
+                data: { name, surname },
+                emailRedirectTo: window.location.origin + "/",
+            },
         });
         if (error) throw error;
         console.log("User signed up successfully");

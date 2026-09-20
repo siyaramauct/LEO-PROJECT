@@ -34,7 +34,6 @@ type ClassroomFormValues = {
   proficiencyLevel: string;
   language: string;
   coverId: string;
-  inviteOnly: boolean;
 };
 
 type ClassroomFormProps = {
@@ -47,11 +46,10 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ClassroomFormValues>({
     mode: "onSubmit",
     reValidateMode: "onSubmit",
-    defaultValues: { proficiencyLevel: "Elementary", language: "English", coverId: coverOptions[0].id, inviteOnly: true },
+    defaultValues: { proficiencyLevel: "Elementary", language: "English", coverId: coverOptions[0].id },
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const selectedCover = watch("coverId");
-  const isInviteOnly = watch("inviteOnly");
 
   const submitClassroom: SubmitHandler<ClassroomFormValues> = async (values) => {
     if (!session?.user) {
@@ -73,7 +71,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
       proficiency_level: values.proficiencyLevel,
       language: values.language,
       cover_image_path: selectedCoverOption.path,
-      invite_only: values.inviteOnly,
+      invite_only: true,
       join_code: generateJoinCode(values.name),
     });
 
@@ -97,7 +95,6 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
         <input type="hidden" {...register("coverId", { required: "Choose a classroom cover." })} />
         <div className="grid grid-cols-3 gap-2">{coverOptions.map((cover) => <button key={cover.id} type="button" aria-label={`Use ${cover.alt} as the classroom cover`} aria-pressed={selectedCover === cover.id} onClick={() => setValue("coverId", cover.id, { shouldValidate: true })} className={`relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition ${selectedCover === cover.id ? "border-violet-700" : "border-transparent hover:border-slate-300"}`}><img src={cover.image} alt={cover.alt} className="h-full w-full object-cover" />{selectedCover === cover.id && <span className="absolute inset-x-0 bottom-0 h-1 bg-violet-700" />}</button>)}</div>
       </ClassroomFormField>
-      <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3"><div><p className="text-sm font-semibold text-slate-800">Invite-only classroom</p><p className="mt-1 text-xs text-slate-500">Learners join with the code you share with them.</p></div><button type="button" role="switch" aria-checked={isInviteOnly} onClick={() => setValue("inviteOnly", !isInviteOnly)} className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${isInviteOnly ? "bg-violet-700" : "bg-slate-300"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${isInviteOnly ? "left-6" : "left-1"}`} /></button></div>
       {submitError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
       <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end"><Link to="/TeacherClassroom" className="rounded-lg px-4 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Cancel</Link><button type="submit" disabled={isSubmitting} className="flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300"><Plus size={17} />{isSubmitting ? "Creating..." : "Create classroom"}</button></div>
     </form>

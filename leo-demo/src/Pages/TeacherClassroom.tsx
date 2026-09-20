@@ -30,7 +30,6 @@ type ClassroomRow = {
   description: string | null;
   cover_image_path: string | null;
   created_date: Date | null;
-  join_code?: string | null;
   // Embedded PostgREST counts, e.g. [{ count: 3 }]
   lessons?: { count: number }[] | null;
   classroom_students?: { count: number }[] | null;
@@ -53,7 +52,6 @@ const toClassroom = (classroom: ClassroomRow): Classroom => {
     description: classroom.description ?? "No description has been added yet.",
     studentCount: classroom.classroom_students?.[0]?.count ?? 0,
     lessonCount: classroom.lessons?.[0]?.count ?? 0,
-    joinCode: classroom.join_code ?? "Not available",
     createdDate: formatCreatedDate(classroom.created_date),
     image: classroom.cover_image_path ? coverUrl : "",
     imageAlt: `${classroom.classroom_name} classroom cover`,
@@ -88,7 +86,6 @@ export default function TeacherClassrooms() {
           description,
           cover_image_path,
           created_date,
-          join_code,
           lessons(count),
           classroom_students(count)
         `

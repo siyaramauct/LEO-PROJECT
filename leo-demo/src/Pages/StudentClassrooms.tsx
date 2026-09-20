@@ -2,6 +2,7 @@ import { Bell, BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import JoinClassroomForm from "../Components/JoinClassroomForm";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
 import { supabase } from "../supabase-client";
@@ -19,7 +20,6 @@ export default function StudentClassrooms() {
   const [classroomSearch, setClassroomSearch] = useState("");
   const [classroomToLeave, setClassroomToLeave] = useState<StudentClassroomCardData | null>(null);
   const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
-
   useEffect(() => {
     if (!session?.user) return;
     const loadClassrooms = async () => {
@@ -152,6 +152,8 @@ export default function StudentClassrooms() {
             </article>
           </section>
 
+          <JoinClassroomForm inputId="classroom-code" className="mt-5 border-b border-slate-200 bg-white px-4 py-5 sm:px-6" />
+
           {isLoading && <p className="py-12 text-center text-sm text-slate-500">Loading your classrooms...</p>}
           {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
@@ -160,7 +162,7 @@ export default function StudentClassrooms() {
               <section className="mt-5 rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
                 <Users size={26} className="mx-auto text-slate-300" />
                 <h2 className="mt-3 text-sm font-semibold">No classrooms yet</h2>
-                <p className="mt-1 text-xs text-slate-500">Your teacher will add you to a classroom before lessons appear here.</p>
+                <p className="mt-1 text-xs text-slate-500">Ask your teacher for an invitation code, then enter it above.</p>
               </section>
             ) : (
               <>
@@ -218,7 +220,7 @@ export default function StudentClassrooms() {
         onCancel={() => setClassroomToLeave(null)}
         onConfirm={() => void leaveClassroom()}
         title={`Leave ${classroomToLeave?.name ?? "this classroom"}?`}
-        description="You will lose access to this classroom's lessons and resources until your teacher adds you back."
+        description="You will lose access to this classroom's lessons and resources until you join again with its code."
         confirmLabel="Leave classroom"
         deletingLabel="Leaving classroom..."
       />
