@@ -234,9 +234,16 @@ export default function StudentClassroomDetail() {
               <img src={imageUrl(lesson.lesson_image_path, "/Level1.png")} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
-                <span className="mt-1 block truncate text-xs text-slate-500">{completed && lesson.score !== null && lesson.totalQuestions ? `${lesson.score} / ${lesson.totalQuestions} questions · ${lesson.percentage}%` : lesson.description ?? "Vocabulary practice"}</span>
+                <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
               </span>
-              {completed ? <CheckCircle2 size={18} className="shrink-0 text-emerald-600" /> : <ChevronRight size={18} className="shrink-0 text-slate-400" />}
+              {completed ? (
+                lesson.score !== null && lesson.totalQuestions ? (
+                  <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs font-bold text-violet-700 sm:gap-3">
+                    <span>{lesson.score} / {lesson.totalQuestions}</span>
+                    <span className="hidden sm:inline">{lesson.percentage}%</span>
+                  </span>
+                ) : <CheckCircle2 size={18} className="shrink-0 text-violet-700" />
+              ) : <ChevronRight size={18} className="shrink-0 text-slate-400" />}
             </Link>
           ))}
         </div>

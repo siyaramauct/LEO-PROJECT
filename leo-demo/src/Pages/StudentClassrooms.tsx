@@ -1,4 +1,4 @@
-import { BookOpen, Check, Search, Users, X } from "lucide-react";
+import { Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
@@ -115,8 +115,6 @@ export default function StudentClassrooms() {
     setIsLeavingClassroom(false);
   }
 
-  const completedLessons = completedLessonIds.length;
-  const lessonCount = lessons.length;
   const normalisedSearch = classroomSearch.trim().toLowerCase();
   const visibleClassrooms = classrooms.filter((classroom) => `${classroom.classroom_name} ${classroom.description ?? ""}`.toLowerCase().includes(normalisedSearch));
 
@@ -157,31 +155,12 @@ export default function StudentClassrooms() {
         </header>
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-          {/* Overview stats */}
-          <section className="grid gap-3 sm:grid-cols-3">
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
-              <Users size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{classrooms.length}</p>
-              <p className="mt-1 text-xs text-slate-500">Classrooms</p>
-            </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
-              <BookOpen size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{lessonCount}</p>
-              <p className="mt-1 text-xs text-slate-500">Available lessons</p>
-            </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
-              <Check size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{completedLessons}</p>
-              <p className="mt-1 text-xs text-slate-500">Completed lessons</p>
-            </article>
-          </section>
-
           {isLoading && <p className="py-12 text-center text-sm text-slate-500">Loading your classrooms...</p>}
           {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
           {!isLoading && !error && (
             classrooms.length === 0 ? (
-              <section className="mt-5 rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
+              <section className="rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
                 <Users size={26} className="mx-auto text-slate-300" />
                 <h2 className="mt-3 text-sm font-semibold">No classrooms yet</h2>
                 <p className="mt-1 text-xs text-slate-500">Your teacher will add you to a classroom before lessons appear here.</p>
@@ -189,7 +168,7 @@ export default function StudentClassrooms() {
             ) : (
               <>
                 {/* Search */}
-                <section className="mt-5 flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                <section className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-sm font-bold">Find a classroom</h2>
                     <p className="mt-0.5 text-xs text-slate-500">Search by classroom name or topic.</p>
