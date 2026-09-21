@@ -17,9 +17,16 @@ begin
         ''
     );
     first_name := coalesce(
-        nullif(metadata ->> 'given_name', ''),
-        nullif(metadata ->> 'first_name', ''),
-        nullif(metadata ->> 'name', ''),
+        nullif(case
+            when metadata ->> 'given_name' = full_name and position(' ' in full_name) > 0
+                then split_part(full_name, ' ', 1)
+            else metadata ->> 'given_name'
+        end, ''),
+        nullif(case
+            when metadata ->> 'first_name' = full_name and position(' ' in full_name) > 0
+                then split_part(full_name, ' ', 1)
+            else metadata ->> 'first_name'
+        end, ''),
         nullif(split_part(full_name, ' ', 1), ''),
         nullif(split_part(new.email, '@', 1), ''),
         'Learner'

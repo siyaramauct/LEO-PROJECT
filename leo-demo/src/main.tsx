@@ -9,12 +9,14 @@ import ClassProgress from "./Pages/ClassProgress";
 import CreateClassroom from "./Pages/CreateClassroom.tsx";
 import CreateLesson from "./Pages/CreateLesson";
 import FlashActivity from "./Pages/FlashActivity.tsx";
+import ForgotPassword from "./Pages/ForgotPassword.tsx";
 import Home from "./Pages/Home.tsx";
 import LearningHub from "./Pages/LearningHub.tsx";
 import Lessons from "./Pages/Lessons.tsx";
 import LessonSummary from "./Pages/LessonSummary.tsx";
 import Login from "./Pages/Login.tsx";
 import QuickQuiz from "./Pages/QuickQuiz.tsx";
+import ResetPassword from "./Pages/ResetPassword.tsx";
 import RoleSelection from "./Pages/RoleSelection.tsx";
 import SignUp from "./Pages/Signup.tsx";
 import StudentClassrooms from "./Pages/StudentClassrooms.tsx";
@@ -33,6 +35,8 @@ const router = createBrowserRouter([
   { path: "/", element: <Home /> },
   { path: "/signup", element: <SignUp /> },
   { path: "/login", element: <Login /> },
+  { path: "/forgot-password", element: <ForgotPassword /> },
+  { path: "/reset-password", element: <ResetPassword /> },
   { path: "/loading", element: <LoadingScreen /> },
   { path: "/select-role", element: <RoleSelection /> },
   {

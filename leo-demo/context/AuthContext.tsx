@@ -29,9 +29,17 @@ function profileNames(user: User) {
     const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
     const parts = fullName.split(/\s+/).filter(Boolean);
     const emailName = user.email?.split("@")[0] ?? "Learner";
+    const suppliedFirstName = typeof metadata.given_name === "string"
+        ? metadata.given_name.trim()
+        : typeof metadata.first_name === "string"
+            ? metadata.first_name.trim()
+            : "";
+    const firstName = suppliedFirstName === fullName && parts.length > 1
+        ? parts[0]
+        : suppliedFirstName;
 
     return {
-        name: metadata.given_name || parts[0] || metadata.name || emailName,
+        name: firstName || parts[0] || metadata.name || emailName,
         surname: metadata.surname || metadata.family_name || parts.slice(1).join(" ") || "",
     };
 }
