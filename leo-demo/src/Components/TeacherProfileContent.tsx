@@ -1,6 +1,7 @@
 import { Bell, Languages, LockKeyhole, LogOut, Trash2, User } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import DeleteAccountDialog from "./DeleteAccountDialog";
+import ChangePasswordDialog from "./ChangePasswordDialog";
 
 type TeacherProfileContentProps = {
   fullName: string;
@@ -13,6 +14,7 @@ type TeacherProfileContentProps = {
 
 export default function TeacherProfileContent({ fullName, initials, loggingOut, onLogout, deletingAccount, onDeleteAccount }: TeacherProfileContentProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -35,7 +37,7 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         <h3 className="font-bold">Preferences</h3>
         <div className="mt-4 divide-y divide-slate-100">
           <ProfileOption icon={<Bell size={18} />} title="Notifications" description="Stay informed about classroom activity" />
-          <ProfileOption icon={<LockKeyhole size={18} />} title="Password and security" description="Update your sign-in details" />
+          <ProfileOption icon={<LockKeyhole size={18} />} title="Password and security" description="Update your sign-in details" onClick={() => setShowPasswordDialog(true)} />
           <ProfileOption icon={<Languages size={18} />} title="Language" description="English" />
         </div>
       </section>
@@ -65,6 +67,7 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         confirmLabel="Delete account"
         deletingLabel="Deleting..."
       />
+      {showPasswordDialog && <ChangePasswordDialog onClose={() => setShowPasswordDialog(false)} />}
     </div>
   );
 }
@@ -73,6 +76,6 @@ function ProfileField({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg bg-slate-50 px-4 py-3"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value}</p></div>;
 }
 
-function ProfileOption({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-  return <button type="button" className="flex w-full items-center gap-3 py-4 text-left"><span className="text-violet-700">{icon}</span><span className="flex-1"><span className="block text-sm font-semibold text-slate-800">{title}</span><span className="mt-1 block text-xs text-slate-500">{description}</span></span><span className="text-lg text-slate-300">›</span></button>;
+function ProfileOption({ icon, title, description, onClick }: { icon: ReactNode; title: string; description: string; onClick?: () => void }) {
+  return <button type="button" onClick={onClick} className="flex w-full items-center gap-3 py-4 text-left"><span className="text-violet-700">{icon}</span><span className="flex-1"><span className="block text-sm font-semibold text-slate-800">{title}</span><span className="mt-1 block text-xs text-slate-500">{description}</span></span><span className="text-lg text-slate-300">›</span></button>;
 }
