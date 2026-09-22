@@ -25,9 +25,11 @@ import StudentClassroomDetail from "./Pages/StudentClassroomDetail.tsx";
 import StudentDashboard from "./Pages/StudentDashboard.tsx";
 import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
 import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
+import StudentLearningReport from "./Pages/StudentLearningReport.tsx";
 import StudentProfile from "./Pages/StudentProfile.tsx";
 import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
+import TeacherLessonReport from "./Pages/TeacherLessonReport.tsx";
 import TeacherProfile from "./Pages/TeacherProfile.tsx";
 import StudentPractice from "./Pages/StudentPractice.tsx";
 import LoadingScreen from "./Components/LoadingScreen.tsx";
@@ -53,6 +55,7 @@ const router = createBrowserRouter([
       { path: "/student/practice", element: <StudentPractice /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },
       { path: "/student/classrooms/:classroomId", element: <StudentClassroomDetail /> },
+      { path: "/student/report", element: <StudentLearningReport /> },
       { path: "/student/flashcards", element: <StudentFlashcards /> },
       { path: "/student/hub", element: <StudentLearningHub /> },
       { path: "/student/profile", element: <StudentProfile /> },
@@ -64,6 +67,7 @@ const router = createBrowserRouter([
       { path: "/teacher-dashboard", element: <TeacherDashboard /> },
       { path: "/TeacherClassroom", element: <TeacherClassroom /> },
       { path: "/teacher-classroom/:classroomId", element: <ClassroomDetail /> },
+      { path: "/teacher-classroom/:classroomId/lesson/:lessonId", element: <TeacherLessonReport /> },
       { path: "/create-classroom", element: <CreateClassroom /> },
       { path: "/create-lesson", element: <CreateLesson /> },
       { path: "/class-progress", element: <ClassProgress /> },
