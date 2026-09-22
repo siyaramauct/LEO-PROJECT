@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useForm, type SubmitHandler } from "react-hook-form"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext.tsx"
 
 type Inputs = {
@@ -78,9 +78,9 @@ export default function LoginForm() {
         />
         {errors.password && <p className="mt-1 text-[11px] text-red-500">{errors.password.message}</p>}
         <div className="mt-2 text-right">
-          <a href="#" className="text-[11px] text-violet-600 font-semibold hover:underline">
+          <Link to="/forgot-password" className="text-[11px] text-violet-600 font-semibold hover:underline">
             Forgot password?
-          </a>
+          </Link>
         </div>
       </div>
 

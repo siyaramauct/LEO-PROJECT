@@ -64,7 +64,7 @@ export default function RoleSelection() {
 
       let username = existingProfile.username;
       if (!username) {
-        const prefix = usernamePrefix(user.user_metadata?.name ?? "", user.user_metadata?.surname ?? "");
+        const prefix = usernamePrefix(profile.name ?? "", profile.surname ?? "");
         for (let attempt = 0; attempt < 10; attempt += 1) {
           const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000).toString().padStart(3, "0");
           const candidate = `${prefix}${randomDigits}`;

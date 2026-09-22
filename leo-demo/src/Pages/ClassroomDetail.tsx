@@ -2,11 +2,7 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
-  BookOpen,
-  ClipboardList,
   Home,
-  Layers,
-  LogOut,
   Plus,
   Settings,
   Sparkles,
@@ -20,12 +16,13 @@ import ClassroomLessonRow, { type ClassroomLesson } from "../Components/Classroo
 import ClassroomMaterialsPanel, {
   type ClassroomMaterial,
 } from "../Components/ClassroomMaterialsPanel";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
-import StudentEnrollmentPanel, {
+import ClassroomInvitePanel, {
   type StudentProfile,
-} from "../Components/StudentEnrollmentPanel";
+} from "../Components/ClassroomInvitePanel";
 import UserIdentity from "../Components/UserIdentity";
 import { supabase } from "../supabase-client";
 
@@ -34,7 +31,6 @@ type ClassroomRow = {
   classroom_name: string;
   description: string | null;
   cover_image_path: string | null;
-  join_code: string | null;
   proficiency_level: string | null;
   language: string | null;
   student_count: number | null;
@@ -42,7 +38,7 @@ type ClassroomRow = {
 };
 
 type LessonRow = {
-  id: string;
+  lesson_id: string;
   title: string;
   description: string | null;
   lesson_image_path: string | null;
@@ -50,7 +46,31 @@ type LessonRow = {
   word_count: number | null;
 };
 
+type MaterialRow = {
+  resource_id: string;
+  resource_type: "document" | "link";
+  resource_url: string;
+  uploaded_date: string;
+};
+
+// Documents have no title column, so the display name is derived from the stored path or link.
+const materialTitle = (row: MaterialRow) => {
+  if (row.resource_type === "link") {
+    try { return new URL(row.resource_url).hostname; } catch { return row.resource_url; }
+  }
+  const segments = row.resource_url.split("/");
+  return decodeURIComponent(segments[segments.length - 1] || row.resource_url);
+};
+
+const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
+  id: row.resource_id,
+  title: materialTitle(row),
+  kind: row.resource_type === "link" ? "Link" : "Document",
+  detail: row.resource_type === "link" ? "External link" : "Shared document",
+});
+
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
+  id: row.lesson_id,
   title: row.title,
   image: row.lesson_image_path
     ? supabase.storage.from("images").getPublicUrl(row.lesson_image_path).data.publicUrl
@@ -70,14 +90,16 @@ export default function ClassroomDetail() {
   const [materials, setMaterials] = useState<ClassroomMaterial[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [enrolledStudentIds, setEnrolledStudentIds] = useState<string[]>([]);
-  const [usernameSearch, setUsernameSearch] = useState("");
-  const [studentSearchResults, setStudentSearchResults] = useState<StudentProfile[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
-  const [isSearchingStudents, setIsSearchingStudents] = useState(false);
-  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
+  const [isRotatingCode, setIsRotatingCode] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [isSavingMaterial, setIsSavingMaterial] = useState(false);
+  const [materialError, setMaterialError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<ClassroomLesson | null>(null);
+  const [isDeletingLesson, setIsDeletingLesson] = useState(false);
 
   useEffect(() => {
     if (!classroomId || !teacherId) return;
@@ -86,11 +108,16 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult] = await Promise.all([
+      const [classroomResult, lessonsResult, enrollmentResult, materialsResult, inviteResult] = await Promise.all([
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
+        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
+        supabase.rpc("get_classroom_invite_code", { p_classroom_id: classroomId }),
       ]);
+
+      setInviteCode(inviteResult.data ?? null);
+      setInviteCodeError(inviteResult.error ? `Could not load invitation code: ${inviteResult.error.message}` : null);
 
       if (classroomResult.error) {
         console.error("Failed to load classroom:", classroomResult.error);
@@ -103,6 +130,10 @@ export default function ClassroomDetail() {
 
       if (!lessonsResult.error && lessonsResult.data) {
         setLessons((lessonsResult.data as LessonRow[]).map(toLessonDisplay));
+      }
+
+      if (!materialsResult.error) {
+        setMaterials(((materialsResult.data ?? []) as MaterialRow[]).map(toMaterialDisplay));
       }
 
       if (enrollmentResult.error) {
@@ -136,69 +167,87 @@ export default function ClassroomDetail() {
 
   const enrolledStudents = studentProfiles.filter((student) => enrolledStudentIds.includes(student.id));
 
-  async function searchStudents() {
-    const searchTerm = usernameSearch.trim();
-    if (!searchTerm || isSearchingStudents) return;
-    setIsSearchingStudents(true);
-    setEnrollmentError(null);
-    setSelectedStudent(null);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name, surname, username, user_role")
-      .ilike("username", `${searchTerm}%`)
-      .order("username")
-      .limit(10);
-    setIsSearchingStudents(false);
-    if (error) {
-      setEnrollmentError(error.message);
+  async function rotateInviteCode() {
+    if (!classroomId || isRotatingCode || !window.confirm("Create a new classroom code? The old code will stop working.")) return;
+    setIsRotatingCode(true);
+    setInviteCodeError(null);
+    const { data, error } = await supabase.rpc("rotate_classroom_invite_code", { p_classroom_id: classroomId });
+    setIsRotatingCode(false);
+    if (error || !data) {
+      setInviteCodeError(error?.message ?? "Could not create a new code.");
       return;
     }
-    const matchingProfiles = (data ?? []) as StudentProfile[];
-    const matchingStudents = matchingProfiles.filter((student) => student.user_role === "student" && !enrolledStudentIds.includes(student.id));
-    setStudentSearchResults(matchingStudents);
-    const exactMatch = matchingStudents.find((student) => student.username?.toLowerCase() === searchTerm.toLowerCase());
-    if (exactMatch) setSelectedStudent(exactMatch);
-    if (!matchingStudents.length) {
-      const matchingProfile = matchingProfiles.find((profile) => profile.username?.toLowerCase() === searchTerm.toLowerCase());
-      const isAlreadyEnrolled = Boolean(matchingProfile && enrolledStudentIds.includes(matchingProfile.id));
-      setEnrollmentError(isAlreadyEnrolled ? "This student is already enrolled in the classroom." : matchingProfile ? "This username belongs to a profile that is not marked as a student." : "No profile was found with that username.");
-    }
+    setInviteCode(data);
   }
 
-  async function enrollStudent() {
-    if (!classroomId || !selectedStudent || !session?.user) return;
-    setIsEnrolling(true);
-    setEnrollmentError(null);
-    const { error } = await supabase.from("classroom_students").insert({
-      student_id: selectedStudent.id,
+  const addFile = async (file: File) => {
+    if (!classroomId || !teacherId) return;
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    // Supabase Storage has no real folders; this prefix auto-creates a per-classroom folder on upload.
+    const storagePath = `classroom_documents/${classroomId}/${safeFileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, file, {
+        contentType: file.type || "application/pdf",
+        upsert: true,
+      });
+    if (uploadError) {
+      console.error("Document storage upload failed:", uploadError);
+      setMaterialError(`The document could not be uploaded: ${uploadError.message}`);
+      setIsSavingMaterial(false);
+      return;
+    }
+    const { data, error } = await supabase.from("learning_resources").insert({
       classroom_id: classroomId,
-      enrolled_at: new Date().toISOString(),
-    });
-    setIsEnrolling(false);
-    if (error) {
-      setEnrollmentError(error.code === "23505" ? "This student is already enrolled in the classroom." : error.message);
+      resource_type: "document",
+      resource_url: storagePath,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    setIsSavingMaterial(false);
+    if (error || !data) {
+      console.error("Learning resource insert failed:", error);
+      setMaterialError(`The document was uploaded but could not be shared: ${error?.message ?? "No resource was returned."}`);
       return;
     }
-    setStudentProfiles((students) => students.some((student) => student.id === selectedStudent.id) ? students : [...students, selectedStudent]);
-    setEnrolledStudentIds((studentIds) => [...studentIds, selectedStudent.id]);
-    setUsernameSearch("");
-    setStudentSearchResults([]);
-    setSelectedStudent(null);
-  }
-
-  const addFile = (file: File) => {
-    setMaterials((prev) => [
-      { id: `${file.name}-${Date.now()}`, title: file.name, kind: "Document", detail: "Document · Added just now" },
-      ...prev,
-    ]);
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
   };
 
-  const addLink = (url: string) => {
-    const linkTitle = new URL(url.includes("://") ? url : `https://${url}`).hostname;
-    setMaterials((prev) => [
-      { id: `${url}-${Date.now()}`, title: linkTitle, kind: "Link", detail: "External link · Added just now" },
-      ...prev,
-    ]);
+  const addLink = async (url: string) => {
+    if (!classroomId || !teacherId) return;
+    setIsSavingMaterial(true);
+    setMaterialError(null);
+    const externalUrl = url.includes("://") ? url : `https://${url}`;
+    new URL(externalUrl); // validates the link before it is shared with learners
+    const { data, error } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      resource_type: "link",
+      resource_url: externalUrl,
+    }).select("resource_id, resource_type, resource_url, uploaded_date").single();
+    setIsSavingMaterial(false);
+    if (error || !data) {
+      setMaterialError("The link could not be shared with learners. Please try again.");
+      return;
+    }
+    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
+  };
+
+  const deleteLesson = async () => {
+    if (!lessonToDelete) return;
+
+    setIsDeletingLesson(true);
+    setLoadError(null);
+
+    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonToDelete.id);
+
+    setIsDeletingLesson(false);
+    if (error) {
+      setLoadError(`Could not delete lesson: ${error.message}`);
+      return;
+    }
+
+    setLessons((currentLessons) => currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id));
+    setLessonToDelete(null);
   };
 
   const coverUrl = classroom?.cover_image_path
@@ -207,7 +256,6 @@ export default function ClassroomDetail() {
 
   const classroomName = classroom?.classroom_name ?? "Classroom";
   const description = classroom?.description ?? "";
-  const joinCode = classroom?.join_code ?? "—";
   const studentCount = enrolledStudentIds.length;
   const lessonCount = lessons.length;
 
@@ -256,12 +304,12 @@ export default function ClassroomDetail() {
           </section>
 
           <div className="mt-3">
-            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
             {materials.length === 0 && <EmptyMaterials />}
           </div>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-            <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+            <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
           </section>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
@@ -277,7 +325,7 @@ export default function ClassroomDetail() {
             {lessons.length === 0 ? (
               <EmptyLessons />
             ) : (
-              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
+              <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
             )}
           </section>
         </main>
@@ -293,18 +341,15 @@ export default function ClassroomDetail() {
 
       {/* Desktop */}
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-white">Teacher Portal</p></div>
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
             <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
-            <SidebarItem icon={<Layers size={18} />} label="Flashcards" />
-            <SidebarItem icon={<ClipboardList size={18} />} label="Quizzes" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
           </nav>
-          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /><SidebarItem icon={<LogOut size={18} />} label="Logout" /></div>
+          <div className="mt-auto space-y-2"><SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
@@ -325,7 +370,7 @@ export default function ClassroomDetail() {
                 <h2 className="mt-2 text-2xl font-bold">{classroomName}</h2>
                 {description && <p className="mt-2 max-w-2xl text-sm text-white/80">{description}</p>}
                 <p className="mt-4 text-xs font-semibold text-white">
-                  {studentCount} students · {lessonCount} lessons · Join code {joinCode}
+                  {studentCount} students · {lessonCount} lessons
                 </p>
               </div>
               <div className="relative h-28 w-36 shrink-0 overflow-hidden rounded-lg bg-white shadow-sm">
@@ -334,12 +379,12 @@ export default function ClassroomDetail() {
             </section>
 
             <div className="mt-4">
-              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} />
+              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
               {materials.length === 0 && <EmptyMaterials />}
             </div>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
-              <StudentEnrollmentPanel students={enrolledStudents} searchTerm={usernameSearch} searchResults={studentSearchResults} selectedStudent={selectedStudent} isSearching={isSearchingStudents} isEnrolling={isEnrolling} error={enrollmentError} onSearchTermChange={setUsernameSearch} onSearch={searchStudents} onStudentSelect={setSelectedStudent} onStudentCancel={() => setSelectedStudent(null)} onEnroll={enrollStudent} />
+              <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
             </section>
 
             <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
@@ -350,12 +395,24 @@ export default function ClassroomDetail() {
               {lessons.length === 0 ? (
                 <EmptyLessons />
               ) : (
-                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.title} lesson={lesson} />)}</div>
+                <div className="mt-2">{lessons.map((lesson) => <ClassroomLessonRow key={lesson.id} lesson={lesson} onDelete={setLessonToDelete} />)}</div>
               )}
             </section>
+
           </div>
         </main>
       </div>
+
+      <DeleteAccountDialog
+        open={Boolean(lessonToDelete)}
+        isDeleting={isDeletingLesson}
+        onCancel={() => setLessonToDelete(null)}
+        onConfirm={() => void deleteLesson()}
+        title={`Delete ${lessonToDelete?.title ?? "this lesson"}?`}
+        description="This will permanently remove this lesson from the classroom. This action cannot be undone."
+        confirmLabel="Delete lesson"
+        deletingLabel="Deleting lesson..."
+      />
     </div>
   );
 }

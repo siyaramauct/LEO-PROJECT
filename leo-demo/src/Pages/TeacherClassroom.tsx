@@ -1,8 +1,6 @@
 
 import {
   Bell,
-  BookOpen,
-  ClipboardList,
   Plus,
   Search,
   Sparkles,
@@ -11,7 +9,6 @@ import {
   BarChart3,
   User,
   Settings,
-  LogOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -20,6 +17,7 @@ import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, {
   type Classroom,
 } from "../Components/ClassroomMobileCard";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
@@ -32,9 +30,9 @@ type ClassroomRow = {
   description: string | null;
   cover_image_path: string | null;
   created_date: Date | null;
-  student_count?: number | null;
-  lesson_count?: number | null;
-  join_code?: string | null;
+  // Embedded PostgREST counts, e.g. [{ count: 3 }]
+  lessons?: { count: number }[] | null;
+  classroom_students?: { count: number }[] | null;
 };
 
 const formatCreatedDate = (createdAt: Date | null) => {
@@ -52,9 +50,8 @@ const toClassroom = (classroom: ClassroomRow): Classroom => {
     id: classroom.classroom_id,
     name: classroom.classroom_name,
     description: classroom.description ?? "No description has been added yet.",
-    studentCount: classroom.student_count ?? 0,
-    lessonCount: classroom.lesson_count ?? 0,
-    joinCode: classroom.join_code ?? "Not available",
+    studentCount: classroom.classroom_students?.[0]?.count ?? 0,
+    lessonCount: classroom.lessons?.[0]?.count ?? 0,
     createdDate: formatCreatedDate(classroom.created_date),
     image: classroom.cover_image_path ? coverUrl : "",
     imageAlt: `${classroom.classroom_name} classroom cover`,
@@ -71,6 +68,8 @@ export default function TeacherClassrooms() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
+  const [isDeletingClassroom, setIsDeletingClassroom] = useState(false);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -80,9 +79,19 @@ export default function TeacherClassrooms() {
       setLoadError(null);
       const { data, error } = await supabase
         .from("classrooms")
-        .select("*")
+        .select(
+          `
+          classroom_id,
+          classroom_name,
+          description,
+          cover_image_path,
+          created_date,
+          lessons(count),
+          classroom_students(count)
+        `
+        )
         .eq("teacher_id", session.user.id)
-        .order("created_date", { ascending: false });
+        .order("classroom_name", { ascending: true });
 
       if (error) {
         setLoadError("We could not load your classrooms. Please try again.");
@@ -100,6 +109,30 @@ export default function TeacherClassrooms() {
     (total, classroom) => total + classroom.studentCount,
     0
   );
+
+  async function deleteClassroom() {
+    if (!classroomToDelete || !session?.user || isDeletingClassroom) return;
+
+    setIsDeletingClassroom(true);
+    const { error } = await supabase
+      .from("classrooms")
+      .delete()
+      .eq("classroom_id", classroomToDelete.id)
+      .eq("teacher_id", session.user.id);
+
+    if (error) {
+      console.error("Failed to delete classroom:", error);
+      setIsDeletingClassroom(false);
+      window.alert("The classroom could not be deleted. Please try again.");
+      return;
+    }
+
+    setClassrooms((currentClassrooms) =>
+      currentClassrooms.filter((classroom) => classroom.id !== classroomToDelete.id)
+    );
+    setClassroomToDelete(null);
+    setIsDeletingClassroom(false);
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -189,7 +222,7 @@ export default function TeacherClassrooms() {
           </div>
 
 
-          {isLoading ? <p className="py-8 text-center text-xs text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms compact /> : <div className="space-y-2">{classrooms.map((classroom) => <ClassroomMobileCard key={classroom.id} classroom={classroom} />)}</div>}
+          {isLoading ? <p className="py-8 text-center text-xs text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms compact /> : <div className="space-y-2">{classrooms.map((classroom) => <ClassroomMobileCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
 
         </section>
 
@@ -242,7 +275,7 @@ export default function TeacherClassrooms() {
       <div className="hidden min-h-dvh lg:flex">
 
         {/* Sidebar */}
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
 
           <div className="mb-10 px-2">
 
@@ -281,25 +314,6 @@ export default function TeacherClassrooms() {
             />
 
             <SidebarItem
-              icon={<BookOpen size={18} />}
-              label="Lessons"
-              to="/lessons"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<ClipboardList size={18} />}
-              label="Flashcards"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<ClipboardList size={18} />}
-              label="Quizzes"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
               icon={<BarChart3 size={18} />}
               label="Reports"
               to="/class-progress"
@@ -315,12 +329,6 @@ export default function TeacherClassrooms() {
               icon={<Settings size={18} />}
               label="Settings"
               to="/teacher-profile"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<LogOut size={18} />}
-              label="Logout"
               inactiveClassName="text-white hover:bg-white/10"
             />
 
@@ -426,7 +434,7 @@ export default function TeacherClassrooms() {
 
             {/* Classroom Grid */}
             <section className="mt-3">
-              {isLoading ? <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms /> : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{classrooms.map((classroom) => <ClassroomDesktopCard key={classroom.id} classroom={classroom} />)}</div>}
+              {isLoading ? <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms /> : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{classrooms.map((classroom) => <ClassroomDesktopCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
             </section>
 
           </div>
@@ -434,6 +442,17 @@ export default function TeacherClassrooms() {
         </main>
 
       </div>
+
+      <DeleteAccountDialog
+        open={Boolean(classroomToDelete)}
+        isDeleting={isDeletingClassroom}
+        onCancel={() => setClassroomToDelete(null)}
+        onConfirm={() => void deleteClassroom()}
+        title={`Delete ${classroomToDelete?.name ?? "this classroom"}?`}
+        description="This will permanently remove this classroom, its lessons, and its student links. This action cannot be undone."
+        confirmLabel="Delete classroom"
+        deletingLabel="Deleting classroom..."
+      />
 
     </div>
   );

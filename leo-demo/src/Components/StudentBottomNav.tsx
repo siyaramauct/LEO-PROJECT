@@ -5,6 +5,7 @@ import {
   PlusIcon,
   UserGroupIcon,
   UserIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline"
 import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
@@ -12,12 +13,14 @@ import { useAuth } from "../../context/AuthContext"
 const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
+  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
   { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
 
 const mobileStartItems = desktopNavItems.slice(0, 2)
 const mobileEndItems = [
+  { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
   { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
 ]
@@ -100,7 +103,7 @@ export default function StudentBottomNav() {
         ))}
 
         <NavLink
-          to="/student/flashcards"
+          to="/student/practice"
           className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white shadow-lg shadow-violet-200 transition active:scale-95"
           aria-label="Start practice"
         >

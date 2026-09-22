@@ -36,14 +36,12 @@ export default function SignupForm() {
     setAuthError(null)
     setSignupMessage(null)
     setSaving(true)
-    console.log("[Signup] Attempting signup for:", data.email)
     try {
       const session = await signup(data.email, data.password, data.firstName, data.lastName)
-      console.log("[Signup] ✓ User created successfully:", data.email)
       if (session) {
         navigate("/select-role")
       } else {
-        setSignupMessage("Account created. Check your email to confirm your address, then sign in.")
+        setSignupMessage("If this is a new email account, check your inbox for a confirmation link. Already used Google? Sign in with Google instead.")
       }
     } catch (error: unknown) {
       console.error("[Signup] ✗ Signup failed:", error)

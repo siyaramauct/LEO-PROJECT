@@ -1,6 +1,9 @@
 import { Check, ClipboardCheck, RotateCcw, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../supabase-client";
 
 type QuizResult = {
   score: number;
@@ -12,8 +15,50 @@ type QuizResult = {
 
 export default function LessonSummary() {
   const navigate = useNavigate();
-  const savedResult = sessionStorage.getItem("quiz-result");
-  const result: QuizResult | null = savedResult ? JSON.parse(savedResult) : null;
+  const { session } = useAuth();
+  const [result, setResult] = useState<QuizResult | null>(() => {
+    const savedResult = sessionStorage.getItem("quiz-result");
+    return savedResult ? JSON.parse(savedResult) : null;
+  });
+  const [isLoading, setIsLoading] = useState(!result && Boolean(session?.user));
+
+  useEffect(() => {
+    if (result || !session?.user) return;
+
+    const loadLatestAttempt = async () => {
+      const { data } = await supabase
+        .from("lesson_attempts")
+        .select("score, lesson_id")
+        .eq("student_id", session.user.id)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setResult({
+          score: data.score,
+          totalQuestions: 10,
+          correct: Math.round((data.score / 100) * 10),
+          incorrect: 10 - Math.round((data.score / 100) * 10),
+          results: [],
+        });
+      }
+      setIsLoading(false);
+    };
+
+    void loadLatestAttempt();
+  }, [result, session?.user]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white text-slate-900">
+        <StudentBottomNav />
+        <main className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 pb-20 md:ml-56 md:pb-0">
+          <p className="text-sm text-slate-500">Loading quiz summary...</p>
+        </main>
+      </div>
+    );
+  }
 
   if (!result) {
     return (

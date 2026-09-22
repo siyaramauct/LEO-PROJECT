@@ -24,19 +24,14 @@ export default function StudentPractice() {
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const isLoading = Boolean(session?.user && loadedUserId !== session.user.id);
 
   useEffect(() => {
-    if (!session?.user) {
-      setIsLoading(false);
-      return;
-    }
+    if (!session?.user) return;
 
     const loadLessons = async () => {
-      setIsLoading(true);
-      setErrorMessage("");
-
       try {
         // Find all classrooms that this student belongs to
         const { data: enrolments, error: enrolmentError } = await supabase
@@ -56,7 +51,7 @@ export default function StudentPractice() {
         if (classroomIds.length === 0) {
           setLessons([]);
           setClassrooms([]);
-          setIsLoading(false);
+          setErrorMessage("");
           return;
         }
 
@@ -87,11 +82,12 @@ export default function StudentPractice() {
         }
 
         setLessons(lessonData ?? []);
+        setErrorMessage("");
       } catch (error) {
         console.error("Error loading student lessons:", error);
         setErrorMessage("We could not load your lessons. Please try again.");
       } finally {
-        setIsLoading(false);
+        setLoadedUserId(session.user.id);
       }
     };
 

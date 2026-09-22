@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from "../src/supabase-client";
 
 interface Profile {
@@ -17,11 +17,32 @@ interface AuthContextType {
     profileError: string | null;
     signup: (email: string, password: string, name: string, surname: string) => Promise<Session | null>;
     login: (email: string, password: string) => Promise<void>;
+    loginWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function profileNames(user: User) {
+    const metadata = user.user_metadata;
+    const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const emailName = user.email?.split("@")[0] ?? "Learner";
+    const suppliedFirstName = typeof metadata.given_name === "string"
+        ? metadata.given_name.trim()
+        : typeof metadata.first_name === "string"
+            ? metadata.first_name.trim()
+            : "";
+    const firstName = suppliedFirstName === fullName && parts.length > 1
+        ? parts[0]
+        : suppliedFirstName;
+
+    return {
+        name: firstName || parts[0] || metadata.name || emailName,
+        surname: metadata.surname || metadata.family_name || parts.slice(1).join(" ") || "",
+    };
+}
 
 export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     const [session, setSession] = useState<Session | null>(null);
@@ -30,38 +51,61 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     const [profileLoading, setProfileLoading] = useState(false);
     const [profileError, setProfileError] = useState<string | null>(null);
 
-    // Fetches the profile row. If it doesn't exist yet (e.g. a DB trigger
-    // hasn't finished creating it right after signup), retries a few times
-    // with a short delay instead of failing immediately.
-    const fetchProfile = async (userId: string, attempt = 0): Promise<void> => {
+    const fetchProfile = async (user: User): Promise<void> => {
         const { data, error } = await supabase
             .from("profiles")
             .select("id, name, surname, user_role")
-            .eq("id", userId)
-            .single();
+            .eq("id", user.id)
+            .maybeSingle();
 
         if (error) {
-            // PGRST116 = no rows found — expected right after signup
-            // if the profile row is created by a trigger with slight delay
-            if (error.code === "PGRST116" && attempt < 5) {
-                await new Promise((res) => setTimeout(res, 500));
-                return fetchProfile(userId, attempt + 1);
-            }
             console.error("Failed to fetch profile:", error);
             setProfile(null);
-            setProfileError(error.code === "PGRST116" ? "Your profile record could not be found. Please contact support." : "Your profile could not be loaded. Please refresh and try again.");
+            setProfileError("Your profile could not be loaded: " + error.message);
             return;
         }
 
-        setProfile(data);
+        if (data) {
+            setProfile(data);
+            setProfileError(null);
+            return;
+        }
+
+        // A first-time OAuth user may not have a profile trigger in the database.
+        const { data: created, error: insertError } = await supabase
+            .from("profiles")
+            .insert({ id: user.id, ...profileNames(user) })
+            .select("id, name, surname, user_role")
+            .single();
+
+        if (insertError?.code === "23505") {
+            const { data: existing, error: readError } = await supabase
+                .from("profiles")
+                .select("id, name, surname, user_role")
+                .eq("id", user.id)
+                .single();
+            if (!readError) {
+                setProfile(existing);
+                setProfileError(null);
+                return;
+            }
+        }
+        if (insertError) {
+            console.error("Failed to create profile:", insertError);
+            setProfile(null);
+            setProfileError("Your account signed in, but its profile could not be created: " + insertError.message);
+            return;
+        }
+
+        setProfile(created);
         setProfileError(null);
     };
 
-    const loadProfile = async (userId: string) => {
+    const loadProfile = async (user: User) => {
         setProfileLoading(true);
         setProfileError(null);
         try {
-            await fetchProfile(userId);
+            await fetchProfile(user);
         } finally {
             setProfileLoading(false);
         }
@@ -75,7 +119,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
                 setSession(session);
                 if (session?.user) {
                     setProfile(null);
-                    await loadProfile(session.user.id);
+                    await loadProfile(session.user);
                 }
             } catch (error) {
                 console.error("Failed to restore session:", error);
@@ -96,7 +140,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
                 setProfile(null);
                 setProfileLoading(true);
                 setTimeout(() => {
-                    void loadProfile(session.user.id);
+                    void loadProfile(session.user);
                 }, 0);
             } else {
                 setProfile(null);
@@ -112,7 +156,10 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { data: { name, surname } },
+            options: {
+                data: { name, surname },
+                emailRedirectTo: window.location.origin + "/",
+            },
         });
         if (error) throw error;
         console.log("User signed up successfully");
@@ -122,8 +169,16 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     const login = async (email: string, password: string) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (data.user) await loadProfile(data.user.id);
+        if (data.user) await loadProfile(data.user);
         console.log("User logged in successfully");
+    };
+
+    const loginWithGoogle = async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: window.location.origin + "/" },
+        });
+        if (error) throw error;
     };
 
     const logout = async () => {
@@ -134,13 +189,13 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
 
     const refreshProfile = async () => {
         if (session?.user) {
-            await loadProfile(session.user.id);
+            await loadProfile(session.user);
         }
     };
 
     return (
         <AuthContext.Provider
-            value={{ session, profile, loading, profileLoading, profileError, signup, login, logout, refreshProfile }}
+            value={{ session, profile, loading, profileLoading, profileError, signup, login, loginWithGoogle, logout, refreshProfile }}
         >
             {children}
         </AuthContext.Provider>

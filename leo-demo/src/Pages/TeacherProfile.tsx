@@ -1,11 +1,10 @@
 import {
   Bell,
-  BookOpen,
   BarChart3,
   Home,
-  LogOut,
   Settings,
   User,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -14,11 +13,13 @@ import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
 import TeacherProfileContent from "../Components/TeacherProfileContent";
 import { useAuth } from "../../context/AuthContext.tsx";
+import { supabase } from "../supabase-client";
 
 export default function TeacherProfile() {
-  const { profile, logout } = useAuth();
+  const { session, profile, logout } = useAuth();
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -27,6 +28,21 @@ export default function TeacherProfile() {
       navigate("/login", { replace: true });
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!session?.user) return;
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.from("profiles").delete().eq("id", session.user.id);
+      if (error) throw error;
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Failed to delete account:", error);
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -48,7 +64,7 @@ export default function TeacherProfile() {
         </header>
 
         <main className="flex-1 bg-slate-50 px-4 py-6 sm:px-6">
-          <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} />
+          <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} />
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-10 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
@@ -61,24 +77,40 @@ export default function TeacherProfile() {
       </div>
 
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="flex w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
           <div className="mb-10 px-2"><h1 className="text-2xl font-bold tracking-tight">LEO</h1><p className="text-xs text-violet-200">Teacher Portal</p></div>
           <nav className="space-y-2">
             <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
-            <SidebarItem icon={<BookOpen size={18} />} label="Lessons" to="/lessons" />
+            <SidebarItem icon={<Sparkles size={18} />}
+              label="Explore"
+              to="/learning-hub"
+              inactiveClassName="text-white hover:bg-white/10"
+            />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
-            <SidebarItem icon={<User size={18} />} label="Profile" to="/teacher-profile" active />
+
           </nav>
           <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-            <SidebarItem icon={<LogOut size={18} />} label={loggingOut ? "Logging out..." : "Logout"} onClick={() => void handleLogout()} />
+            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" active />
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          <header className="border-b border-slate-100 bg-white px-6 py-5"><h2 className="text-xl font-bold">Profile</h2><p className="mt-1 text-sm text-slate-500">Manage your teacher account and preferences.</p></header>
-          <div className="mx-auto w-full max-w-5xl p-6"><TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} /></div>
+        <main className="min-h-dvh min-w-0 flex-1 bg-slate-50">
+          <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium text-violet-700">Teacher portal</p>
+                <h1 className="mt-1 text-xl font-bold">Profile</h1>
+              </div>
+              <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
+                <Bell size={19} />
+              </button>
+            </div>
+          </header>
+
+          <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
+            <TeacherProfileContent fullName={fullName} initials={initials} loggingOut={loggingOut} onLogout={handleLogout} deletingAccount={deletingAccount} onDeleteAccount={handleDeleteAccount} />
+          </div>
         </main>
       </div>
     </div>

@@ -6,30 +6,35 @@ export type ClassroomMaterial = {
   title: string;
   kind: "Document" | "Link";
   detail: string;
+  url?: string;
 };
 
 // Parent-owned callbacks keep this panel reusable with any materials store.
 type ClassroomMaterialsPanelProps = {
   materials: ClassroomMaterial[];
-  onFileUpload: (file: File) => void;
-  onAddLink: (url: string) => void;
+  onFileUpload: (file: File) => Promise<void>;
+  onAddLink: (url: string) => Promise<void>;
+  isSaving?: boolean;
+  error?: string | null;
 };
 
 export default function ClassroomMaterialsPanel({
   materials,
   onFileUpload,
   onAddLink,
+  isSaving = false,
+  error,
 }: ClassroomMaterialsPanelProps) {
   // Link-entry state belongs to the panel because it is only needed while editing.
   const [isLinkFormOpen, setIsLinkFormOpen] = useState(false);
   const [url, setUrl] = useState("");
 
-  const submitLink = () => {
+  const submitLink = async () => {
     if (!url.trim()) {
       return;
     }
 
-    onAddLink(url.trim());
+    await onAddLink(url.trim());
     setUrl("");
     setIsLinkFormOpen(false);
   };
@@ -51,20 +56,21 @@ export default function ClassroomMaterialsPanel({
       <div className="mt-3 flex gap-2">
         <label
           htmlFor="classroom-material-upload"
-          className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${isSaving ? "cursor-not-allowed bg-slate-300" : "cursor-pointer bg-violet-700 hover:bg-violet-800"}`}
         >
           <Paperclip size={15} />
-          Upload document
+          {isSaving ? "Saving..." : "Upload PDF"}
         </label>
         <input
           id="classroom-material-upload"
           type="file"
           className="sr-only"
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+          accept="application/pdf,.pdf"
+          disabled={isSaving}
           onChange={(event) => {
             const [file] = Array.from(event.target.files ?? []);
             if (file) {
-              onFileUpload(file);
+              void onFileUpload(file);
             }
             event.target.value = "";
           }}
@@ -73,8 +79,9 @@ export default function ClassroomMaterialsPanel({
         <button
           type="button"
           aria-label="Add a material link"
+          disabled={isSaving}
           onClick={() => setIsLinkFormOpen((isOpen) => !isOpen)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus size={17} />
         </button>
@@ -89,7 +96,7 @@ export default function ClassroomMaterialsPanel({
             onChange={(event) => setUrl(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
-                submitLink();
+                void submitLink();
               }
             }}
             placeholder="Paste a URL"
@@ -97,22 +104,23 @@ export default function ClassroomMaterialsPanel({
           />
           <button
             type="button"
-            onClick={submitLink}
-            disabled={!url.trim()}
+            onClick={() => void submitLink()}
+            disabled={!url.trim() || isSaving}
             className="rounded-lg bg-violet-700 px-3 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-200"
           >
-            Add
+            {isSaving ? "Saving" : "Add"}
           </button>
         </div>
       )}
+
+      {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
 
       {/* Existing classroom resources */}
       <div className="mt-3 divide-y divide-slate-100">
         {materials.map((material) => {
           const Icon = material.kind === "Link" ? LinkIcon : FileText;
-
-          return (
-            <div key={material.id} className="flex items-center gap-2 py-2.5">
+          const content = (
+            <>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-violet-700">
                 <Icon size={15} />
               </span>
@@ -120,6 +128,16 @@ export default function ClassroomMaterialsPanel({
                 <p className="truncate text-xs font-semibold text-slate-700">{material.title}</p>
                 <p className="mt-0.5 truncate text-[10px] text-slate-400">{material.detail}</p>
               </div>
+            </>
+          );
+
+          return material.url ? (
+            <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 py-2.5 transition hover:bg-slate-50">
+              {content}
+            </a>
+          ) : (
+            <div key={material.id} className="flex items-center gap-2 py-2.5">
+              {content}
             </div>
           );
         })}

@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flashcard from "../Components/Flashcard";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 type FlashcardData = { flashcard_id: string; lesson_id: string; word: string; definition: string };
 
 export default function FlashActivity() {
   const { lessonId } = useParams<{ lessonId: string }>();
+  const { session } = useAuth();
   const navigate = useNavigate();
   const [flashcards, setFlashcards] = useState<FlashcardData[]>([]);
   const [index, setIndex] = useState(0);
@@ -22,9 +24,18 @@ export default function FlashActivity() {
       if (loadError) setError(loadError.message);
       else setFlashcards((data ?? []) as FlashcardData[]);
       setIsLoading(false);
+
+      if (session?.user) {
+        void supabase
+          .from("student_activity")
+          .upsert(
+            { student_id: session.user.id, source: "flashcard_practice" },
+            { onConflict: "student_id,activity_date", ignoreDuplicates: true }
+          );
+      }
     };
     void loadFlashcards();
-  }, [lessonId]);
+  }, [lessonId, session?.user]);
 
   const currentCard = flashcards[index];
   const isLastCard = index === flashcards.length - 1;
