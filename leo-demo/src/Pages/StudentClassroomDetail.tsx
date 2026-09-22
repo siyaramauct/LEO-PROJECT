@@ -1,12 +1,24 @@
-import { ArrowLeft, Bell, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon, LogOut } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { notifyUser } from "../notifications";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
-type Lesson = { lesson_id: string; title: string; description: string | null; lesson_image_path: string | null; created_at: string | null };
+type Lesson = {
+  lesson_id: string;
+  title: string;
+  description: string | null;
+  lesson_image_path: string | null;
+  created_at: string | null;
+  score: number | null;
+  totalQuestions: number | null;
+  percentage: number | null;
+};
 type Material = { resource_id: string; resource_type: "document" | "link"; resource_url: string; uploaded_date: string | null };
 
 const imageUrl = (path: string | null, fallback: string) => path ? supabase.storage.from("images").getPublicUrl(path).data.publicUrl : fallback;
@@ -38,15 +50,58 @@ const materialTitle = (material: Material) => {
   return documentFileName(material.resource_url);
 };
 
+const LessonList = ({ title, description, items, completed }: { title: string; description: string; items: Lesson[]; completed?: boolean }) => (
+  <section className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base font-bold">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+    </div>
+    {items.length === 0 ? (
+      <p className="py-7 text-center text-sm text-slate-500">
+        {completed ? "Completed lessons will appear here." : "There are no lessons waiting for you."}
+      </p>
+    ) : (
+      <div className="mt-3 divide-y divide-slate-100">
+        {items.map((lesson) => (
+          <Link
+            key={lesson.lesson_id}
+            to={`/lesson/${lesson.lesson_id}`}
+            className="flex items-center gap-3 py-3 transition hover:bg-slate-50"
+          >
+            <img src={imageUrl(lesson.lesson_image_path, "/Level1.png")} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
+              <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
+            </span>
+            {completed ? (
+              lesson.score !== null && lesson.totalQuestions ? (
+                <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs font-bold text-violet-700 sm:gap-3">
+                  <span>{lesson.score} / {lesson.totalQuestions}</span>
+                  <span className="hidden sm:inline">{lesson.percentage}%</span>
+                </span>
+              ) : <CheckCircle2 size={18} className="shrink-0 text-violet-700" />
+            ) : <ChevronRight size={18} className="shrink-0 text-slate-400" />}
+          </Link>
+        ))}
+      </div>
+    )}
+  </section>
+);
+
 export default function StudentClassroomDetail() {
   const { classroomId } = useParams<{ classroomId: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const navigate = useNavigate();
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
 
   useEffect(() => {
     if (!session?.user || !classroomId) return;
@@ -86,20 +141,57 @@ export default function StudentClassroomDetail() {
         return;
       }
 
-      const classroomLessons = (lessonsResult.data ?? []) as Lesson[];
+      const classroomLessons = (lessonsResult.data ?? []).map((lesson) => ({
+        ...(lesson as Omit<Lesson, "score" | "totalQuestions" | "percentage">),
+        score: null,
+        totalQuestions: null,
+        percentage: null,
+      }));
       const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
-      const { data: attempts, error: attemptsError } = lessonIds.length
-        ? await supabase.from("lesson_attempts").select("lesson_id").eq("student_id", session.user.id).in("lesson_id", lessonIds).not("completed_at", "is", null)
-        : { data: [], error: null };
+      const [attemptsResult, mcqsResult] = lessonIds.length
+        ? await Promise.all([
+            supabase
+              .from("lesson_attempts")
+              .select("lesson_id, score, completed_at")
+              .eq("student_id", session.user.id)
+              .in("lesson_id", lessonIds)
+              .not("completed_at", "is", null)
+              .order("completed_at", { ascending: false }),
+            supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", lessonIds),
+          ])
+        : [
+            { data: [], error: null },
+            { data: [], error: null },
+          ];
+      const attempts = attemptsResult.data ?? [];
+      const attemptsError = attemptsResult.error;
 
       if (attemptsError) {
         console.error("Failed to load lesson progress:", attemptsError);
         if (isCurrent) setError("Lesson progress could not be loaded right now.");
       } else if (isCurrent) {
+        const latestAttemptByLesson = new Map<string, { score: number | null }>();
+        attempts.forEach((attempt) => {
+          if (!latestAttemptByLesson.has(attempt.lesson_id)) {
+            latestAttemptByLesson.set(attempt.lesson_id, { score: attempt.score });
+          }
+        });
+        const totalQuestionsByLesson = new Map((mcqsResult.data ?? []).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]));
+        const lessonsWithScores = classroomLessons.map((lesson) => {
+          const attempt = latestAttemptByLesson.get(lesson.lesson_id);
+          const totalQuestions = totalQuestionsByLesson.get(lesson.lesson_id) ?? null;
+          const score = attempt?.score ?? null;
+          return {
+            ...lesson,
+            score,
+            totalQuestions,
+            percentage: score !== null && totalQuestions ? Math.round((score / totalQuestions) * 100) : null,
+          };
+        });
         setClassroom(classroomResult.data as Classroom);
-        setLessons(classroomLessons);
+        setLessons(lessonsWithScores);
         setMaterials(materialsResult.error ? [] : ((materialsResult.data ?? []) as Material[]));
-        setCompletedLessonIds([...new Set((attempts ?? []).map((attempt) => attempt.lesson_id))]);
+        setCompletedLessonIds([...new Set(attempts.map((attempt) => attempt.lesson_id))]);
       }
       if (isCurrent) setIsLoading(false);
     };
@@ -112,44 +204,53 @@ export default function StudentClassroomDetail() {
   const completedLessons = lessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id));
   const coverUrl = imageUrl(classroom?.cover_image_path ?? null, "/classRoomIllustration.png");
 
+  // Removes the calling student's enrolment row so the classroom no longer appears for them.
+  async function leaveClassroom() {
+    if (!classroomId || !session?.user || isLeavingClassroom) return;
+    setIsLeavingClassroom(true);
+    const teacher = await supabase
+      .from("classrooms")
+      .select("teacher_id")
+      .eq("classroom_id", classroomId)
+      .single();
+
+    if (teacher.error) {
+      console.error("Failed to fetch classroom teacher:", teacher.error);
+      setIsLeavingClassroom(false);
+      window.alert("Could not verify classroom teacher. Please try again.");
+      return;
+    }
+
+    const { error: leaveError } = await supabase
+      .from("classroom_students")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("student_id", session.user.id);
+
+    if (leaveError) {
+      console.error("Failed to leave classroom:", leaveError);
+      setIsLeavingClassroom(false);
+      window.alert("You could not be removed from this classroom. Please try again.");
+      return;
+    }
+
+    const studentName = [profile?.name, profile?.surname].filter(Boolean).join(" ") || session.user.email || "A student";
+    await notifyUser({
+      recipient_id: teacher.data.teacher_id,
+      type: "student_left_classroom",
+      title: "Student left classroom",
+      body: `${studentName} left "${classroom?.classroom_name ?? "this classroom"}".`,
+      link_url: `/teacher-classroom/${classroomId}`,
+    });
+
+    setIsLeaveDialogOpen(false);
+    setIsLeavingClassroom(false);
+    navigate("/student/classrooms");
+  }
+
   if (isLoading) return <main className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Loading classroom...</p></main>;
   if (error) return <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-center"><p className="text-sm text-red-700">{error}</p></main>;
 
-  const LessonList = ({ title, description, items, completed }: { title: string; description: string; items: Lesson[]; completed?: boolean }) => (
-    <section className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${completed ? "bg-emerald-50 text-emerald-700" : "bg-violet-50 text-violet-700"}`}>
-          {items.length}
-        </span>
-      </div>
-      {items.length === 0 ? (
-        <p className="py-7 text-center text-sm text-slate-500">
-          {completed ? "Completed lessons will appear here." : "There are no lessons waiting for you."}
-        </p>
-      ) : (
-        <div className="mt-3 divide-y divide-slate-100">
-          {items.map((lesson) => (
-            <Link
-              key={lesson.lesson_id}
-              to={`/lesson/${lesson.lesson_id}`}
-              className="flex items-center gap-3 py-3 transition hover:bg-slate-50"
-            >
-              <img src={imageUrl(lesson.lesson_image_path, "/Level1.png")} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
-                <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
-              </span>
-              {completed ? <CheckCircle2 size={18} className="shrink-0 text-emerald-600" /> : <ChevronRight size={18} className="shrink-0 text-slate-400" />}
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
-  );
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -166,9 +267,16 @@ export default function StudentClassroomDetail() {
                 <h1 className="mt-1 text-xl font-bold">Classroom overview</h1>
               </div>
             </div>
-            <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-              <Bell size={19} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsLeaveDialogOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+              >
+                <LogOut size={15} /> Leave classroom
+              </button>
+              <NotificationBell />
+            </div>
           </div>
         </header>
 
@@ -233,6 +341,17 @@ export default function StudentClassroomDetail() {
           </div>
         </div>
       </main>
+
+      <DeleteAccountDialog
+        open={isLeaveDialogOpen}
+        isDeleting={isLeavingClassroom}
+        onCancel={() => setIsLeaveDialogOpen(false)}
+        onConfirm={() => void leaveClassroom()}
+        title={`Leave ${classroom?.classroom_name ?? "this classroom"}?`}
+        description="You will lose access to its lessons and materials. Your teacher can re-add you later using your username."
+        confirmLabel="Leave classroom"
+        deletingLabel="Leaving..."
+      />
     </div>
   );
 }

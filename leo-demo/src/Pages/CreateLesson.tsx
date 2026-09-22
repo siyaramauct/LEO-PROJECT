@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { notifyClassroomStudents } from "../notifications";
 import { supabase } from "../supabase-client";
 
 /* ------------------------------------------------------------------------ */
@@ -294,6 +295,15 @@ export default function CreateLesson() {
       })));
 
       if (questionError) throw new Error(questionError.message);
+
+      // Best-effort: notification delivery should never block lesson creation.
+      await notifyClassroomStudents(classroomId, {
+        type: "new_lesson",
+        title: "New lesson available",
+        body: `Your teacher added "${title.trim()}".`,
+        link_url: `/lesson/${lesson.lesson_id}`,
+      });
+
       navigate(`/teacher-classroom/${classroomId}`);
     } catch (creationError) {
       setError(creationError instanceof Error ? creationError.message : "The lesson could not be created.");

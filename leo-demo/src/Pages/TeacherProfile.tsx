@@ -1,5 +1,4 @@
 import {
-  Bell,
   BarChart3,
   Home,
   Settings,
@@ -10,6 +9,7 @@ import {
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import TeacherProfileContent from "../Components/TeacherProfileContent";
 import { useAuth } from "../../context/AuthContext.tsx";
@@ -57,10 +57,7 @@ export default function TeacherProfile() {
             <p className="text-xs font-semibold text-violet-700">Teacher Portal</p>
             <h1 className="mt-1 text-xl font-bold tracking-tight">Profile</h1>
           </div>
-          <button type="button" aria-label="Notifications" className="relative rounded-full p-2 text-slate-600 hover:bg-slate-100">
-            <Bell size={20} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" />
-          </button>
+          <NotificationBell />
         </header>
 
         <main className="flex-1 bg-slate-50 px-4 py-6 sm:px-6">
@@ -102,9 +99,7 @@ export default function TeacherProfile() {
                 <p className="text-xs font-medium text-violet-700">Teacher portal</p>
                 <h1 className="mt-1 text-xl font-bold">Profile</h1>
               </div>
-              <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-                <Bell size={19} />
-              </button>
+              <NotificationBell />
             </div>
           </header>
 

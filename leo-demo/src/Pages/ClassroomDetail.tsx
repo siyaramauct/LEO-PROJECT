@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   BarChart3,
-  Bell,
   Home,
   Plus,
   Settings,
@@ -19,10 +18,12 @@ import ClassroomMaterialsPanel, {
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import ClassroomInvitePanel, {
   type StudentProfile,
 } from "../Components/ClassroomInvitePanel";
+import { notifyClassroomStudents, notifyUser } from "../notifications";
 import UserIdentity from "../Components/UserIdentity";
 import { supabase } from "../supabase-client";
 
@@ -67,6 +68,8 @@ const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
   title: materialTitle(row),
   kind: row.resource_type === "link" ? "Link" : "Document",
   detail: row.resource_type === "link" ? "External link" : "Shared document",
+  resourceType: row.resource_type,
+  resourcePath: row.resource_url,
 });
 
 const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
@@ -101,6 +104,10 @@ export default function ClassroomDetail() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<ClassroomLesson | null>(null);
   const [isDeletingLesson, setIsDeletingLesson] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<StudentProfile | null>(null);
+  const [isRemovingStudent, setIsRemovingStudent] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<ClassroomMaterial | null>(null);
+  const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
 
   useEffect(() => {
     if (!classroomId || !teacherId) return;
@@ -212,6 +219,12 @@ export default function ClassroomDetail() {
       return;
     }
     setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
+    await notifyClassroomStudents(classroomId, {
+      type: "new_material",
+      title: "New classroom material",
+      body: `Your teacher shared "${file.name}" in "${classroom?.classroom_name ?? "your classroom"}".`,
+      link_url: `/student/classrooms/${classroomId}`,
+    });
   };
 
   const addLink = async (url: string) => {
@@ -231,6 +244,12 @@ export default function ClassroomDetail() {
       return;
     }
     setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
+    await notifyClassroomStudents(classroomId, {
+      type: "new_material",
+      title: "New classroom material",
+      body: `Your teacher shared a link in "${classroom?.classroom_name ?? "your classroom"}".`,
+      link_url: `/student/classrooms/${classroomId}`,
+    });
   };
 
   const deleteLesson = async () => {
@@ -249,6 +268,59 @@ export default function ClassroomDetail() {
 
     setLessons((currentLessons) => currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id));
     setLessonToDelete(null);
+  };
+
+  const removeStudent = async () => {
+    if (!classroomId || !studentToRemove) return;
+
+    setIsRemovingStudent(true);
+    setEnrollmentError(null);
+
+    const { error } = await supabase
+      .from("classroom_students")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("student_id", studentToRemove.id);
+
+    setIsRemovingStudent(false);
+    if (error) {
+      setEnrollmentError(`Could not remove this student: ${error.message}`);
+      return;
+    }
+
+    setStudentProfiles((students) => students.filter((student) => student.id !== studentToRemove.id));
+    setEnrolledStudentIds((studentIds) => studentIds.filter((id) => id !== studentToRemove.id));
+    await notifyUser({
+      recipient_id: studentToRemove.id,
+      type: "removed_from_classroom",
+      title: "You were removed from a classroom",
+      body: `You were removed from "${classroom?.classroom_name ?? "a classroom"}".`,
+      link_url: "/student/classrooms",
+    });
+    setStudentToRemove(null);
+  };
+
+  const deleteMaterial = async () => {
+    if (!materialToDelete) return;
+
+    setIsDeletingMaterial(true);
+    setMaterialError(null);
+
+    if (materialToDelete.resourceType === "document") {
+      const { error: storageError } = await supabase.storage.from("documents").remove([materialToDelete.resourcePath]);
+      if (storageError) console.error("Failed to delete document from storage:", storageError);
+    }
+
+    const { error } = await supabase.from("learning_resources").delete().eq("resource_id", materialToDelete.id);
+
+    setIsDeletingMaterial(false);
+    if (error) {
+      setMaterialError(`Could not delete this material: ${error.message}`);
+      return;
+    }
+
+    setMaterials((prev) => prev.filter((material) => material.id !== materialToDelete.id));
+    setMaterialToDelete(null);
   };
 
   const coverUrl = classroom?.cover_image_path
@@ -284,10 +356,7 @@ export default function ClassroomDetail() {
           <Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
             <ArrowLeft size={19} />
           </Link>
-          <button aria-label="Notifications" className="relative rounded-full p-2 transition hover:bg-slate-100">
-            <Bell size={20} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" />
-          </button>
+          <NotificationBell />
         </header>
 
         <main className="px-4 pb-5 sm:px-6">
@@ -305,7 +374,7 @@ export default function ClassroomDetail() {
           </section>
 
           <div className="mt-3">
-            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
+            <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} onDeleteMaterial={setMaterialToDelete} isSaving={isSavingMaterial} error={materialError} />
             {materials.length === 0 && <EmptyMaterials />}
           </div>
 
@@ -359,7 +428,7 @@ export default function ClassroomDetail() {
               <Link to="/TeacherClassroom" aria-label="Back to classrooms" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"><ArrowLeft size={19} /></Link>
               <div><p className="text-xs font-medium text-violet-700">Teacher Portal</p><h1 className="mt-1 text-xl font-bold">Classroom overview</h1></div>
             </div>
-            <div className="flex items-center gap-4"><button aria-label="Notifications" className="rounded-xl p-2.5 transition hover:bg-slate-100"><Bell size={19} /></button><UserIdentity /></div>
+            <div className="flex items-center gap-4"><NotificationBell /><UserIdentity /></div>
           </header>
 
           <div className="mx-auto w-full max-w-7xl p-5">
@@ -380,7 +449,7 @@ export default function ClassroomDetail() {
             </section>
 
             <div className="mt-4">
-              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} isSaving={isSavingMaterial} error={materialError} />
+              <ClassroomMaterialsPanel materials={materials} onFileUpload={addFile} onAddLink={addLink} onDeleteMaterial={setMaterialToDelete} isSaving={isSavingMaterial} error={materialError} />
               {materials.length === 0 && <EmptyMaterials />}
             </div>
 
@@ -413,6 +482,28 @@ export default function ClassroomDetail() {
         description="This will permanently remove this lesson from the classroom. This action cannot be undone."
         confirmLabel="Delete lesson"
         deletingLabel="Deleting lesson..."
+      />
+
+      <DeleteAccountDialog
+        open={Boolean(studentToRemove)}
+        isDeleting={isRemovingStudent}
+        onCancel={() => setStudentToRemove(null)}
+        onConfirm={() => void removeStudent()}
+        title={`Remove ${[studentToRemove?.name, studentToRemove?.surname].filter(Boolean).join(" ") || "this student"}?`}
+        description="This will unenrol the student from this classroom. They can be re-added later by searching their username."
+        confirmLabel="Remove student"
+        deletingLabel="Removing..."
+      />
+
+      <DeleteAccountDialog
+        open={Boolean(materialToDelete)}
+        isDeleting={isDeletingMaterial}
+        onCancel={() => setMaterialToDelete(null)}
+        onConfirm={() => void deleteMaterial()}
+        title={`Delete ${materialToDelete?.title ?? "this material"}?`}
+        description="This will permanently remove this material from the classroom and its stored file, if any. This action cannot be undone."
+        confirmLabel="Delete material"
+        deletingLabel="Deleting..."
       />
     </div>
   );

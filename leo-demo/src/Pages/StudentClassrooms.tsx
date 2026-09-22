@@ -1,17 +1,19 @@
-import { Bell, BookOpen, Check, Search, Users, X } from "lucide-react";
+import { BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import JoinClassroomForm from "../Components/JoinClassroomForm";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
+import { notifyUser } from "../notifications";
 import { supabase } from "../supabase-client";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
 type Lesson = { lesson_id: string; classroom_id: string; title: string; description: string | null; lesson_image_path: string | null };
 
 export default function StudentClassrooms() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
@@ -65,6 +67,17 @@ export default function StudentClassrooms() {
   async function leaveClassroom() {
     if (!classroomToLeave || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
+    const teacher = await supabase
+      .from("classrooms")
+      .select("teacher_id")
+      .eq("classroom_id", classroomToLeave.id)
+      .single();
+    if (teacher.error) {
+      console.error("Failed to fetch classroom teacher:", teacher.error);
+      setIsLeavingClassroom(false);
+      window.alert("Could not verify classroom teacher. Please try again.");
+      return;
+    }
     const { error: leaveError } = await supabase
       .from("classroom_students")
       .delete()
@@ -78,6 +91,15 @@ export default function StudentClassrooms() {
       return;
     }
 
+    const studentName = [profile?.name, profile?.surname].filter(Boolean).join(" ") || session.user.email || "A student";
+    await notifyUser({
+      recipient_id: teacher.data.teacher_id,
+      type: "student_left_classroom",
+      title: "Student left classroom",
+      body: `${studentName} left "${classroomToLeave.name}".`,
+      link_url: `/teacher-classroom/${classroomToLeave.id}`,
+    });
+
     const remainingLessonIds = lessons
       .filter((lesson) => lesson.classroom_id !== classroomToLeave.id)
       .map((lesson) => lesson.lesson_id);
@@ -89,9 +111,9 @@ export default function StudentClassrooms() {
     setIsLeavingClassroom(false);
   }
 
-  const completedLessons = completedLessonIds.length;
-  const lessonCount = lessons.length;
   const normalisedSearch = classroomSearch.trim().toLowerCase();
+  const lessonCount = lessons.length;
+  const completedLessons = completedLessonIds.length;
   const visibleClassrooms = classrooms.filter((classroom) => `${classroom.classroom_name} ${classroom.description ?? ""}`.toLowerCase().includes(normalisedSearch));
 
   // Builds the card's display data (stats + cover image) for a single classroom.
@@ -126,9 +148,7 @@ export default function StudentClassrooms() {
               <h1 className="mt-1 text-xl font-bold">My classrooms</h1>
               <p className="mt-1 text-xs text-slate-500">Open a classroom to see lessons and teacher resources.</p>
             </div>
-            <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-              <Bell size={19} />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 
@@ -159,7 +179,7 @@ export default function StudentClassrooms() {
 
           {!isLoading && !error && (
             classrooms.length === 0 ? (
-              <section className="mt-5 rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
+              <section className="rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
                 <Users size={26} className="mx-auto text-slate-300" />
                 <h2 className="mt-3 text-sm font-semibold">No classrooms yet</h2>
                 <p className="mt-1 text-xs text-slate-500">Ask your teacher for an invitation code, then enter it above.</p>
@@ -167,7 +187,7 @@ export default function StudentClassrooms() {
             ) : (
               <>
                 {/* Search */}
-                <section className="mt-5 flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                <section className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-sm font-bold">Find a classroom</h2>
                     <p className="mt-0.5 text-xs text-slate-500">Search by classroom name or topic.</p>

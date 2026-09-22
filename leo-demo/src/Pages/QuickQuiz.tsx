@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { notifyUser } from "../notifications";
 import { supabase } from "../supabase-client";
 
 type Mcq = { mcq_id: string; title: string | null; score_ceiling: number | null };
@@ -63,6 +64,22 @@ export default function QuickQuiz() {
     if (attemptError) {
       setError(attemptError.message);
       return;
+    }
+    const { data: lesson } = await supabase
+      .from("lessons")
+      .select("title, classrooms(classroom_id, teacher_id, classroom_name)")
+      .eq("lesson_id", lessonId)
+      .maybeSingle();
+    const classroom = (Array.isArray(lesson?.classrooms) ? lesson.classrooms[0] : lesson?.classrooms) as { classroom_id: string; teacher_id: string; classroom_name: string } | null | undefined;
+    if (classroom?.teacher_id) {
+      const studentName = session.user.user_metadata?.name || session.user.email || "A student";
+      await notifyUser({
+        recipient_id: classroom.teacher_id,
+        type: "lesson_completed",
+        title: "A student completed a lesson",
+        body: `${studentName} scored ${score}/${scoreCeiling} on "${lesson?.title ?? "the lesson"}" in "${classroom.classroom_name}".`,
+        link_url: `/teacher-classroom/${classroom.classroom_id}`,
+      });
     }
     // Record today's learning activity for the streak. Best-effort: a failure here
     // must never block the student from seeing their quiz result.

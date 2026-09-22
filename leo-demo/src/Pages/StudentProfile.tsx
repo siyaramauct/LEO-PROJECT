@@ -1,6 +1,6 @@
-import { Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentProfileContent from "../Components/StudentProfileContent";
 import { useAuth } from "../../context/AuthContext";
@@ -68,9 +68,7 @@ export default function StudentProfile() {
               <p className="text-xs font-medium text-violet-700">Student portal</p>
               <h1 className="mt-1 text-xl font-bold">Profile</h1>
             </div>
-            <button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100">
-              <Bell size={19} />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

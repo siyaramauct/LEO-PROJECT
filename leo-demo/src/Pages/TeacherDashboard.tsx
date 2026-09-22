@@ -1,5 +1,4 @@
 import {
-  Bell,
   BookOpen,
   Users,
   BarChart3,
@@ -17,6 +16,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import NavItem from "../Components/NavItem";
+import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
@@ -329,10 +329,7 @@ export default function TeacherDashboard() {
             </p>
           </div>
 
-          <button className="relative rounded-full p-2 hover:bg-slate-100">
-            <Bell size={21} strokeWidth={1.8} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-violet-700" />
-          </button>
+          <NotificationBell />
         </header>
 
         {/* =========================
@@ -353,22 +350,22 @@ export default function TeacherDashboard() {
               <div className="mt-3 flex items-center justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-lg font-bold">
-                    {classrooms?.[0]?.name ?? "No classroom yet"}
+                    {classrooms?.[0]?.name ?? "Create your first classroom"}
                   </h2>
                   <p className="mt-1 text-xs text-violet-100">
                     {classrooms?.[0]
                       ? `${classrooms[0].studentCount} students · ${classrooms[0].lessonCount} lessons`
-                      : "Create your first classroom to get started"}
+                      : "Set up a space for your learners and lessons"}
                   </p>
                 </div>
 
-                <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
-                  <img
-                    src={classrooms?.[0]?.image ?? "/classRoomIllustration.png"}
-                    alt={classrooms?.[0]?.imageAlt ?? "Classroom illustration"}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
+                {classrooms?.[0] ? <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
+                  <img src={classrooms[0].image} alt={classrooms[0].imageAlt} className="h-full w-full object-contain" />
+                </div> : <div aria-hidden="true" className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-violet-600/50">
+                  <div className="absolute -right-4 -top-5 h-16 w-16 rounded-full border-[10px] border-violet-200/50" />
+                  <div className="absolute -bottom-5 left-3 h-16 w-16 rotate-45 rounded-2xl bg-fuchsia-300/30" />
+                  <div className="absolute bottom-4 right-4 h-3 w-10 -rotate-12 rounded-full bg-white/25" />
+                </div>}
               </div>
 
               <Link
@@ -379,7 +376,7 @@ export default function TeacherDashboard() {
                 }
                 className="mt-3 flex w-fit items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50"
               >
-                View Classroom
+                {classrooms?.[0] ? "View Classroom" : "Create Classroom"}
                 <ChevronRight size={15} />
               </Link>
             </div>
@@ -614,9 +611,7 @@ export default function TeacherDashboard() {
             </div>
 
             <div className="flex shrink-0 items-center gap-4 self-end sm:self-auto">
-              <button className="rounded-xl p-2 hover:bg-slate-100">
-                <Bell size={19} />
-              </button>
+              <NotificationBell />
 
               <button
                 type="button"
@@ -674,9 +669,12 @@ export default function TeacherDashboard() {
 
                 <div className="mt-2 space-y-1.5">
                   {classrooms === null ? (
-                    <p className="text-xs text-slate-400">
-                      You haven't created any classrooms yet.
-                    </p>
+                    <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/60 px-4 py-6 text-center">
+                      <Users className="mx-auto text-violet-700" size={22} />
+                      <p className="mt-2 text-sm font-semibold text-slate-800">Your first classroom starts here</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">Create a classroom to organise lessons and invite learners.</p>
+                      <Link to="/create-classroom" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create Classroom</Link>
+                    </div>
                   ) : (
                     classrooms.map((item) => (
                       <Link
