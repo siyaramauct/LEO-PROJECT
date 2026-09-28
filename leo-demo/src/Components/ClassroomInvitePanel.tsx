@@ -13,8 +13,9 @@ type Props = {
   classroomName: string;
   code: string | null;
   codeError: string | null;
-  students: StudentProfile[];
-  rosterError: string | null;
+  // Omit students to render only the invite code (e.g. inside the desktop banner popover).
+  students?: StudentProfile[];
+  rosterError?: string | null;
   isRotating: boolean;
   onRotate: () => void;
 };
@@ -67,13 +68,13 @@ export default function ClassroomInvitePanel({ classroomName, code, codeError, s
       {codeError && <p role="alert" className="mt-2 text-sm text-red-700">{codeError}</p>}
       {shareMessage && <p role="status" className="mt-2 text-xs text-slate-600">{shareMessage}</p>}
 
-      <div className="mt-5 border-t border-slate-100 pt-4">
+      {students && <div className="mt-5 border-t border-slate-100 pt-4">
         <h3 className="text-sm font-semibold">Students ({students.length})</h3>
         {rosterError && <p role="alert" className="mt-2 text-xs text-red-700">{rosterError}</p>}
         {students.length === 0 ? <div className="flex items-center gap-2 py-5 text-sm text-slate-500"><Users size={18} /> No students have joined yet.</div> : (
           <div className="mt-2 divide-y divide-slate-100">{students.map((student) => <div key={student.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}</span><span><span className="block text-sm font-semibold">{[student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student"}</span>{student.username && <span className="text-xs text-slate-500">@{student.username}</span>}</span></div>)}</div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

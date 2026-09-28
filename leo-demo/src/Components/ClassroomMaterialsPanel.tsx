@@ -9,6 +9,7 @@ export type ClassroomMaterial = {
   url?: string;
   resourceType: "document" | "link";
   resourcePath: string;
+  uploadedDate?: string;
 };
 
 // Parent-owned callbacks keep this panel reusable with any materials store.
