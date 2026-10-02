@@ -170,7 +170,7 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
                     <tr key={student.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{initials(student)}</span>
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-bold text-violet-700">{initials(student)}</span>
                           <span className="min-w-0">
                             <span className="block truncate font-semibold text-slate-800">{fullName(student)}</span>
                             {student.username && <span className="text-xs text-slate-500">@{student.username}</span>}

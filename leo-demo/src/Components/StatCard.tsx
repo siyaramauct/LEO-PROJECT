@@ -15,7 +15,7 @@ export default function StatCard({
 }: StatCardProps) {
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-violet-700">
+      <div className="flex h-8 w-8 items-center justify-center text-violet-700">
           {cloneElement(icon, { size: 19 })}
       </div>
 

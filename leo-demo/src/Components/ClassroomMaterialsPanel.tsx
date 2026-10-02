@@ -126,7 +126,7 @@ export default function ClassroomMaterialsPanel({
           const Icon = material.kind === "Link" ? LinkIcon : FileText;
           const content = (
             <>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-violet-700">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center text-violet-700">
                 <Icon size={15} />
               </span>
               <div className="min-w-0 flex-1">

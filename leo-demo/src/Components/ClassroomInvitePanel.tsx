@@ -72,7 +72,7 @@ export default function ClassroomInvitePanel({ classroomName, code, codeError, s
         <h3 className="text-sm font-semibold">Students ({students.length})</h3>
         {rosterError && <p role="alert" className="mt-2 text-xs text-red-700">{rosterError}</p>}
         {students.length === 0 ? <div className="flex items-center gap-2 py-5 text-sm text-slate-500"><Users size={18} /> No students have joined yet.</div> : (
-          <div className="mt-2 divide-y divide-slate-100">{students.map((student) => <div key={student.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}</span><span><span className="block text-sm font-semibold">{[student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student"}</span>{student.username && <span className="text-xs text-slate-500">@{student.username}</span>}</span></div>)}</div>
+          <div className="mt-2 divide-y divide-slate-100">{students.map((student) => <div key={student.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 items-center justify-center text-sm font-bold text-violet-700">{`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}</span><span><span className="block text-sm font-semibold">{[student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student"}</span>{student.username && <span className="text-xs text-slate-500">@{student.username}</span>}</span></div>)}</div>
         )}
       </div>}
     </div>

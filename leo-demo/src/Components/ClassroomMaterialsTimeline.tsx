@@ -142,7 +142,7 @@ export default function ClassroomMaterialsTimeline({
                 const Icon = material.kind === "Link" ? LinkIcon : FileText;
                 return (
                   <li key={material.id} className="group flex items-center gap-3 px-4 py-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
                       <Icon size={18} />
                     </span>
                     <div className="min-w-0 flex-1">

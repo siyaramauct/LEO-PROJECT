@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { SpeakerWaveIcon, LanguageIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../supabase-client";
 
-type LanguageCode = "zh" | "es" | "fr";
+type LanguageCode = "fr" | "ru" | "es" | "pt";
 
 const languageOptions: { code: LanguageCode; label: string; name: string }[] = [
-    { code: "zh", label: "中文", name: "Mandarin" },
-    { code: "es", label: "ES", name: "Spanish" },
     { code: "fr", label: "FR", name: "French" },
+    { code: "ru", label: "RU", name: "Russian" },
+    { code: "es", label: "ES", name: "Spanish" },
+    { code: "pt", label: "PT", name: "Portuguese" },
 ];
 
 type Translation = { word: string; definition: string };

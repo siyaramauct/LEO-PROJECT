@@ -53,7 +53,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
     <div role="dialog" aria-modal="true" aria-labelledby="change-password-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onKeyDown={(event) => { if (event.key === "Escape" && !isSaving) onClose(); }}>
       <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><LockKeyhole size={20} /></div>
+          <div className="flex h-10 w-10 items-center justify-center text-violet-700"><LockKeyhole size={20} /></div>
           <button type="button" onClick={onClose} disabled={isSaving} aria-label="Close password settings" className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"><X size={18} /></button>
         </div>
         <h2 id="change-password-title" className="mt-4 text-lg font-bold text-slate-900">Password and security</h2>
