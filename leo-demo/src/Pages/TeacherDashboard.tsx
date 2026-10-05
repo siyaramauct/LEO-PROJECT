@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [lessonCount, setLessonCount] = useState<number>(0);
   const [quizzesCompleted, setQuizzesCompleted] = useState<number>(0);
-  const [averageScore, setAverageScore] = useState<number | null>(null);
+  
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -252,7 +252,7 @@ export default function TeacherDashboard() {
       const allLessonIds = (allLessons ?? []).map((lesson) => lesson.lesson_id);
       if (!allLessonIds.length) {
         setQuizzesCompleted(0);
-        setAverageScore(null);
+        
         return;
       }
 
@@ -289,11 +289,7 @@ export default function TeacherDashboard() {
         })
         .filter((score): score is number => score !== null);
 
-      setAverageScore(
-        scorePercentages.length
-          ? Math.round(scorePercentages.reduce((total, score) => total + score, 0) / scorePercentages.length)
-          : null
-      );
+     
     };
 
     void loadLessons();
@@ -639,11 +635,11 @@ export default function TeacherDashboard() {
 
           <div className="mx-auto flex min-h-[calc(100dvh-65px)] w-full max-w-7xl flex-col p-4">
             {/* Desktop Stats */}
-            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-3">
               <StatCard icon={<Users />} label="Classrooms" value={String(classrooms?.length ?? 0)} />
               <StatCard icon={<BookOpen />} label="Lessons Created" value={String(lessonCount)} />
               <StatCard icon={<ClipboardCheck />} label="Quizzes Completed" value={String(quizzesCompleted)} />
-              <StatCard icon={<BarChart3 />} label="Average Score" value={averageScore === null ? "—" : `${averageScore}%`} progress={averageScore ?? 0} />
+              
             </div>
 
             {/* Main Grid */}
