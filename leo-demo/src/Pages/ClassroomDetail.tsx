@@ -30,8 +30,9 @@ import SidebarItem from "../Components/SidebarItem";
 import ClassroomInvitePanel, {
   type StudentProfile,
 } from "../Components/ClassroomInvitePanel";
-import { notifyClassroomStudents, notifyUser } from "../notifications";
+import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
 import UserIdentity from "../Components/UserIdentity";
+import { validateMaterialFile } from "../utils/materialFileTypes";
 import { supabase } from "../supabase-client";
 
 type ClassroomRow = {
@@ -91,7 +92,7 @@ const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
   uploadedDate: row.uploaded_date,
 });
 
-const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
+const toLessonDisplay = (row: LessonRow, hasQuiz: boolean): ClassroomLesson => ({
   id: row.lesson_id,
   title: row.title,
   image: row.lesson_image_path
@@ -101,6 +102,7 @@ const toLessonDisplay = (row: LessonRow): ClassroomLesson => ({
   status: row.status ?? "Draft",
   words: row.word_count ?? 0,
   completion: 0,
+  hasQuiz,
 });
 
 export default function ClassroomDetail() {
@@ -160,7 +162,14 @@ export default function ClassroomDetail() {
       }
 
       if (!lessonsResult.error && lessonsResult.data) {
-        setLessons((lessonsResult.data as LessonRow[]).map(toLessonDisplay));
+        const lessonRows = lessonsResult.data as LessonRow[];
+        // Lessons without an mcqs row are flashcards-only. If the lookup fails, don't mislabel them.
+        const mcqResult = lessonRows.length
+          ? await supabase.from("mcqs").select("lesson_id").in("lesson_id", lessonRows.map((row) => row.lesson_id))
+          : { data: [], error: null };
+        if (mcqResult.error) console.error("Failed to load lesson quizzes:", mcqResult.error);
+        const quizLessonIds = new Set((mcqResult.data ?? []).map((mcq) => mcq.lesson_id as string));
+        setLessons(lessonRows.map((row) => toLessonDisplay(row, Boolean(mcqResult.error) || quizLessonIds.has(row.lesson_id))));
       }
 
       if (!materialsResult.error) {
@@ -242,6 +251,11 @@ export default function ClassroomDetail() {
 
   const addFile = async (file: File) => {
     if (!classroomId || !teacherId) return;
+    const validation = validateMaterialFile(file);
+    if ("error" in validation) {
+      setMaterialError(validation.error);
+      return;
+    }
     setIsSavingMaterial(true);
     setMaterialError(null);
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -251,7 +265,7 @@ export default function ClassroomDetail() {
     const { error: uploadError } = await supabase.storage
       .from("documents")
       .upload(storagePath, file, {
-        contentType: file.type || "application/pdf",
+        contentType: validation.contentType,
         upsert: false,
       });
     if (uploadError) {
@@ -432,7 +446,7 @@ export default function ClassroomDetail() {
           </div>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-            <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
+            <ClassroomInvitePanel classroomName={classroomName} code={inviteCode} codeError={inviteCodeError} students={enrolledStudents} enrolledAt={enrolledAt} rosterError={enrollmentError} isRotating={isRotatingCode} onRotate={() => void rotateInviteCode()} />
           </section>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">

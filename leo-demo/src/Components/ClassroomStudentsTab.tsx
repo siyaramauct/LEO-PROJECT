@@ -2,8 +2,10 @@ import { Activity, BarChart3, CheckCircle2, UserMinus, Users } from "lucide-reac
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ClassroomMetric from "./ClassroomMetric";
+import SearchSortBar from "./SearchSortBar";
 import type { StudentProfile } from "./ClassroomInvitePanel";
 import { supabase } from "../supabase-client";
+import { compareNullableNumbers, compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
 type ClassroomStudentsTabProps = {
   classroomId: string;
@@ -21,6 +23,17 @@ type StudentStats = {
 };
 
 const ACTIVITY_WINDOW_DAYS = 30;
+
+type StudentSort = "name-asc" | "name-desc" | "recently-joined" | "highest-score" | "most-quizzes" | "recently-active";
+
+const studentSortOptions: SortOption<StudentSort>[] = [
+  { value: "name-asc", label: "Name (A–Z)" },
+  { value: "name-desc", label: "Name (Z–A)" },
+  { value: "recently-joined", label: "Recently joined" },
+  { value: "highest-score", label: "Highest avg score" },
+  { value: "most-quizzes", label: "Most quizzes done" },
+  { value: "recently-active", label: "Recently active" },
+];
 
 // student_activity.activity_date is a plain date, so compare against local YYYY-MM-DD strings.
 const localDate = (daysAgo = 0) => {
@@ -47,8 +60,12 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
   const [stats, setStats] = useState<Record<string, StudentStats>>({});
   const [statsError, setStatsError] = useState<string | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  // Lessons with an MCQ. Flashcards-only lessons can't be completed, so they're left out of completion stats.
+  const [quizLessonCount, setQuizLessonCount] = useState<number | null>(null);
   const studentKey = students.map((student) => student.id).join(",");
   const lessonKey = lessonIds.join(",");
+  const [studentQuery, setStudentQuery] = useState("");
+  const [studentSort, setStudentSort] = useState<StudentSort>("name-asc");
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +96,7 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
       if (error) setStatsError(`Some statistics could not be loaded: ${error.message}`);
 
       const ceilings = new Map((mcqResult.data ?? []).map((mcq) => [mcq.lesson_id as string, mcq.score_ceiling as number | null]));
+      setQuizLessonCount(mcqResult.error ? null : ceilings.size);
       // Keep each student's best percentage per lesson so retakes don't drag the average down.
       const bestPercent = new Map<string, Map<string, number | null>>();
       for (const attempt of attemptResult.data ?? []) {
@@ -112,7 +130,8 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
     return () => { cancelled = true; };
   }, [studentKey, lessonKey]);
 
-  const lessonCount = lessonIds.length;
+  const lessonCount = quizLessonCount ?? lessonIds.length;
+  const flashcardOnlyCount = lessonIds.length - lessonCount;
   const studentStats = students.map((student) => stats[student.id]).filter(Boolean);
   const weekStart = localDate(6);
   const activeThisWeek = studentStats.filter((stat) => stat.lastActive && stat.lastActive >= weekStart).length;
@@ -122,13 +141,31 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
   const completionRate = possibleCompletions ? Math.round((studentStats.reduce((sum, stat) => sum + stat.completedLessons, 0) / possibleCompletions) * 100) : null;
   const pending = isLoadingStats ? "…" : null;
 
+  // Stat-based sorts put students without a value (or still loading) last, then fall back to name.
+  const compareStudents = (a: StudentProfile, b: StudentProfile) => {
+    const byName = compareText(fullName(a), fullName(b));
+    const statA = stats[a.id];
+    const statB = stats[b.id];
+    switch (studentSort) {
+      case "name-desc": return -byName;
+      case "recently-joined": return compareNullableNumbers(toTime(enrolledAt[a.id]), toTime(enrolledAt[b.id]), "desc") || byName;
+      case "highest-score": return compareNullableNumbers(statA?.averagePercent, statB?.averagePercent, "desc") || byName;
+      case "most-quizzes": return compareNullableNumbers(statA?.completedLessons, statB?.completedLessons, "desc") || byName;
+      case "recently-active": return compareNullableNumbers(toTime(statA?.lastActive), toTime(statB?.lastActive), "desc") || byName;
+      default: return byName;
+    }
+  };
+  const visibleStudents = students
+    .filter((student) => matchesSearch(studentQuery, student.name, student.surname, student.username))
+    .sort(compareStudents);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <ClassroomMetric icon={<Users size={16} />} label="Students enrolled" value={String(students.length)} detail="Total" />
         <ClassroomMetric icon={<Activity size={16} />} label="Active this week" value={pending ?? `${activeThisWeek}/${students.length}`} detail="Last 7 days" />
         <ClassroomMetric icon={<BarChart3 size={16} />} label="Average quiz score" value={pending ?? (classAverage === null ? "—" : `${classAverage}%`)} detail="Best attempt" />
-        <ClassroomMetric icon={<CheckCircle2 size={16} />} label="Lesson completion" value={pending ?? (completionRate === null ? "—" : `${completionRate}%`)} detail={`${lessonCount} lesson${lessonCount !== 1 ? "s" : ""}`} />
+        <ClassroomMetric icon={<CheckCircle2 size={16} />} label="Lesson completion" value={pending ?? (completionRate === null ? "—" : `${completionRate}%`)} detail={`${lessonCount} quiz lesson${lessonCount !== 1 ? "s" : ""}${flashcardOnlyCount > 0 ? ` · ${flashcardOnlyCount} flashcards only` : ""}`} />
       </div>
 
       <section className="rounded-xl border border-slate-100 bg-white">
@@ -140,6 +177,19 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
           <Link to={`/class-progress/${classroomId}`} className="text-xs font-semibold text-violet-700 hover:underline">Full progress report</Link>
         </div>
 
+        {students.length > 0 && (
+          <SearchSortBar
+            size="sm"
+            className="mx-4 mt-3"
+            query={studentQuery}
+            onQueryChange={setStudentQuery}
+            searchPlaceholder="Search by name or username..."
+            sort={studentSort}
+            onSortChange={setStudentSort}
+            sortOptions={studentSortOptions}
+          />
+        )}
+
         {rosterError && <p role="alert" className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{rosterError}</p>}
         {statsError && <p role="alert" className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{statsError}</p>}
 
@@ -149,6 +199,8 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
             <p className="mt-2 text-sm font-semibold text-slate-600">No students have joined yet</p>
             <p className="mt-1 text-xs text-slate-400">Use “Invite students” in the banner to share the classroom code.</p>
           </div>
+        ) : visibleStudents.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-slate-500">No students match "{studentQuery.trim()}".</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -156,14 +208,14 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
                 <tr>
                   <th scope="col" className="px-4 py-2 font-medium">Student</th>
                   <th scope="col" className="px-4 py-2 font-medium">Joined</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Lessons done</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Quizzes done</th>
                   <th scope="col" className="px-4 py-2 font-medium">Avg score</th>
                   <th scope="col" className="px-4 py-2 font-medium">Last active</th>
                   <th scope="col" className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((student) => {
+                {visibleStudents.map((student) => {
                   const stat = stats[student.id];
                   const joined = enrolledAt[student.id];
                   return (
@@ -186,7 +238,7 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
                           type="button"
                           onClick={() => onRemove(student)}
                           aria-label={`Remove ${fullName(student)} from this classroom`}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition-colors duration-1000 ease-out hover:bg-violet-700 hover:text-white"
                         >
                           <UserMinus size={15} /> Remove
                         </button>

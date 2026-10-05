@@ -152,7 +152,7 @@ export default function StudentLearningReport() {
 
               <section className="mt-4 rounded-xl border border-slate-100 bg-white p-5">
                 <h2 className="text-base font-bold">Lessons covered</h2>
-                <p className="mt-1 text-sm text-slate-500">Every lesson quiz you've completed, most recent first.</p>
+                <p className="mt-1 text-sm text-slate-500">Every lesson quiz you've completed, most recent first. Flashcards-only lessons have no quiz, so they aren't scored or listed here.</p>
 
                 {isLoading ? (
                   <p className="mt-4 text-sm text-slate-400">Loading your learning report...</p>

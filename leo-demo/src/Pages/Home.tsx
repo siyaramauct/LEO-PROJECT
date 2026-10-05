@@ -1,7 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import LoadingScreen from "../Components/LoadingScreen";
-import { oauthErrorFromUrl } from "../auth/oauthError";
+import { oauthErrorFromUrl } from "../utils/oauthError";
 
 export default function Home() {
   const { session, profile, loading, profileLoading, profileError } = useAuth();

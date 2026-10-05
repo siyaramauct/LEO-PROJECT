@@ -32,7 +32,6 @@ type ClassroomFormValues = {
   name: string;
   description: string;
   proficiencyLevel: string;
-  language: string;
   coverId: string;
 };
 
@@ -46,7 +45,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<ClassroomFormValues>({
     mode: "onSubmit",
     reValidateMode: "onSubmit",
-    defaultValues: { proficiencyLevel: "Elementary", language: "English", coverId: coverOptions[0].id },
+    defaultValues: { proficiencyLevel: "Elementary", coverId: coverOptions[0].id },
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const selectedCover = watch("coverId");
@@ -69,7 +68,8 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
       classroom_name: values.name.trim(),
       description: values.description.trim(),
       proficiency_level: values.proficiencyLevel,
-      language: values.language,
+      // The language picker was removed; every classroom is English. Kept because the column may be required.
+      language: "English",
       cover_image_path: selectedCoverOption.path,
       invite_only: true,
       join_code: generateJoinCode(values.name),
@@ -87,10 +87,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
     <form onSubmit={handleSubmit(submitClassroom)} className="space-y-5" noValidate>
       <ClassroomFormField label="Classroom name" htmlFor={`${idPrefix}-classroom-name`} hint="Use a name learners will recognise." error={errors.name?.message}><input id={`${idPrefix}-classroom-name`} placeholder="e.g. English for Everyday Life" className={inputClassName} {...register("name", { required: "Enter a classroom name.", maxLength: { value: 80, message: "Keep the classroom name under 80 characters." } })} /></ClassroomFormField>
       <ClassroomFormField label="Description" htmlFor={`${idPrefix}-classroom-description`} hint="A short summary shown on the classroom card." error={errors.description?.message}><textarea id={`${idPrefix}-classroom-description`} rows={3} placeholder="What will learners practise in this classroom?" className={`${inputClassName} resize-none`} {...register("description", { required: "Add a short classroom description.", minLength: { value: 10, message: "Use at least 10 characters so learners have enough context." }, maxLength: { value: 240, message: "Keep the description under 240 characters." } })} /></ClassroomFormField>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ClassroomFormField label="Proficiency level" htmlFor={`${idPrefix}-classroom-level`} error={errors.proficiencyLevel?.message}><select id={`${idPrefix}-classroom-level`} className={inputClassName} {...register("proficiencyLevel", { required: "Choose a proficiency level." })}><option>Beginner</option><option>Elementary</option><option>Intermediate</option><option>Advanced</option><option>Mixed levels</option></select></ClassroomFormField>
-        <ClassroomFormField label="Language" htmlFor={`${idPrefix}-classroom-language`} error={errors.language?.message}><select id={`${idPrefix}-classroom-language`} className={inputClassName} {...register("language", { required: "Choose a language." })}><option>English</option><option>Afrikaans</option><option>isiZulu</option><option>isiXhosa</option><option>Sesotho</option><option>French</option><option>Spanish</option><option>Multiple languages</option><option>Other language</option></select></ClassroomFormField>
-      </div>
+      <ClassroomFormField label="Proficiency level" htmlFor={`${idPrefix}-classroom-level`} error={errors.proficiencyLevel?.message}><select id={`${idPrefix}-classroom-level`} className={inputClassName} {...register("proficiencyLevel", { required: "Choose a proficiency level." })}><option>Beginner</option><option>Elementary</option><option>Intermediate</option><option>Advanced</option><option>Mixed levels</option></select></ClassroomFormField>
       <ClassroomFormField label="Classroom cover" hint="Choose an image that gives learners a quick sense of the class." error={errors.coverId?.message}>
         <input type="hidden" {...register("coverId", { required: "Choose a classroom cover." })} />
         <div className="grid grid-cols-3 gap-2">{coverOptions.map((cover) => <button key={cover.id} type="button" aria-label={`Use ${cover.alt} as the classroom cover`} aria-pressed={selectedCover === cover.id} onClick={() => setValue("coverId", cover.id, { shouldValidate: true })} className={`relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition ${selectedCover === cover.id ? "border-violet-700" : "border-transparent hover:border-slate-300"}`}><img src={cover.image} alt={cover.alt} className="h-full w-full object-cover" />{selectedCover === cover.id && <span className="absolute inset-x-0 bottom-0 h-1 bg-violet-700" />}</button>)}</div>

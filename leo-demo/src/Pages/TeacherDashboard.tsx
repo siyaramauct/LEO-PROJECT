@@ -1,11 +1,9 @@
 import {
-  BookOpen,
   Users,
   BarChart3,
   Calendar,
   Plus,
   ChevronRight,
-  ClipboardCheck,
   Home,
   User,
   Settings,
@@ -19,7 +17,6 @@ import LoadingScreen from "../Components/LoadingScreen";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
-import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
@@ -58,9 +55,6 @@ export default function TeacherDashboard() {
   const [lessonsError, setLessonsError] = useState<string | null>(null);
   const [isLessonsLoading, setIsLessonsLoading] = useState(true);
   // null = unknown (failed to load), rendered as "—" rather than a misleading 0.
-  const [lessonCount, setLessonCount] = useState<number | null>(null);
-  const [quizzesCompleted, setQuizzesCompleted] = useState<number | null>(null);
-  const [averageScore, setAverageScore] = useState<number | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -179,7 +173,6 @@ export default function TeacherDashboard() {
       // If the teacher has no classrooms yet, they can't have any lessons.
       if (!teacherClassrooms || teacherClassrooms.length === 0) {
         setLessons([]);
-        setLessonCount(0);
         return;
       }
 
@@ -246,67 +239,6 @@ export default function TeacherDashboard() {
         }))
       );
 
-      // Step 4: get the REAL total lesson count across all of this
-      // teacher's classrooms, and every lesson's id — we need the ids to
-      // pull quiz stats below. We can't use recentLessons here — that's
-      // capped at 4 by the limit() above and would undercount everything.
-      const { data: allLessons, error: allLessonsError } = await supabase
-        .from("lessons")
-        .select("lesson_id")
-        .in("classroom_id", classroomIds);
-
-      if (allLessonsError) {
-        console.error("Failed to count lessons:", allLessonsError);
-        return;
-      }
-
-      setLessonCount(allLessons?.length ?? 0);
-
-      const allLessonIds = (allLessons ?? []).map((lesson) => lesson.lesson_id);
-      if (!allLessonIds.length) {
-        setQuizzesCompleted(0);
-        setAverageScore(null);
-        return;
-      }
-
-      // Step 5: quiz stats — each mcq's score_ceiling tells us the max
-      // possible score for its lesson, so we can turn a raw attempt score
-      // into a percentage the same way ClassProgress.tsx does.
-      const [{ data: mcqs, error: mcqsError }, { data: attempts, error: attemptsError }] =
-        await Promise.all([
-          supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", allLessonIds),
-          supabase
-            .from("lesson_attempts")
-            .select("lesson_id, score")
-            .in("lesson_id", allLessonIds)
-            .not("completed_at", "is", null),
-        ]);
-
-      if (mcqsError || attemptsError) {
-        console.error("Failed to load quiz stats:", mcqsError ?? attemptsError);
-        return;
-      }
-
-      const scoreCeilingByLesson: Record<string, number> = {};
-      (mcqs ?? []).forEach((mcq) => {
-        if (mcq.score_ceiling !== null) scoreCeilingByLesson[mcq.lesson_id] = mcq.score_ceiling;
-      });
-
-      const completedAttempts = attempts ?? [];
-      setQuizzesCompleted(completedAttempts.length);
-
-      const scorePercentages = completedAttempts
-        .map((attempt) => {
-          const ceiling = scoreCeilingByLesson[attempt.lesson_id];
-          return ceiling && ceiling > 0 && attempt.score !== null ? (Number(attempt.score) / ceiling) * 100 : null;
-        })
-        .filter((score): score is number => score !== null);
-
-      setAverageScore(
-        scorePercentages.length
-          ? Math.round(scorePercentages.reduce((total, score) => total + score, 0) / scorePercentages.length)
-          : null
-      );
     };
 
     // finally: every exit path (including the early error returns) must end
@@ -407,52 +339,6 @@ export default function TeacherDashboard() {
                 {classrooms?.[0] ? "View Classroom" : "Create Classroom"}
                 <ChevronRight size={15} />
               </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* =========================
-            TODAY'S OVERVIEW
-        ========================== */}
-        <section className="mt-3 shrink-0 px-4 sm:px-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold">Account Overview</h2>
-            <button className="text-xs font-medium text-violet-700">
-              View reports
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center text-violet-700">
-                <BookOpen size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">{lessonCount ?? "—"}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Lessons created
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center text-violet-700">
-                <Users size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">
-                {classrooms?.length ?? 0}
-              </p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Active classrooms
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center text-violet-700">
-                <ClipboardCheck size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">{quizzesCompleted ?? "—"}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Quizzes completed
-              </p>
             </div>
           </div>
         </section>
@@ -670,16 +556,8 @@ export default function TeacherDashboard() {
           </header>
 
           <div className="mx-auto flex min-h-[calc(100dvh-65px)] w-full max-w-7xl flex-col p-4">
-            {/* Desktop Stats */}
-            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-4">
-              <StatCard icon={<Users />} label="Classrooms" value={String(classrooms?.length ?? 0)} />
-              <StatCard icon={<BookOpen />} label="Lessons Created" value={lessonCount === null ? "—" : String(lessonCount)} />
-              <StatCard icon={<ClipboardCheck />} label="Quizzes Completed" value={quizzesCompleted === null ? "—" : String(quizzesCompleted)} />
-              <StatCard icon={<BarChart3 />} label="Average Score" value={averageScore === null ? "—" : `${averageScore}%`} progress={averageScore ?? 0} />
-            </div>
-
             {/* Main Grid */}
-            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
+            <div className="grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
               {/* Classes */}
               <section className="rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">

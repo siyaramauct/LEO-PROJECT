@@ -1,5 +1,6 @@
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL } from "../utils/materialFileTypes";
 
 export type ClassroomMaterial = {
   id: string;
@@ -51,6 +52,7 @@ export default function ClassroomMaterialsPanel({
         <div>
           <h2 className="text-sm font-bold text-slate-900">Class materials</h2>
           <p className="mt-1 text-xs text-slate-500">Files and links shared with learners.</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Files: {MATERIAL_FILE_LABEL}</p>
         </div>
         <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500">
           {materials.length} items
@@ -64,13 +66,13 @@ export default function ClassroomMaterialsPanel({
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${isSaving ? "cursor-not-allowed bg-slate-300" : "cursor-pointer bg-violet-700 hover:bg-violet-800"}`}
         >
           <Paperclip size={15} />
-          {isSaving ? "Saving..." : "Upload PDF"}
+          {isSaving ? "Saving..." : "Upload file"}
         </label>
         <input
           id="classroom-material-upload"
           type="file"
           className="sr-only"
-          accept="application/pdf,.pdf"
+          accept={MATERIAL_FILE_ACCEPT}
           disabled={isSaving}
           onChange={(event) => {
             const [file] = Array.from(event.target.files ?? []);
@@ -149,7 +151,7 @@ export default function ClassroomMaterialsPanel({
                 type="button"
                 aria-label={`Delete ${material.title}`}
                 onClick={() => onDeleteMaterial(material)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-600 text-white transition hover:bg-rose-700"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-600 text-white transition-colors duration-1000 ease-out hover:bg-violet-700"
               >
                 <Trash2 size={14} />
               </button>

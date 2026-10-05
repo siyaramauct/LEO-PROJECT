@@ -1,5 +1,7 @@
 import { Copy, Mail, RefreshCw, Share2, Users } from "lucide-react";
 import { useState } from "react";
+import SearchSortBar from "./SearchSortBar";
+import { compareNullableNumbers, compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
 export type StudentProfile = {
   id: string;
@@ -15,13 +17,35 @@ type Props = {
   codeError: string | null;
   // Omit students to render only the invite code (e.g. inside the desktop banner popover).
   students?: StudentProfile[];
+  // Enrolment timestamps by student id, used for "Recently joined" sorting.
+  enrolledAt?: Record<string, string>;
   rosterError?: string | null;
   isRotating: boolean;
   onRotate: () => void;
 };
 
-export default function ClassroomInvitePanel({ classroomName, code, codeError, students, rosterError, isRotating, onRotate }: Props) {
+type StudentSort = "name-asc" | "name-desc" | "recently-joined";
+
+const studentSortOptions: SortOption<StudentSort>[] = [
+  { value: "name-asc", label: "Name (A–Z)" },
+  { value: "name-desc", label: "Name (Z–A)" },
+  { value: "recently-joined", label: "Recently joined" },
+];
+
+const studentName = (student: StudentProfile) => [student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student";
+
+export default function ClassroomInvitePanel({ classroomName, code, codeError, students, enrolledAt = {}, rosterError, isRotating, onRotate }: Props) {
   const [shareMessage, setShareMessage] = useState("");
+  const [studentQuery, setStudentQuery] = useState("");
+  const [studentSort, setStudentSort] = useState<StudentSort>("name-asc");
+  const visibleStudents = (students ?? [])
+    .filter((student) => matchesSearch(studentQuery, student.name, student.surname, student.username))
+    .sort((a, b) => {
+      const byName = compareText(studentName(a), studentName(b));
+      if (studentSort === "name-desc") return -byName;
+      if (studentSort === "recently-joined") return compareNullableNumbers(toTime(enrolledAt[a.id]), toTime(enrolledAt[b.id]), "desc") || byName;
+      return byName;
+    });
   const invitation = `You're invited to ${classroomName} on LEO Vocabulary App. Sign in, open My Classrooms, and enter this code: ${code}`;
 
   const copyCode = async () => {
@@ -72,7 +96,10 @@ export default function ClassroomInvitePanel({ classroomName, code, codeError, s
         <h3 className="text-sm font-semibold">Students ({students.length})</h3>
         {rosterError && <p role="alert" className="mt-2 text-xs text-red-700">{rosterError}</p>}
         {students.length === 0 ? <div className="flex items-center gap-2 py-5 text-sm text-slate-500"><Users size={18} /> No students have joined yet.</div> : (
-          <div className="mt-2 divide-y divide-slate-100">{students.map((student) => <div key={student.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 items-center justify-center text-sm font-bold text-violet-700">{`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}</span><span><span className="block text-sm font-semibold">{[student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student"}</span>{student.username && <span className="text-xs text-slate-500">@{student.username}</span>}</span></div>)}</div>
+          <>
+          <SearchSortBar size="sm" className="mt-3" query={studentQuery} onQueryChange={setStudentQuery} searchPlaceholder="Search students..." sort={studentSort} onSortChange={setStudentSort} sortOptions={studentSortOptions} />
+          {visibleStudents.length === 0 ? <p className="py-5 text-center text-sm text-slate-500">No students match "{studentQuery.trim()}".</p> : <div className="mt-2 divide-y divide-slate-100">{visibleStudents.map((student) => <div key={student.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 items-center justify-center text-sm font-bold text-violet-700">{`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}</span><span><span className="block text-sm font-semibold">{studentName(student)}</span>{student.username && <span className="text-xs text-slate-500">@{student.username}</span>}</span></div>)}</div>}
+          </>
         )}
       </div>}
     </div>

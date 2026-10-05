@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { notifyUser } from "../notifications";
+import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
 
 type Mcq = { mcq_id: string; title: string | null; score_ceiling: number | null };

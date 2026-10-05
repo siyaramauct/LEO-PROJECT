@@ -1,6 +1,7 @@
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { ClassroomMaterial } from "./ClassroomMaterialsPanel";
+import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL } from "../utils/materialFileTypes";
 
 type ClassroomMaterialsTimelineProps = {
   materials: ClassroomMaterial[];
@@ -66,6 +67,7 @@ export default function ClassroomMaterialsTimeline({
           <div>
             <h2 className="text-base font-bold">Share with the class</h2>
             <p className="mt-1 text-sm text-slate-500">Students are notified when you post a document or link.</p>
+            <p className="mt-0.5 text-xs text-slate-400">Accepted files: {MATERIAL_FILE_LABEL}</p>
           </div>
           <div className="flex gap-2">
             <label
@@ -73,13 +75,13 @@ export default function ClassroomMaterialsTimeline({
               className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${isSaving ? "cursor-not-allowed bg-slate-300" : "cursor-pointer bg-violet-700 hover:bg-violet-800"}`}
             >
               <Paperclip size={15} />
-              {isSaving ? "Saving..." : "Upload PDF"}
+              {isSaving ? "Saving..." : "Upload file"}
             </label>
             <input
               id={uploadInputId}
               type="file"
               className="sr-only"
-              accept="application/pdf,.pdf"
+              accept={MATERIAL_FILE_ACCEPT}
               disabled={isSaving}
               onChange={(event) => {
                 const [file] = Array.from(event.target.files ?? []);
@@ -162,7 +164,7 @@ export default function ClassroomMaterialsTimeline({
                       type="button"
                       aria-label={`Delete ${material.title}`}
                       onClick={() => onDeleteMaterial(material)}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 opacity-0 transition duration-1000 ease-out hover:bg-violet-700 hover:text-white focus:opacity-100 group-hover:opacity-100"
                     >
                       <Trash2 size={15} />
                     </button>

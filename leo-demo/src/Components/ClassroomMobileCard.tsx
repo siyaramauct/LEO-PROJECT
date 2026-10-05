@@ -8,6 +8,8 @@ export interface Classroom {
   studentCount: number;
   lessonCount: number;
   createdDate: string;
+  // Raw creation time for sorting; null when the row has no date.
+  createdTime: number | null;
   image: string;
   imageAlt: string;
   imageClassName: string;

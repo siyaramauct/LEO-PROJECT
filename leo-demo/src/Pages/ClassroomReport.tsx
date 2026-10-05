@@ -45,6 +45,8 @@ type LessonProgress = {
   title: string;
   completed: boolean;
   score: number | null;
+  // False for flashcards-only lessons: no quiz, so no completion or score.
+  hasQuiz: boolean;
 };
 
 type StudentProgress = {
@@ -75,6 +77,7 @@ export default function ClassroomReport() {
 
   const [quizCount, setQuizCount] = useState(0);
   const [lessonCount, setLessonCount] = useState(0);
+  const [flashcardOnlyCount, setFlashcardOnlyCount] = useState(0);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -227,6 +230,10 @@ export default function ClassroomReport() {
       // 6. Store score ceilings
       // =========================
       const scoreCeilings = new Map<string, number>();
+      // Lessons without an mcqs row are flashcards-only and are left out of progress.
+      const quizLessonIds = new Set(mcqs.map((mcq) => mcq.lesson_id));
+      const quizLessonCount = classroomLessons.filter((lesson) => quizLessonIds.has(lesson.lesson_id)).length;
+      setFlashcardOnlyCount(classroomLessons.length - quizLessonCount);
 
       mcqs.forEach((mcq) => {
         if (mcq.score_ceiling !== null) {
@@ -303,19 +310,20 @@ export default function ClassroomReport() {
                 title: lesson.title,
                 completed: !!attempt,
                 score: percentageScore,
+                hasQuiz: quizLessonIds.has(lesson.lesson_id),
               };
             });
 
           const completedLessons =
             lessonProgress.filter(
-              (lesson) => lesson.completed
+              (lesson) => lesson.hasQuiz && lesson.completed
             ).length;
 
           const progress =
-            classroomLessons.length > 0
+            quizLessonCount > 0
               ? Math.round(
                   (completedLessons /
-                    classroomLessons.length) *
+                    quizLessonCount) *
                     100
                 )
               : 0;
@@ -356,7 +364,7 @@ export default function ClassroomReport() {
       setCompletedStudentCount(
         progressData.filter(
           (student) =>
-            classroomLessons.length > 0 &&
+            quizLessonCount > 0 &&
             student.progress === 100
         ).length
       );
@@ -489,6 +497,7 @@ export default function ClassroomReport() {
                   <p className="mt-1 text-xs text-slate-500">
                     {students.length} students ·{" "}
                     {lessonCount} lessons
+                    {flashcardOnlyCount > 0 && ` · ${flashcardOnlyCount} flashcards only`}
                   </p>
                 </div>
 
@@ -524,11 +533,11 @@ export default function ClassroomReport() {
                               {
                                 student.lessons.filter(
                                   (lesson) =>
-                                    lesson.completed
+                                    lesson.hasQuiz && lesson.completed
                                 ).length
                               }{" "}
                               /{" "}
-                              {student.lessons.length}{" "}
+                              {student.lessons.filter((lesson) => lesson.hasQuiz).length}{" "}
                               completed
                             </p>
                           </div>
@@ -588,7 +597,9 @@ export default function ClassroomReport() {
                                     </p>
 
                                     <p className="mt-0.5 text-[10px] text-slate-400">
-                                      {lesson.completed
+                                      {!lesson.hasQuiz
+                                        ? "Flashcards only · no score"
+                                        : lesson.completed
                                         ? "Completed"
                                         : "Not started"}
                                     </p>
@@ -605,7 +616,7 @@ export default function ClassroomReport() {
                                     {lesson.score !==
                                     null
                                       ? `${lesson.score}%`
-                                      : "—"}
+                                      : lesson.hasQuiz ? "—" : "No quiz"}
                                   </span>
                                 </div>
                               )
@@ -789,6 +800,7 @@ export default function ClassroomReport() {
                     <p className="mt-1 text-xs text-slate-500">
                       {students.length} students ·{" "}
                       {lessonCount} lessons
+                      {flashcardOnlyCount > 0 && ` · ${flashcardOnlyCount} flashcards only`}
                     </p>
                   </div>
 
@@ -826,12 +838,12 @@ export default function ClassroomReport() {
                                   {
                                     student.lessons.filter(
                                       (lesson) =>
-                                        lesson.completed
+                                        lesson.hasQuiz && lesson.completed
                                     ).length
                                   }{" "}
                                   /{" "}
                                   {
-                                    student.lessons.length
+                                    student.lessons.filter((lesson) => lesson.hasQuiz).length
                                   }{" "}
                                   completed
                                 </p>
@@ -896,7 +908,9 @@ export default function ClassroomReport() {
                                       </p>
 
                                       <p className="mt-0.5 text-[10px] text-slate-400">
-                                        {lesson.completed
+                                        {!lesson.hasQuiz
+                                          ? "Flashcards only · no score"
+                                          : lesson.completed
                                           ? "Completed"
                                           : "Not started"}
                                       </p>
@@ -913,7 +927,7 @@ export default function ClassroomReport() {
                                       {lesson.score !==
                                       null
                                         ? `${lesson.score}%`
-                                        : "—"}
+                                        : lesson.hasQuiz ? "—" : "No quiz"}
                                     </span>
                                   </div>
                                 )

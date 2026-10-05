@@ -1,4 +1,4 @@
-import { supabase } from "./supabase-client";
+import { supabase } from "../supabase-client";
 
 type NotificationInput = {
   recipient_id: string;
