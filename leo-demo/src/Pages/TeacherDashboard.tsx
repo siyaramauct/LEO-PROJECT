@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [lessonCount, setLessonCount] = useState<number>(0);
   const [quizzesCompleted, setQuizzesCompleted] = useState<number>(0);
-  const [averageScore, setAverageScore] = useState<number | null>(null);
+  
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -252,48 +252,23 @@ export default function TeacherDashboard() {
       const allLessonIds = (allLessons ?? []).map((lesson) => lesson.lesson_id);
       if (!allLessonIds.length) {
         setQuizzesCompleted(0);
-        setAverageScore(null);
+        
         return;
       }
 
-      // Step 5: quiz stats — each mcq's score_ceiling tells us the max
-      // possible score for its lesson, so we can turn a raw attempt score
-      // into a percentage the same way ClassProgress.tsx does.
-      const [{ data: mcqs, error: mcqsError }, { data: attempts, error: attemptsError }] =
-        await Promise.all([
-          supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", allLessonIds),
-          supabase
-            .from("lesson_attempts")
-            .select("lesson_id, score")
-            .in("lesson_id", allLessonIds)
-            .not("completed_at", "is", null),
-        ]);
+      // Step 5: count completed quiz attempts for the teacher's lessons.
+      const { data: attempts, error: attemptsError } = await supabase
+        .from("lesson_attempts")
+        .select("lesson_id")
+        .in("lesson_id", allLessonIds)
+        .not("completed_at", "is", null);
 
-      if (mcqsError || attemptsError) {
-        console.error("Failed to load quiz stats:", mcqsError ?? attemptsError);
+      if (attemptsError) {
+        console.error("Failed to load quiz stats:", attemptsError);
         return;
       }
 
-      const scoreCeilingByLesson: Record<string, number> = {};
-      (mcqs ?? []).forEach((mcq) => {
-        if (mcq.score_ceiling !== null) scoreCeilingByLesson[mcq.lesson_id] = mcq.score_ceiling;
-      });
-
-      const completedAttempts = attempts ?? [];
-      setQuizzesCompleted(completedAttempts.length);
-
-      const scorePercentages = completedAttempts
-        .map((attempt) => {
-          const ceiling = scoreCeilingByLesson[attempt.lesson_id];
-          return ceiling && ceiling > 0 && attempt.score !== null ? (Number(attempt.score) / ceiling) * 100 : null;
-        })
-        .filter((score): score is number => score !== null);
-
-      setAverageScore(
-        scorePercentages.length
-          ? Math.round(scorePercentages.reduce((total, score) => total + score, 0) / scorePercentages.length)
-          : null
-      );
+      setQuizzesCompleted(attempts?.length ?? 0);
     };
 
     void loadLessons();
@@ -639,11 +614,11 @@ export default function TeacherDashboard() {
 
           <div className="mx-auto flex min-h-[calc(100dvh-65px)] w-full max-w-7xl flex-col p-4">
             {/* Desktop Stats */}
-            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-3">
               <StatCard icon={<Users />} label="Classrooms" value={String(classrooms?.length ?? 0)} />
               <StatCard icon={<BookOpen />} label="Lessons Created" value={String(lessonCount)} />
               <StatCard icon={<ClipboardCheck />} label="Quizzes Completed" value={String(quizzesCompleted)} />
-              <StatCard icon={<BarChart3 />} label="Average Score" value={averageScore === null ? "—" : `${averageScore}%`} progress={averageScore ?? 0} />
+              
             </div>
 
             {/* Main Grid */}
