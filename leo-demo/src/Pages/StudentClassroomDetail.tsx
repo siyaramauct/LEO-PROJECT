@@ -1,10 +1,10 @@
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Link as LinkIcon, LogOut } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, FileText, Layers, Link as LinkIcon, LogOut } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { notifyUser } from "../notifications";
+import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
 
@@ -18,6 +18,8 @@ type Lesson = {
   score: number | null;
   totalQuestions: number | null;
   percentage: number | null;
+  // False for flashcards-only lessons (no mcqs row): they have no quiz, so no score or completion.
+  hasQuiz: boolean;
 };
 type Material = { resource_id: string; resource_type: "document" | "link"; resource_url: string; uploaded_date: string | null };
 
@@ -75,7 +77,11 @@ const LessonList = ({ title, description, items, completed }: { title: string; d
               <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
               <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
             </span>
-            {completed ? (
+            {!lesson.hasQuiz ? (
+              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                <Layers size={12} /> Flashcards only
+              </span>
+            ) : completed ? (
               lesson.score !== null && lesson.totalQuestions ? (
                 <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs font-bold text-violet-700 sm:gap-3">
                   <span>{lesson.score} / {lesson.totalQuestions}</span>
@@ -142,10 +148,11 @@ export default function StudentClassroomDetail() {
       }
 
       const classroomLessons = (lessonsResult.data ?? []).map((lesson) => ({
-        ...(lesson as Omit<Lesson, "score" | "totalQuestions" | "percentage">),
+        ...(lesson as Omit<Lesson, "score" | "totalQuestions" | "percentage" | "hasQuiz">),
         score: null,
         totalQuestions: null,
         percentage: null,
+        hasQuiz: true,
       }));
       const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
       const [attemptsResult, mcqsResult] = lessonIds.length
@@ -176,6 +183,7 @@ export default function StudentClassroomDetail() {
             latestAttemptByLesson.set(attempt.lesson_id, { score: attempt.score });
           }
         });
+        if (mcqsResult.error) console.error("Failed to load lesson quizzes:", mcqsResult.error);
         const totalQuestionsByLesson = new Map((mcqsResult.data ?? []).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]));
         const lessonsWithScores = classroomLessons.map((lesson) => {
           const attempt = latestAttemptByLesson.get(lesson.lesson_id);
@@ -183,6 +191,8 @@ export default function StudentClassroomDetail() {
           const score = attempt?.score ?? null;
           return {
             ...lesson,
+            // If the quiz lookup failed, assume a quiz exists rather than mislabel lessons.
+            hasQuiz: mcqsResult.error ? true : totalQuestionsByLesson.has(lesson.lesson_id),
             score,
             totalQuestions,
             percentage: score !== null && totalQuestions ? Math.round((score / totalQuestions) * 100) : null,
@@ -202,6 +212,9 @@ export default function StudentClassroomDetail() {
 
   const assignedLessons = lessons.filter((lesson) => !completedLessonIds.includes(lesson.lesson_id));
   const completedLessons = lessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id));
+  // Flashcards-only lessons can never be completed, so they sit outside the to-do count.
+  const flashcardOnlyCount = lessons.filter((lesson) => !lesson.hasQuiz).length;
+  const toDoCount = assignedLessons.filter((lesson) => lesson.hasQuiz).length;
   const coverUrl = imageUrl(classroom?.cover_image_path ?? null, "/classRoomIllustration.png");
 
   // Removes the calling student's enrolment row so the classroom no longer appears for them.
@@ -292,7 +305,8 @@ export default function StudentClassroomDetail() {
               <div className="mt-5 flex flex-wrap gap-4 text-xs font-semibold text-violet-100">
                 <span className="inline-flex items-center gap-1.5"><BookOpen size={15} />{lessons.length} lessons</span>
                 <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={15} />{completedLessons.length} completed</span>
-                <span className="inline-flex items-center gap-1.5"><Clock size={15} />{assignedLessons.length} to do</span>
+                <span className="inline-flex items-center gap-1.5"><Clock size={15} />{toDoCount} to do</span>
+                {flashcardOnlyCount > 0 && <span className="inline-flex items-center gap-1.5"><Layers size={15} />{flashcardOnlyCount} flashcards only</span>}
               </div>
             </div>
           </section>

@@ -1,4 +1,4 @@
-import { ChevronRight, Trash2 } from "lucide-react";
+import { ChevronRight, Layers, Trash2 } from "lucide-react";
 
 // Lesson summary data used by the classroom lesson catalogue.
 type ClassroomLesson = {
@@ -9,6 +9,8 @@ type ClassroomLesson = {
   status: string;
   words: number;
   completion: number;
+  // False for flashcards-only lessons (no MCQ), which have no scores or completion.
+  hasQuiz: boolean;
 };
 
 type ClassroomLessonRowProps = {
@@ -39,8 +41,15 @@ export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: Classro
               {lesson.status}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">
-            {lesson.words} words · {lesson.completion}% completed
+          <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+            {lesson.words} words ·{" "}
+            {lesson.hasQuiz ? (
+              `${lesson.completion}% completed`
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
+                <Layers size={10} /> Flashcards only · no scores
+              </span>
+            )}
           </p>
         </div>
 
@@ -52,7 +61,7 @@ export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: Classro
           type="button"
           aria-label={`Delete ${lesson.title}`}
           onClick={() => onDelete(lesson)}
-          className="flex shrink-0 items-center justify-center rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+          className="flex shrink-0 items-center justify-center rounded-lg p-2 text-slate-400 transition-colors duration-1000 ease-out hover:bg-violet-700 hover:text-white"
         >
           <Trash2 size={16} />
         </button>

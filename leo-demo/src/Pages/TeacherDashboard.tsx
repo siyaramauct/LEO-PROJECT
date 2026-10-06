@@ -1,26 +1,28 @@
 import {
-  BookOpen,
   Users,
   BarChart3,
   Calendar,
   Plus,
   ChevronRight,
-  ClipboardCheck,
   Home,
   User,
   Settings,
   LogOut,
   MoreHorizontal,
   Sparkles,
+  BookOpen,
+  ClipboardCheck,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import LoadingScreen from "../Components/LoadingScreen";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { supabase } from "../supabase-client";
+import usePreloadImages from "../hooks/usePreloadImages";
 
 type ActiveClassroom = {
   id: string;
@@ -49,11 +51,14 @@ export default function TeacherDashboard() {
   const teacher = profile;
   const avatar = profile?.name[0];
   const navigate = useNavigate();
+  // null = still loading; an empty array means the teacher genuinely has none.
   const [classrooms, setClassrooms] = useState<ActiveClassroom[] | null>(null);
+  const [classroomsError, setClassroomsError] = useState<string | null>(null);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [lessonCount, setLessonCount] = useState<number>(0);
   const [quizzesCompleted, setQuizzesCompleted] = useState<number>(0);
-  
+  const [lessonsError, setLessonsError] = useState<string | null>(null);
+  const [isLessonsLoading, setIsLessonsLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -78,13 +83,14 @@ export default function TeacherDashboard() {
 
       if (error) {
         console.error("Failed to load the active classroom:", error);
-        setClassrooms(null);
+        setClassroomsError("Your classrooms could not be loaded right now.");
+        setClassrooms([]);
         return;
       }
 
       const classroom = data?.[0];
       if (!classroom) {
-        setClassrooms(null);
+        setClassrooms([]);
         return;
       }
 
@@ -164,13 +170,13 @@ export default function TeacherDashboard() {
 
       if (classroomsError) {
         console.error("Failed to load classrooms for lessons:", classroomsError);
+        setLessonsError("Your recent lessons could not be loaded right now.");
         return;
       }
 
       // If the teacher has no classrooms yet, they can't have any lessons.
       if (!teacherClassrooms || teacherClassrooms.length === 0) {
         setLessons([]);
-        setLessonCount(0);
         return;
       }
 
@@ -192,6 +198,7 @@ export default function TeacherDashboard() {
 
       if (lessonsError) {
         console.error("Failed to load the lessons:", lessonsError);
+        setLessonsError("Your recent lessons could not be loaded right now.");
         return;
       }
 
@@ -226,7 +233,10 @@ export default function TeacherDashboard() {
           classroomName: lesson.classrooms?.classroom_name ?? "Unknown classroom",
           title: lesson.title,
           description: lesson.description,
-          lesson_image_path: supabase.storage .from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl,
+          // Guarded like classroom covers so the "?? fallback" in the JSX actually kicks in.
+          lesson_image_path: lesson.lesson_image_path
+            ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
+            : "/classRoomIllustration.png",
           wordCount: wordCountByLesson[lesson.lesson_id] ?? 0,
           imageAlt: `${lesson.title} lesson cover`,
           created_at: lesson.created_at,
@@ -271,8 +281,19 @@ export default function TeacherDashboard() {
       setQuizzesCompleted(attempts?.length ?? 0);
     };
 
-    void loadLessons();
+    // finally: every exit path (including the early error returns) must end
+    // loading, otherwise the dashboard would sit behind the loader forever.
+    void loadLessons().finally(() => setIsLessonsLoading(false));
   }, [session?.user]);
+
+  const imageUrls = useMemo(
+    () =>
+      classrooms === null || isLessonsLoading
+        ? null
+        : [...classrooms.map((c) => c.image), ...(lessons ?? []).map((l) => l.lesson_image_path)],
+    [classrooms, lessons, isLessonsLoading]
+  );
+  const imagesReady = usePreloadImages(imageUrls);
 
   const today = new Date();
   const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -283,6 +304,10 @@ export default function TeacherDashboard() {
     return { label, day: date.getDate(), isToday: date.toDateString() === today.toDateString() };
   });
   const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  if (classrooms === null || isLessonsLoading || !imagesReady) {
+    return <LoadingScreen label="Loading your dashboard" />;
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -359,52 +384,6 @@ export default function TeacherDashboard() {
         </section>
 
         {/* =========================
-            TODAY'S OVERVIEW
-        ========================== */}
-        <section className="mt-3 shrink-0 px-4 sm:px-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold">Account Overview</h2>
-            <button className="text-xs font-medium text-violet-700">
-              View reports
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-violet-700">
-                <BookOpen size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">{lessonCount}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Lessons created
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-violet-700">
-                <Users size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">
-                {classrooms?.length ?? 0}
-              </p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Active classrooms
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-violet-700">
-                <ClipboardCheck size={16} />
-              </div>
-              <p className="mt-2 text-lg font-bold">{quizzesCompleted}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                Quizzes completed
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* =========================
             QUICK ACTIONS
         ========================== */}
         <section className="mt-3 shrink-0 px-4 sm:px-6">
@@ -415,7 +394,7 @@ export default function TeacherDashboard() {
               to="/create-lesson"
               className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-left transition hover:bg-violet-100"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
                 <Plus size={20} />
               </div>
               <div>
@@ -430,7 +409,7 @@ export default function TeacherDashboard() {
               to="/TeacherClassroom"
               className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
                 <Users size={19} />
               </div>
               <div>
@@ -454,7 +433,9 @@ export default function TeacherDashboard() {
             </button>
           </div>
 
-          {classrooms === null ? (
+          {classroomsError ? (
+            <p role="alert" className="text-xs text-red-700">{classroomsError}</p>
+          ) : classrooms.length === 0 ? (
             <p className="text-xs text-slate-400">
               You haven't created any classrooms yet.
             </p>
@@ -499,7 +480,9 @@ export default function TeacherDashboard() {
             </button>
           </div>
 
-          {lessons === null || lessons.length === 0 ? (
+          {lessonsError ? (
+            <p role="alert" className="text-xs text-red-700">{lessonsError}</p>
+          ) : lessons === null || lessons.length === 0 ? (
             <p className="text-xs text-slate-400">
               You haven't created any lessons yet.
             </p>
@@ -618,11 +601,10 @@ export default function TeacherDashboard() {
               <StatCard icon={<Users />} label="Classrooms" value={String(classrooms?.length ?? 0)} />
               <StatCard icon={<BookOpen />} label="Lessons Created" value={String(lessonCount)} />
               <StatCard icon={<ClipboardCheck />} label="Quizzes Completed" value={String(quizzesCompleted)} />
-              
             </div>
 
             {/* Main Grid */}
-            <div className="mt-3 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
+            <div className="grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
               {/* Classes */}
               <section className="rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">
@@ -643,7 +625,9 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="mt-2 space-y-1.5">
-                  {classrooms === null ? (
+                  {classroomsError ? (
+                    <p role="alert" className="text-sm text-red-700">{classroomsError}</p>
+                  ) : classrooms.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/60 px-4 py-6 text-center">
                       <Users className="mx-auto text-violet-700" size={22} />
                       <p className="mt-2 text-sm font-semibold text-slate-800">Your first classroom starts here</p>
@@ -735,7 +719,9 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="mt-2 space-y-1.5">
-                {lessons === null || lessons.length === 0 ? (
+                {lessonsError ? (
+                  <p role="alert" className="text-xs text-red-700">{lessonsError}</p>
+                ) : lessons === null || lessons.length === 0 ? (
                   <p className="text-xs text-slate-400">
                     You haven't created any lessons yet.
                   </p>

@@ -6,7 +6,7 @@ import JoinClassroomForm from "../Components/JoinClassroomForm";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
-import { notifyUser } from "../notifications";
+import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };

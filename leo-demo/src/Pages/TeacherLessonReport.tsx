@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3, Check, CheckCircle2, ClipboardList, ExternalLink, FileText, ImagePlus, Pencil, Trash2, Upload, Users, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, CheckCircle2, ClipboardList, ExternalLink, FileText, ImagePlus, Layers, Pencil, Trash2, Upload, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -33,6 +33,16 @@ type StudentResult = {
   completedAt: string | null;
 };
 
+const NoScoresNotice = () => (
+  <div className="flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Layers size={17} /></span>
+    <div>
+      <p className="text-sm font-bold text-slate-800">No score statistics for this lesson</p>
+      <p className="mt-1 text-sm leading-5 text-slate-500">This is a flashcards-only lesson without an MCQ activity, so students aren't scored and quiz completion isn't tracked.</p>
+    </div>
+  </div>
+);
+
 const formatDate = (value: string | null) =>
   value ? new Intl.DateTimeFormat("en-ZA", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value)) : null;
 
@@ -45,6 +55,8 @@ export default function TeacherLessonReport() {
   const [lesson, setLesson] = useState<LessonRow | null>(null);
   const [flashcards, setFlashcards] = useState<FlashcardRow[]>([]);
   const [mcq, setMcq] = useState<McqRow | null>(null);
+  // Only trust "no quiz" when the mcqs lookup itself succeeded.
+  const [isFlashcardsOnly, setIsFlashcardsOnly] = useState(false);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -115,6 +127,7 @@ export default function TeacherLessonReport() {
       const profiles = (profilesResult.data ?? []) as StudentProfile[];
       const mcqData = (mcqResult.data ?? null) as McqRow | null;
       setMcq(mcqData);
+      setIsFlashcardsOnly(!mcqResult.error && !mcqData);
 
       let attempts: AttemptRow[] = [];
       if (studentIds.length) {
@@ -364,17 +377,24 @@ export default function TeacherLessonReport() {
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold">{lesson.title}</h2>
             {lesson.description && <p className="mt-2 text-sm leading-5 text-slate-500">{lesson.description}</p>}
-            <p className="mt-3 text-xs text-slate-400">{flashcards.length} word{flashcards.length === 1 ? "" : "s"} · {mcq?.title ?? "No quiz yet"}</p>
+            <p className="mt-3 text-xs text-slate-400">{flashcards.length} word{flashcards.length === 1 ? "" : "s"} · {isFlashcardsOnly ? "Flashcards only, no MCQ activity" : mcq?.title ?? "Quiz"}</p>
           </div>
         </section>
 
-        {/* General statistics */}
-        <section className="mt-4 grid gap-3 sm:grid-cols-4">
-          <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
-          <StatCard icon={<CheckCircle2 />} label="Completed the quiz" value={`${attemptedCount}/${enrolledCount}`} progress={completionRate} />
-          <StatCard icon={<BarChart3 />} label="Average score" value={averageScore === null ? "—" : `${averageScore}%`} />
-          <StatCard icon={<ClipboardList />} label="Highest score" value={highestScore === null ? "—" : `${highestScore}%`} />
-        </section>
+        {/* General statistics — flashcards-only lessons have no quiz, so there is nothing to score */}
+        {isFlashcardsOnly ? (
+          <section className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
+            <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
+            <NoScoresNotice />
+          </section>
+        ) : (
+          <section className="mt-4 grid gap-3 sm:grid-cols-4">
+            <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
+            <StatCard icon={<CheckCircle2 />} label="Completed the quiz" value={`${attemptedCount}/${enrolledCount}`} progress={completionRate} />
+            <StatCard icon={<BarChart3 />} label="Average score" value={averageScore === null ? "—" : `${averageScore}%`} />
+            <StatCard icon={<ClipboardList />} label="Highest score" value={highestScore === null ? "—" : `${highestScore}%`} />
+          </section>
+        )}
 
         <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -442,7 +462,7 @@ export default function TeacherLessonReport() {
                           <button type="button" aria-label={`Edit ${card.word}`} onClick={() => startEditingCard(card)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
                             <Pencil size={15} />
                           </button>
-                          <button type="button" aria-label={`Delete ${card.word}`} onClick={() => setCardToDelete(card)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                          <button type="button" aria-label={`Delete ${card.word}`} onClick={() => setCardToDelete(card)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors duration-1000 ease-out hover:bg-violet-700 hover:text-white">
                             <Trash2 size={15} />
                           </button>
                         </div>
@@ -456,7 +476,7 @@ export default function TeacherLessonReport() {
         </section>
 
         {/* Per-student scores */}
-        <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+        {!isFlashcardsOnly && <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-bold">Student results</h2>
           <p className="mt-1 text-sm text-slate-500">Each enrolled student's quiz score for this lesson.</p>
 
@@ -485,7 +505,7 @@ export default function TeacherLessonReport() {
               ))}
             </div>
           )}
-        </section>
+        </section>}
       </main>
 
       <DeleteAccountDialog

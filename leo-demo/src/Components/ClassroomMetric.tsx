@@ -18,7 +18,7 @@ export default function ClassroomMetric({
     // Top row pairs the metric icon with supporting context.
     <div className="rounded-lg border border-slate-100 bg-white p-3">
       <div className="flex items-center justify-between text-violet-700">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
+        <span className="flex h-8 w-8 items-center justify-center">
           {icon}
         </span>
         <span className="text-[10px] font-medium text-slate-400">{detail}</span>

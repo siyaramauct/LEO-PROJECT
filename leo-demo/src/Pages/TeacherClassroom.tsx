@@ -1,7 +1,6 @@
 
 import {
   Plus,
-  Search,
   Sparkles,
   Users,
   Home,
@@ -9,7 +8,7 @@ import {
   User,
   Settings,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
@@ -19,10 +18,12 @@ import ClassroomMobileCard, {
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
+import SearchSortBar from "../Components/SearchSortBar";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import UserIdentity from "../Components/UserIdentity";
 import { supabase } from "../supabase-client";
+import { compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
 type ClassroomRow = {
   classroom_id: string;
@@ -53,10 +54,33 @@ const toClassroom = (classroom: ClassroomRow): Classroom => {
     studentCount: classroom.classroom_students?.[0]?.count ?? 0,
     lessonCount: classroom.lessons?.[0]?.count ?? 0,
     createdDate: formatCreatedDate(classroom.created_date),
+    createdTime: toTime(classroom.created_date),
     image: classroom.cover_image_path ? coverUrl : "",
     imageAlt: `${classroom.classroom_name} classroom cover`,
     imageClassName: "object-cover",
   };
+};
+
+type ClassroomSort = "name-asc" | "name-desc" | "newest" | "oldest" | "most-students" | "most-lessons";
+
+const classroomSortOptions: SortOption<ClassroomSort>[] = [
+  { value: "name-asc", label: "Name (A–Z)" },
+  { value: "name-desc", label: "Name (Z–A)" },
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "most-students", label: "Most students" },
+  { value: "most-lessons", label: "Most lessons" },
+];
+
+const compareClassrooms = (sort: ClassroomSort) => (a: Classroom, b: Classroom) => {
+  switch (sort) {
+    case "name-desc": return compareText(b.name, a.name);
+    case "newest": return (b.createdTime ?? 0) - (a.createdTime ?? 0) || compareText(a.name, b.name);
+    case "oldest": return (a.createdTime ?? 0) - (b.createdTime ?? 0) || compareText(a.name, b.name);
+    case "most-students": return b.studentCount - a.studentCount || compareText(a.name, b.name);
+    case "most-lessons": return b.lessonCount - a.lessonCount || compareText(a.name, b.name);
+    default: return compareText(a.name, b.name);
+  }
 };
 
 /* =========================================================
@@ -70,6 +94,21 @@ export default function TeacherClassrooms() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
   const [isDeletingClassroom, setIsDeletingClassroom] = useState(false);
+  const [classroomQuery, setClassroomQuery] = useState("");
+  const [classroomSort, setClassroomSort] = useState<ClassroomSort>("name-asc");
+
+  const visibleClassrooms = useMemo(
+    () =>
+      classrooms
+        .filter((classroom) => matchesSearch(classroomQuery, classroom.name, classroom.description))
+        .sort(compareClassrooms(classroomSort)),
+    [classrooms, classroomQuery, classroomSort]
+  );
+  const noMatches = (
+    <p className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+      No classrooms match "{classroomQuery.trim()}".
+    </p>
+  );
 
   useEffect(() => {
     if (!session?.user) return;
@@ -164,23 +203,18 @@ export default function TeacherClassrooms() {
 
         </header>
 
-        {/* Search */}
+        {/* Search + sort */}
         <section className="mt-4 shrink-0 px-4 sm:px-6">
 
-          <div className="relative">
-
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-
-            <input
-              type="text"
-              placeholder="Search classrooms..."
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-            />
-
-          </div>
+          <SearchSortBar
+            size="sm"
+            query={classroomQuery}
+            onQueryChange={setClassroomQuery}
+            searchPlaceholder="Search classrooms..."
+            sort={classroomSort}
+            onSortChange={setClassroomSort}
+            sortOptions={classroomSortOptions}
+          />
 
         </section>
 
@@ -209,13 +243,13 @@ export default function TeacherClassrooms() {
             </h2>
 
             <span className="text-xs text-slate-400">
-              {classrooms.length} classrooms
+              {visibleClassrooms.length === classrooms.length ? `${classrooms.length} classrooms` : `${visibleClassrooms.length} of ${classrooms.length} classrooms`}
             </span>
 
           </div>
 
 
-          {isLoading ? <p className="py-8 text-center text-xs text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms compact /> : <div className="space-y-2">{classrooms.map((classroom) => <ClassroomMobileCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
+          {isLoading ? <p className="py-8 text-center text-xs text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms compact /> : visibleClassrooms.length === 0 ? noMatches : <div className="space-y-2">{visibleClassrooms.map((classroom) => <ClassroomMobileCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
 
         </section>
 
@@ -395,26 +429,21 @@ export default function TeacherClassrooms() {
 
 
             {/* Search + Filters */}
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3 flex items-center justify-between gap-4">
 
-              <div className="relative w-72">
-
-                <Search
-                  size={17}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Search classrooms..."
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                />
-
-              </div>
+              <SearchSortBar
+                className="w-full max-w-xl"
+                query={classroomQuery}
+                onQueryChange={setClassroomQuery}
+                searchPlaceholder="Search classrooms..."
+                sort={classroomSort}
+                onSortChange={setClassroomSort}
+                sortOptions={classroomSortOptions}
+              />
 
 
-              <p className="text-xs text-slate-400">
-                Showing all classrooms
+              <p className="shrink-0 text-xs text-slate-400">
+                {visibleClassrooms.length === classrooms.length ? "Showing all classrooms" : `Showing ${visibleClassrooms.length} of ${classrooms.length}`}
               </p>
 
             </div>
@@ -422,7 +451,7 @@ export default function TeacherClassrooms() {
 
             {/* Classroom Grid */}
             <section className="mt-3">
-              {isLoading ? <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms /> : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{classrooms.map((classroom) => <ClassroomDesktopCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
+              {isLoading ? <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p> : loadError ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">{loadError}</p> : classrooms.length === 0 ? <EmptyClassrooms /> : visibleClassrooms.length === 0 ? noMatches : <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{visibleClassrooms.map((classroom) => <ClassroomDesktopCard key={classroom.id} classroom={classroom} onDelete={setClassroomToDelete} />)}</div>}
             </section>
 
           </div>

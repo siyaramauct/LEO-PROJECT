@@ -1,11 +1,12 @@
 import { ChevronRight, Layers, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import JoinClassroomForm from "../Components/JoinClassroomForm";
+import LoadingScreen from "../Components/LoadingScreen";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
+import usePreloadImages from "../hooks/usePreloadImages";
 
 type StudentProfile = { name: string | null; surname: string | null };
 type StudentProgress = { current_streak: number; longest_streak: number; weekly_lessons_completed: number; weekly_goal: number };
@@ -20,6 +21,8 @@ type Classroom = {
 
 const DASHBOARD_CLASSROOM_LIMIT = 2;
 const RECENTLY_ADDED_LIMIT = 4;
+// Static illustrations on the quick-action tiles, preloaded with the data images.
+const QUICK_ACTION_IMAGES = ["/girlMagnifyingGlass.png", "/Level1.png", "/classRoomIllustration.png", "/Nerd-amico.png"];
 
 type RecentlyAddedLesson = {
   lesson_id: string;
@@ -35,9 +38,10 @@ export default function StudentDashboard() {
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
   const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  // null = still loading; an empty array means the student genuinely has none.
+  const [classrooms, setClassrooms] = useState<Classroom[] | null>(null);
   const [classroomError, setClassroomError] = useState<string | null>(null);
-  const [recentlyAddedLessons, setRecentlyAddedLessons] = useState<RecentlyAddedLesson[]>([]);
+  const [recentlyAddedLessons, setRecentlyAddedLessons] = useState<RecentlyAddedLesson[] | null>(null);
   const [recentlyAddedError, setRecentlyAddedError] = useState<string | null>(null);
   const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "there";
   const studentName = studentProfile?.name ?? fallbackName;
@@ -56,10 +60,9 @@ export default function StudentDashboard() {
       ]);
       setStudentProfile(data);
       setProgress((progressData?.[0] as StudentProgress) ?? null);
-      setIsProfileLoading(false);
     };
 
-    void loadProfile();
+    void loadProfile().finally(() => setIsProfileLoading(false));
   }, [session?.user]);
 
   useEffect(() => {
@@ -77,7 +80,10 @@ export default function StudentDashboard() {
         .limit(DASHBOARD_CLASSROOM_LIMIT);
 
       if (enrolmentError) {
-        if (isCurrent) setClassroomError("Your classrooms could not be loaded right now.");
+        if (isCurrent) {
+          setClassroomError("Your classrooms could not be loaded right now.");
+          setClassrooms([]);
+        }
         return;
       }
 
@@ -96,7 +102,10 @@ export default function StudentDashboard() {
         .in("classroom_id", classroomIds);
 
       if (classroomsError) {
-        if (isCurrent) setClassroomError("Your classroom details could not be loaded right now.");
+        if (isCurrent) {
+          setClassroomError("Your classroom details could not be loaded right now.");
+          setClassrooms([]);
+        }
         return;
       }
 
@@ -135,7 +144,10 @@ export default function StudentDashboard() {
         .eq("student_id", session.user.id);
 
       if (enrolmentError) {
-        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        if (isCurrent) {
+          setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+          setRecentlyAddedLessons([]);
+        }
         return;
       }
 
@@ -153,7 +165,10 @@ export default function StudentDashboard() {
         .limit(RECENTLY_ADDED_LIMIT);
 
       if (lessonsError) {
-        if (isCurrent) setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+        if (isCurrent) {
+          setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+          setRecentlyAddedLessons([]);
+        }
         return;
       }
 
@@ -178,6 +193,23 @@ export default function StudentDashboard() {
     return () => { isCurrent = false; };
   }, [session?.user]);
 
+  const imageUrls = useMemo(
+    () =>
+      classrooms === null || recentlyAddedLessons === null
+        ? null
+        : [
+            ...QUICK_ACTION_IMAGES,
+            ...classrooms.flatMap((classroom) => (classroom.cover_image_path ? [classroom.cover_image_path] : [])),
+            ...recentlyAddedLessons.flatMap((lesson) => (lesson.lesson_image_path ? [lesson.lesson_image_path] : [])),
+          ],
+    [classrooms, recentlyAddedLessons]
+  );
+  const imagesReady = usePreloadImages(imageUrls);
+
+  if (isProfileLoading || classrooms === null || recentlyAddedLessons === null || !imagesReady) {
+    return <LoadingScreen label="Loading your dashboard" />;
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
@@ -191,8 +223,6 @@ export default function StudentDashboard() {
             <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6"><div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />{studentClassroom ? <img src={studentClassroom.cover_image_path ?? undefined} alt="Student learning" className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52" /> : <div aria-hidden="true" className="absolute inset-y-0 right-0 w-44 sm:w-56"><div className="absolute -right-10 -top-12 h-36 w-36 rounded-full border-[18px] border-violet-300/40" /><div className="absolute bottom-[-3rem] right-10 h-32 w-32 rotate-12 rounded-3xl bg-fuchsia-300/30" /><div className="absolute right-28 top-16 h-12 w-20 -rotate-12 rounded-full bg-white/20" /></div>}<div className="relative max-w-md pr-24 sm:pr-32">{studentClassroom ? <><p className="text-xs font-medium text-violet-100">Continue learning</p><h2 className="mt-2 text-xl font-bold">{studentClassroom.classroom_name}</h2><p className="mt-2 text-sm text-violet-100">{studentClassroom.description}</p><button type="button" onClick={() => navigate(`/student/classrooms/${studentClassroom.classroom_id}`)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">Open Classroom <ChevronRight size={16} /></button></> : <><p className="text-xs font-medium text-violet-100">Ready to learn?</p><h2 className="mt-2 text-xl font-bold">Join your first classroom</h2><p className="mt-2 text-sm text-violet-100">Ask your teacher for an invitation, then open your classrooms to get started.</p><button type="button" onClick={() => navigate("/student/classrooms")} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50">View Classrooms <Users size={16} /></button></>}</div></article>
             <button type="button" onClick={() => navigate("/student/report")} className="rounded-xl border border-slate-100 bg-white p-5 text-left transition hover:bg-slate-50"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">Learning overview</h2><ChevronRight size={16} className="text-slate-400" /></div><div className="mt-5 grid grid-cols-2 gap-4"><div><p className="text-2xl font-bold">{progress ? `${progress.weekly_lessons_completed} / ${progress.weekly_goal}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Weekly lessons</p></div><div><p className="text-2xl font-bold">{progress ? `${progress.current_streak} day${progress.current_streak === 1 ? "" : "s"}` : "—"}</p><p className="mt-1 text-xs text-slate-500">Learning streak</p></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-700" style={{ width: `${weeklyPct}%` }} /></div><p className="mt-2 text-xs text-slate-500">{weeklyPct}% of this week’s goal completed</p></button>
           </section>
-
-          <JoinClassroomForm inputId="dashboard-classroom-code" className="mt-4 border-b border-slate-200 bg-white px-4 py-5 sm:px-6" />
 
           <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             <button type="button" onClick={() => navigate("/student/practice")} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left transition hover:bg-slate-50">

@@ -5,6 +5,8 @@ type StatCardProps = {
   label: string;
   value: string;
   progress?: number;
+  // Optional filled icon tile, e.g. "bg-sky-100 text-sky-700". Defaults to a plain violet icon.
+  iconClassName?: string;
 };
 
 export default function StatCard({
@@ -12,10 +14,11 @@ export default function StatCard({
   label,
   value,
   progress,
+  iconClassName,
 }: StatCardProps) {
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-violet-700">
+      <div className={`flex h-8 w-8 items-center justify-center ${iconClassName ? `rounded-lg ${iconClassName}` : "text-violet-700"}`}>
           {cloneElement(icon, { size: 19 })}
       </div>
 
