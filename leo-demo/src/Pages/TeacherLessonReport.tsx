@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3, Check, CheckCircle2, ClipboardList, Pencil, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, CheckCircle2, ClipboardList, ExternalLink, FileText, ImagePlus, Pencil, Trash2, Upload, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -17,7 +17,8 @@ type LessonRow = {
 
 type McqRow = { mcq_id: string; title: string | null; score_ceiling: number | null };
 
-type FlashcardRow = { flashcard_id: string; word: string; definition: string };
+type FlashcardRow = { flashcard_id: string; word: string; definition: string; image_path: string | null };
+type LessonDocument = { resource_id: string; resource_url: string; uploaded_date: string; signedUrl: string };
 
 type StudentProfile = { id: string; name: string | null; surname: string | null; username: string | null };
 
@@ -51,10 +52,16 @@ export default function TeacherLessonReport() {
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editWord, setEditWord] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isSavingCard, setIsSavingCard] = useState(false);
   const [cardError, setCardError] = useState("");
   const [cardToDelete, setCardToDelete] = useState<FlashcardRow | null>(null);
   const [isDeletingCard, setIsDeletingCard] = useState(false);
+  const [documents, setDocuments] = useState<LessonDocument[]>([]);
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
+  const [documentError, setDocumentError] = useState("");
 
   useEffect(() => {
     if (!classroomId || !lessonId || !teacherId) return;
@@ -63,11 +70,12 @@ export default function TeacherLessonReport() {
       setIsLoading(true);
       setError("");
 
-      const [classroomResult, lessonResult, enrollmentResult, flashcardsResult] = await Promise.all([
+      const [classroomResult, lessonResult, enrollmentResult, flashcardsResult, documentsResult] = await Promise.all([
         supabase.from("classrooms").select("classroom_id, classroom_name, teacher_id").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("lesson_id, title, description, lesson_image_path").eq("lesson_id", lessonId).eq("classroom_id", classroomId).single(),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
-        supabase.from("flashcards").select("flashcard_id, word, definition").eq("lesson_id", lessonId).order("created_at"),
+        supabase.from("flashcards").select("flashcard_id, word, definition, image_path").eq("lesson_id", lessonId).order("created_at"),
+        supabase.from("learning_resources").select("resource_id, resource_url, uploaded_date").eq("lesson_id", lessonId).eq("resource_type", "document").order("uploaded_date", { ascending: false }),
       ]);
 
       if (classroomResult.error || !classroomResult.data || classroomResult.data.teacher_id !== teacherId) {
@@ -84,6 +92,16 @@ export default function TeacherLessonReport() {
       setClassroom(classroomResult.data as ClassroomRow);
       setLesson(lessonResult.data as LessonRow);
       setFlashcards((flashcardsResult.data ?? []) as FlashcardRow[]);
+      if (documentsResult.error) {
+        setDocumentError(documentsResult.error.message);
+      } else {
+        const signedDocuments = await Promise.all((documentsResult.data ?? []).map(async (document) => {
+          const { data: signedData, error: signedError } = await supabase.storage.from("documents").createSignedUrl(document.resource_url, 60 * 60);
+          if (signedError) console.error("Could not sign lesson document:", signedError);
+          return { ...document, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument;
+        }));
+        setDocuments(signedDocuments);
+      }
 
       const studentIds = (enrollmentResult.data ?? []).map((row) => row.student_id as string);
 
@@ -161,12 +179,31 @@ export default function TeacherLessonReport() {
     setEditingCardId(card.flashcard_id);
     setEditWord(card.word);
     setEditDefinition(card.definition);
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setRemoveExistingImage(false);
   }
 
   function cancelEditingCard() {
+    if (editImagePreview) URL.revokeObjectURL(editImagePreview);
     setEditingCardId(null);
     setEditWord("");
     setEditDefinition("");
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setRemoveExistingImage(false);
+  }
+
+  function chooseEditImage(file: File | null) {
+    setCardError("");
+    if (file && (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024)) {
+      setCardError("Flashcard images must be image files smaller than 5 MB.");
+      return;
+    }
+    if (editImagePreview) URL.revokeObjectURL(editImagePreview);
+    setEditImageFile(file);
+    setEditImagePreview(file ? URL.createObjectURL(file) : null);
+    setRemoveExistingImage(false);
   }
 
   async function saveEditingCard() {
@@ -179,16 +216,35 @@ export default function TeacherLessonReport() {
     }
     setIsSavingCard(true);
     setCardError("");
+    const currentCard = flashcards.find((card) => card.flashcard_id === editingCardId);
+    let imagePath = removeExistingImage ? null : currentCard?.image_path ?? null;
+    if (editImageFile && lessonId) {
+      const safeName = editImageFile.name.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+      imagePath = `flashcards/${lessonId}/${editingCardId}-${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from("images").upload(imagePath, editImageFile, {
+        contentType: editImageFile.type,
+        upsert: false,
+      });
+      if (uploadError) {
+        setIsSavingCard(false);
+        setCardError(uploadError.message);
+        return;
+      }
+    }
     const { error: updateError } = await supabase
       .from("flashcards")
-      .update({ word, definition })
+      .update({ word, definition, image_path: imagePath })
       .eq("flashcard_id", editingCardId);
     setIsSavingCard(false);
     if (updateError) {
       setCardError(updateError.message);
       return;
     }
-    setFlashcards((cards) => cards.map((card) => (card.flashcard_id === editingCardId ? { ...card, word, definition } : card)));
+    if (currentCard?.image_path && currentCard.image_path !== imagePath) {
+      const { error: removeError } = await supabase.storage.from("images").remove([currentCard.image_path]);
+      if (removeError) console.error("Could not remove the replaced flashcard image:", removeError);
+    }
+    setFlashcards((cards) => cards.map((card) => (card.flashcard_id === editingCardId ? { ...card, word, definition, image_path: imagePath } : card)));
     cancelEditingCard();
   }
 
@@ -202,8 +258,66 @@ export default function TeacherLessonReport() {
       setCardToDelete(null);
       return;
     }
+    if (cardToDelete.image_path) {
+      const { error: imageDeleteError } = await supabase.storage.from("images").remove([cardToDelete.image_path]);
+      if (imageDeleteError) console.error("Could not remove the deleted flashcard image:", imageDeleteError);
+    }
     setFlashcards((cards) => cards.filter((card) => card.flashcard_id !== cardToDelete.flashcard_id));
     setCardToDelete(null);
+  }
+
+  async function uploadLessonDocument(file: File) {
+    if (!classroomId || !lessonId || isSavingDocument) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setDocumentError("Please choose a PDF document.");
+      return;
+    }
+    setIsSavingDocument(true);
+    setDocumentError("");
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const storagePath = `lesson_documents/${classroomId}/${lessonId}/${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage.from("documents").upload(storagePath, file, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+    if (uploadError) {
+      setDocumentError(uploadError.message);
+      setIsSavingDocument(false);
+      return;
+    }
+    const { data, error: insertError } = await supabase.from("learning_resources").insert({
+      classroom_id: classroomId,
+      lesson_id: lessonId,
+      resource_type: "document",
+      resource_url: storagePath,
+    }).select("resource_id, resource_url, uploaded_date").single();
+    if (insertError || !data) {
+      await supabase.storage.from("documents").remove([storagePath]);
+      setDocumentError(insertError?.message ?? "The lesson document could not be saved.");
+      setIsSavingDocument(false);
+      return;
+    }
+    const { data: signedData, error: signedError } = await supabase.storage.from("documents").createSignedUrl(storagePath, 60 * 60);
+    if (signedError) setDocumentError("The document was uploaded but its preview link could not be created.");
+    setDocuments((current) => [{ ...data, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument, ...current]);
+    setIsSavingDocument(false);
+  }
+
+  async function deleteLessonDocument(document: LessonDocument) {
+    setDocumentError("");
+    const { error: deleteError } = await supabase.from("learning_resources").delete().eq("resource_id", document.resource_id);
+    if (deleteError) {
+      setDocumentError(deleteError.message);
+      return;
+    }
+    const { error: storageError } = await supabase.storage.from("documents").remove([document.resource_url]);
+    if (storageError) console.error("Could not remove lesson document from Storage:", storageError);
+    setDocuments((current) => current.filter((item) => item.resource_id !== document.resource_id));
+  }
+
+  function documentName(path: string) {
+    const storedName = decodeURIComponent(path.split("/").pop() ?? path);
+    return storedName.replace(/^[0-9a-f-]{36}-/i, "");
   }
 
   const coverUrl = lesson?.lesson_image_path
@@ -262,6 +376,15 @@ export default function TeacherLessonReport() {
           <StatCard icon={<ClipboardList />} label="Highest score" value={highestScore === null ? "—" : `${highestScore}%`} />
         </section>
 
+        <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="text-base font-bold">Lesson documents</h2><p className="mt-1 text-sm text-slate-500">PDFs attached only to this lesson.</p></div>
+            <label className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white transition ${isSavingDocument ? "cursor-not-allowed bg-slate-300" : "cursor-pointer bg-violet-700 hover:bg-violet-800"}`}><Upload size={16} /> {isSavingDocument ? "Uploading..." : "Upload PDF"}<input type="file" accept="application/pdf,.pdf" disabled={isSavingDocument} className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadLessonDocument(file); event.currentTarget.value = ""; }} /></label>
+          </div>
+          {documentError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{documentError}</p>}
+          {documents.length === 0 ? <p className="mt-4 text-sm text-slate-500">No documents are attached to this lesson.</p> : <div className="mt-4 divide-y divide-slate-100">{documents.map((document) => <div key={document.resource_id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><FileText size={17} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{documentName(document.resource_url)}</span><span className="mt-0.5 block text-xs text-slate-400">PDF document</span></span>{document.signedUrl && <a href={document.signedUrl} target="_blank" rel="noreferrer" aria-label={`Open ${documentName(document.resource_url)}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"><ExternalLink size={15} /></a>}<button type="button" onClick={() => void deleteLessonDocument(document)} aria-label={`Delete ${documentName(document.resource_url)}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50"><Trash2 size={15} /></button></div>)}</div>}
+        </section>
+
         {/* Flashcards */}
         <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-bold">Flashcards</h2>
@@ -289,6 +412,14 @@ export default function TeacherLessonReport() {
                             <input value={editDefinition} onChange={(event) => setEditDefinition(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" />
                           </label>
                         </div>
+                        <div>
+                          <span className="mb-1 block text-xs font-semibold text-slate-600">Image (optional)</span>
+                          <div className="flex flex-wrap items-center gap-3">
+                            {editImagePreview ? <img src={editImagePreview} alt="New flashcard preview" className="h-20 w-28 rounded-lg object-cover" /> : !removeExistingImage && card.image_path ? <img src={supabase.storage.from("images").getPublicUrl(card.image_path).data.publicUrl} alt="Current flashcard" className="h-20 w-28 rounded-lg object-cover" /> : null}
+                            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"><ImagePlus size={15} /> {card.image_path || editImageFile ? "Replace image" : "Add image"}<input type="file" accept="image/*" className="sr-only" onChange={(event) => { chooseEditImage(event.target.files?.[0] ?? null); event.currentTarget.value = ""; }} /></label>
+                            {(card.image_path || editImageFile) && <button type="button" onClick={() => { chooseEditImage(null); setRemoveExistingImage(true); }} className="text-xs font-semibold text-rose-600">Remove image</button>}
+                          </div>
+                        </div>
                         <div className="flex justify-end gap-2">
                           <button type="button" onClick={cancelEditingCard} disabled={isSavingCard} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50">
                             <X size={14} /> Cancel
@@ -300,9 +431,12 @@ export default function TeacherLessonReport() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-3">
+                          {card.image_path && <img src={supabase.storage.from("images").getPublicUrl(card.image_path).data.publicUrl} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />}
+                          <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-800">{card.word}</p>
                           <p className="mt-0.5 truncate text-xs text-slate-500">{card.definition}</p>
+                          </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <button type="button" aria-label={`Edit ${card.word}`} onClick={() => startEditingCard(card)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">

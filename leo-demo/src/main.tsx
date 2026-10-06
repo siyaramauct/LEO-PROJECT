@@ -26,6 +26,7 @@ import StudentDashboard from "./Pages/StudentDashboard.tsx";
 import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
 import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
 import StudentLearningReport from "./Pages/StudentLearningReport.tsx";
+import ImageMatchActivity from "./Pages/ImageMatchActivity.tsx";
 import StudentProfile from "./Pages/StudentProfile.tsx";
 import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
 import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/lessons", element: <Lessons /> },
       { path: "/lesson/:lessonId", element: <FlashActivity /> },
+      { path: "/lesson/:lessonId/match", element: <ImageMatchActivity /> },
       { path: "/quiz", element: <QuickQuiz /> },
       { path: "/quiz/:lessonId", element: <QuickQuiz /> },
       { path: "/summary", element: <LessonSummary /> },

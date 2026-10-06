@@ -127,7 +127,7 @@ export default function StudentClassroomDetail() {
       const [classroomResult, lessonsResult, materialsResult] = await Promise.all([
         supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path").eq("classroom_id", classroomId).maybeSingle(),
         supabase.from("lessons").select("lesson_id, title, description, lesson_image_path, created_at").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
-        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
+        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).is("lesson_id", null).order("uploaded_date", { ascending: false }),
       ]);
 
       if (classroomResult.error) console.error("Failed to load classroom:", classroomResult.error);
