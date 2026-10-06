@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, ImagePlus, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { notifyClassroomStudents } from "../notifications";
@@ -13,7 +13,13 @@ import { supabase } from "../supabase-client";
 // teacher can edit it before anything is written to the database.
 type Step = "details" | "flashcards" | "activity" | "review";
 
-type Flashcard = { id: number; term: string; definition: string };
+type Flashcard = {
+  id: number;
+  term: string;
+  definition: string;
+  imageFile: File | null;
+  imagePreview: string | null;
+};
 type ClassroomOption = { classroom_id: string; classroom_name: string };
 type McqFormat = "basic-mcq" | "fill-blank-mcq";
 type OptionKey = "option_a" | "option_b" | "option_c" | "option_d";
@@ -61,6 +67,15 @@ const optionKeys: OptionKey[] = ["option_a", "option_b", "option_c", "option_d"]
 const correctOptions: CorrectOption[] = ["A", "B", "C", "D"];
 
 const inputClassName = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-700 focus:ring-2 focus:ring-slate-100";
+const MAX_FLASHCARD_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function emptyFlashcard(id: number): Flashcard {
+  return { id, term: "", definition: "", imageFile: null, imagePreview: null };
+}
+
+function safeImageName(fileName: string): string {
+  return fileName.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+}
 
 /* ------------------------------------------------------------------------ */
 /*  Helpers                                                                  */
@@ -130,7 +145,7 @@ export default function CreateLesson() {
   const [coverId, setCoverId] = useState(lessonCoverOptions[0].id);
 
   // ---- Step 2: flashcards state ----
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([{ id: 1, term: "", definition: "" }]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([emptyFlashcard(1)]);
 
   // ---- Step 3: activity format state ----
   const [selectedMcqFormat, setSelectedMcqFormat] = useState<McqFormat | null>(null);
@@ -171,11 +186,30 @@ export default function CreateLesson() {
   }
 
   function addFlashcard() {
-    if (flashcards.length < 15) setFlashcards((cards) => [...cards, { id: Date.now(), term: "", definition: "" }]);
+    if (flashcards.length < 15) setFlashcards((cards) => [...cards, emptyFlashcard(Date.now())]);
   }
 
   function removeFlashcard(id: number) {
-    if (flashcards.length > 1) setFlashcards((cards) => cards.filter((card) => card.id !== id));
+    if (flashcards.length > 1) {
+      setFlashcards((cards) => {
+        const removedCard = cards.find((card) => card.id === id);
+        if (removedCard?.imagePreview) URL.revokeObjectURL(removedCard.imagePreview);
+        return cards.filter((card) => card.id !== id);
+      });
+    }
+  }
+
+  function setFlashcardImage(id: number, file: File | null) {
+    setError("");
+    if (file && (!file.type.startsWith("image/") || file.size > MAX_FLASHCARD_IMAGE_BYTES)) {
+      setError("Flashcard images must be image files smaller than 5 MB.");
+      return;
+    }
+    setFlashcards((cards) => cards.map((card) => {
+      if (card.id !== id) return card;
+      if (card.imagePreview) URL.revokeObjectURL(card.imagePreview);
+      return { ...card, imageFile: file, imagePreview: file ? URL.createObjectURL(file) : null };
+    }));
   }
 
   /* ---------------------------------------------------------------------- */
@@ -270,11 +304,25 @@ export default function CreateLesson() {
       }).select("lesson_id").single();
 
       if (lessonError || !lesson) throw new Error(lessonError?.message ?? "The lesson could not be created.");
-      const { error: flashcardError } = await supabase.from("flashcards").insert(flashcards.map((flashcard) => ({
-        lesson_id: lesson.lesson_id,
-        word: flashcard.term.trim(),
-        definition: flashcard.definition.trim(),
-      })));
+      const flashcardsToInsert = await Promise.all(flashcards.map(async (flashcard, index) => {
+        let imagePath: string | null = null;
+        if (flashcard.imageFile) {
+          imagePath = `flashcards/${lesson.lesson_id}/${index + 1}-${crypto.randomUUID()}-${safeImageName(flashcard.imageFile.name)}`;
+          const { error: uploadError } = await supabase.storage.from("images").upload(imagePath, flashcard.imageFile, {
+            contentType: flashcard.imageFile.type,
+            upsert: false,
+          });
+          if (uploadError) throw new Error(`Could not upload the image for "${flashcard.term}": ${uploadError.message}`);
+        }
+        return {
+          lesson_id: lesson.lesson_id,
+          word: flashcard.term.trim(),
+          definition: flashcard.definition.trim(),
+          image_path: imagePath,
+        };
+      }));
+
+      const { error: flashcardError } = await supabase.from("flashcards").insert(flashcardsToInsert);
 
       if (flashcardError) throw new Error(flashcardError.message);
       const { data: mcq, error: mcqError } = await supabase.from("mcqs").insert({
@@ -329,7 +377,7 @@ export default function CreateLesson() {
         {step === "details" && <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="mb-6"><h3 className="text-lg font-bold">Lesson details</h3><p className="mt-1 text-sm text-slate-500">Give learners a clear title and identify where this lesson belongs.</p></div><div className="space-y-5"><label className="block"><span className="mb-2 block text-sm font-semibold">Classroom</span>{isClassroomLocked ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-800">{selectedClassroom?.classroom_name}</div> : <select value={classroomId} onChange={(event) => setClassroomId(event.target.value)} className={inputClassName}><option value="">Select a classroom</option>{classrooms.map((classroom) => <option key={classroom.classroom_id} value={classroom.classroom_id}>{classroom.classroom_name}</option>)}</select>}<span className="mt-1.5 block text-xs text-slate-500">{isClassroomLocked ? "This lesson will be added to the classroom you opened." : "Choose the classroom that should contain this lesson."}</span></label><label className="block"><span className="mb-2 block text-sm font-semibold">Lesson title</span><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={80} placeholder="e.g. Essential travel vocabulary" className={inputClassName} /></label><label className="block"><span className="mb-2 block text-sm font-semibold">Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} maxLength={280} placeholder="What will learners understand or practise in this lesson?" className={`${inputClassName} resize-none`} /></label>{error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="flex justify-end"><button type="button" onClick={continueToFlashcards} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto">Continue <ChevronRight size={17} /></button></div></div></div><aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-sm font-bold">Lesson cover</h3><p className="mt-1 text-sm leading-5 text-slate-500">Choose an image learners can recognise.</p><div className="mt-4 grid grid-cols-3 gap-2">{lessonCoverOptions.map((cover) => <button key={cover.id} type="button" aria-label={`Use ${cover.alt} as the lesson cover`} aria-pressed={coverId === cover.id} onClick={() => setCoverId(cover.id)} className={`relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition ${coverId === cover.id ? "border-slate-800" : "border-transparent hover:border-slate-300"}`}><img src={cover.image} alt={cover.alt} className="h-full w-full object-cover" />{coverId === cover.id && <span className="absolute inset-x-0 bottom-0 h-1 bg-slate-800" />}</button>)}</div><div className="mt-4 overflow-hidden rounded-lg border border-slate-200"><img src={selectedCover.image} alt={selectedCover.alt} className="aspect-[16/9] w-full object-cover" /><p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">Selected cover: {selectedCover.alt}</p></div></aside></section>}
 
         {/* Step 2: flashcards */}
-        {step === "flashcards" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col justify-between gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end"><div><h3 className="text-lg font-bold">Flashcards</h3><p className="mt-1 text-sm text-slate-500">Add up to 15 term and definition pairs.</p></div><span className="text-sm font-semibold text-slate-500">{flashcards.length} of 15</span></div><div className="mt-5 space-y-3">{flashcards.map((card, index) => <div key={card.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="mb-3 flex items-center justify-between"><span className="text-sm font-bold text-slate-700">Flashcard {index + 1}</span>{flashcards.length > 1 && <button type="button" onClick={() => removeFlashcard(card.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700" aria-label={`Remove flashcard ${index + 1}`}><Trash2 size={16} /></button>}</div><div className="grid gap-3 md:grid-cols-2"><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Term</span><input value={card.term} onChange={(event) => updateFlashcard(card.id, "term", event.target.value)} placeholder="e.g. Itinerary" className={inputClassName} /></label><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Definition</span><input value={card.definition} onChange={(event) => updateFlashcard(card.id, "definition", event.target.value)} placeholder="A planned route or journey" className={inputClassName} /></label></div></div>)}</div>{flashcards.length < 15 && <button type="button" onClick={addFlashcard} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><Plus size={17} /> Add flashcard</button>}{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row"><button type="button" onClick={() => { setError(""); setStep("details"); }} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Back</button><button type="button" onClick={continueToActivities} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">Choose activity <ChevronRight size={17} /></button></div></section>}
+        {step === "flashcards" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col justify-between gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end"><div><h3 className="text-lg font-bold">Flashcards</h3><p className="mt-1 text-sm text-slate-500">Add up to 15 term and definition pairs. Images are optional and enable the matching activity.</p></div><span className="text-sm font-semibold text-slate-500">{flashcards.length} of 15</span></div><div className="mt-5 space-y-3">{flashcards.map((card, index) => <div key={card.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="mb-3 flex items-center justify-between"><span className="text-sm font-bold text-slate-700">Flashcard {index + 1}</span>{flashcards.length > 1 && <button type="button" onClick={() => removeFlashcard(card.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700" aria-label={`Remove flashcard ${index + 1}`}><Trash2 size={16} /></button>}</div><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]"><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Term</span><input value={card.term} onChange={(event) => updateFlashcard(card.id, "term", event.target.value)} placeholder="e.g. Itinerary" className={inputClassName} /></label><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Definition</span><input value={card.definition} onChange={(event) => updateFlashcard(card.id, "definition", event.target.value)} placeholder="A planned route or journey" className={inputClassName} /></label><div><span className="mb-1.5 block text-xs font-semibold text-slate-600">Image (optional)</span>{card.imagePreview ? <div className="relative h-24 overflow-hidden rounded-lg border border-slate-200 bg-white"><img src={card.imagePreview} alt="Flashcard preview" className="h-full w-full object-cover" /><button type="button" onClick={() => setFlashcardImage(card.id, null)} aria-label={`Remove image from flashcard ${index + 1}`} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-700 shadow"><X size={14} /></button></div> : <label className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-center text-xs font-semibold text-slate-600 transition hover:border-slate-500"><ImagePlus size={20} className="mb-1" /> Add image<input type="file" accept="image/*" className="sr-only" onChange={(event) => { setFlashcardImage(card.id, event.target.files?.[0] ?? null); event.currentTarget.value = ""; }} /></label>}</div></div></div>)}</div>{flashcards.length < 15 && <button type="button" onClick={addFlashcard} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><Plus size={17} /> Add flashcard</button>}{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row"><button type="button" onClick={() => { setError(""); setStep("details"); }} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Back</button><button type="button" onClick={continueToActivities} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700">Choose activity <ChevronRight size={17} /></button></div></section>}
 
         {/* Step 3: choose the MCQ format, then generate it with AI */}
         {step === "activity" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="max-w-xl"><h3 className="text-xl font-bold">Choose the MCQ activity</h3><p className="mt-2 text-sm leading-6 text-slate-500">Your lesson has {flashcards.length} flashcard{flashcards.length === 1 ? "" : "s"}. Select the question format to generate from them.</p></div><div className="mt-6 grid gap-3 md:grid-cols-2">{mcqFormatOptions.map((format) => { const selected = selectedMcqFormat === format.id; return <button key={format.id} type="button" onClick={() => setSelectedMcqFormat(format.id)} className={`min-h-36 rounded-lg border p-5 text-left transition ${selected ? "border-slate-800 bg-slate-50 ring-2 ring-slate-100" : "border-slate-200 hover:border-slate-400"}`} aria-pressed={selected}><h4 className="font-bold">{format.name}</h4><p className="mt-2 text-sm leading-5 text-slate-500">{format.description}</p>{selected && <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-700"><Check size={15} /> Selected</span>}</button>; })}</div>{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center"><button type="button" onClick={() => setStep("flashcards")} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Edit flashcards</button><button type="button" disabled={!selectedMcqFormat || isGenerating} onClick={generateActivity} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{isGenerating ? "Generating..." : "Generate activity"} {!isGenerating && <ChevronRight size={17} />}</button></div></section>}

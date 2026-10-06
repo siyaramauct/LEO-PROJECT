@@ -21,7 +21,7 @@ function parseTranslation(result: unknown): Translation {
     return parsed;
 }
 
-export default function Flashcard({ word, definition, flashcardId }: { word: string; definition: string; flashcardId?: string }) {
+export default function Flashcard({ word, definition, flashcardId, imageUrl }: { word: string; definition: string; flashcardId?: string; imageUrl?: string | null }) {
     const [flipped, setFlipped] = useState(false);
     const [activeLanguage, setActiveLanguage] = useState<LanguageCode | null>(null);
     const [translations, setTranslations] = useState<Partial<Record<LanguageCode, Translation>>>({});
@@ -117,7 +117,8 @@ export default function Flashcard({ word, definition, flashcardId }: { word: str
                 }`}
             >
                 {/* // Front  */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-lg shadow-md p-4 [backface-visibility:hidden]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden bg-white rounded-lg shadow-md p-4 [backface-visibility:hidden]">
+                    {imageUrl && <img src={imageUrl} alt="" className="mb-4 h-32 w-full rounded-lg object-cover" />}
                     <h1 className="text-2xl font-bold">{displayedWord}</h1>
 
                     <button
