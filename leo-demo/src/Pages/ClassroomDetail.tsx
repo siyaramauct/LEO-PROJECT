@@ -120,7 +120,7 @@ export default function ClassroomDetail() {
         supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
         supabase.from("lessons").select("*").eq("classroom_id", classroomId),
         supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
-        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).order("uploaded_date", { ascending: false }),
+        supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).is("lesson_id", null).order("uploaded_date", { ascending: false }),
         supabase.rpc("get_classroom_invite_code", { p_classroom_id: classroomId }),
       ]);
 
