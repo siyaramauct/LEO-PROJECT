@@ -1,0 +1,4 @@
+export const MAX_CLASSROOM_STUDENTS = 30;
+export const MAX_LESSONS_PER_CLASSROOM = 50;
+export const MAX_FLASHCARDS_PER_LESSON = 15;
+export const MAX_FLASHCARD_IMAGE_BYTES = 5 * 1024 * 1024;
