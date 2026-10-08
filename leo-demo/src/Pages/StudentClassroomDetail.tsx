@@ -2,6 +2,8 @@ import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, ExternalLink, F
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import { MaterialSpine, MaterialTypeTag } from "../Components/MaterialTypeMarks";
+import { materialTypeLabel } from "../utils/materialFileTypes";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { notifyUser } from "../utils/notifications";
@@ -79,7 +81,7 @@ const LessonList = ({ title, description, items, completed }: { title: string; d
             </span>
             {!lesson.hasQuiz ? (
               <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                <Layers size={12} /> Flashcards only
+                <Layers size={9} /> Flashcards only
               </span>
             ) : completed ? (
               lesson.score !== null && lesson.totalQuestions ? (
@@ -329,7 +331,8 @@ export default function StudentClassroomDetail() {
                 <div className="mt-4 divide-y divide-slate-100">
                   {materials.map((material) => {
                     const href = material.resource_type === "link" ? material.resource_url : documentUrl(material.resource_url);
-                    const Icon = material.resource_type === "link" ? LinkIcon : FileText;
+                    const isLink = material.resource_type === "link";
+                    const Icon = isLink ? LinkIcon : FileText;
                     return (
                       <a
                         key={material.resource_id}
@@ -338,11 +341,13 @@ export default function StudentClassroomDetail() {
                         rel="noreferrer"
                         className="flex items-center gap-3 py-3 transition hover:bg-slate-50"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-                          <Icon size={16} />
-                        </span>
+                        <MaterialSpine isLink={isLink} />
+                        <Icon size={16} className="shrink-0 text-violet-700" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-slate-800">{materialTitle(material)}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-slate-800">{materialTitle(material)}</span>
+                            <MaterialTypeTag label={materialTypeLabel(material.resource_type, material.resource_url)} />
+                          </span>
                           <span className="mt-1 block text-xs text-slate-500">{material.resource_type === "link" ? "External link" : "Document"}</span>
                         </span>
                         <ExternalLink size={16} className="shrink-0 text-slate-400" />

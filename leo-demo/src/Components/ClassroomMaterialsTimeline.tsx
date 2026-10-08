@@ -1,7 +1,8 @@
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { ClassroomMaterial } from "./ClassroomMaterialsPanel";
-import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL } from "../utils/materialFileTypes";
+import { MaterialSpine, MaterialTypeTag } from "./MaterialTypeMarks";
+import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL, materialTypeLabel } from "../utils/materialFileTypes";
 
 type ClassroomMaterialsTimelineProps = {
   materials: ClassroomMaterial[];
@@ -141,20 +142,23 @@ export default function ClassroomMaterialsTimeline({
             <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</h3>
             <ol className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
               {group.items.map((material) => {
-                const Icon = material.kind === "Link" ? LinkIcon : FileText;
+                const isLink = material.kind === "Link";
+                const Icon = isLink ? LinkIcon : FileText;
                 return (
                   <li key={material.id} className="group flex items-center gap-3 px-4 py-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
-                      <Icon size={18} />
-                    </span>
+                    <MaterialSpine isLink={isLink} />
+                    <Icon size={17} className="shrink-0 text-violet-700" />
                     <div className="min-w-0 flex-1">
-                      {material.url ? (
-                        <a href={material.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold text-slate-800 hover:text-violet-700 hover:underline">
-                          {material.title}
-                        </a>
-                      ) : (
-                        <p className="truncate text-sm font-semibold text-slate-800">{material.title}</p>
-                      )}
+                      <div className="flex min-w-0 items-center gap-2">
+                        {material.url ? (
+                          <a href={material.url} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-slate-800 hover:text-violet-700 hover:underline">
+                            {material.title}
+                          </a>
+                        ) : (
+                          <p className="truncate text-sm font-semibold text-slate-800">{material.title}</p>
+                        )}
+                        <MaterialTypeTag label={materialTypeLabel(material.resourceType, material.resourcePath)} />
+                      </div>
                       <p className="mt-0.5 text-xs text-slate-400">
                         {material.detail}
                         {material.uploadedDate && <> · <time dateTime={material.uploadedDate}>{formatTimestamp(material.uploadedDate)}</time></>}

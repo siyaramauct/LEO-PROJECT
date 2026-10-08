@@ -1,6 +1,7 @@
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL } from "../utils/materialFileTypes";
+import { MaterialSpine, MaterialTypeTag } from "./MaterialTypeMarks";
+import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL, materialTypeLabel } from "../utils/materialFileTypes";
 
 export type ClassroomMaterial = {
   id: string;
@@ -125,14 +126,17 @@ export default function ClassroomMaterialsPanel({
       {/* Existing classroom resources */}
       <div className="mt-3 divide-y divide-slate-100">
         {materials.map((material) => {
-          const Icon = material.kind === "Link" ? LinkIcon : FileText;
+          const isLink = material.kind === "Link";
+          const Icon = isLink ? LinkIcon : FileText;
           const content = (
             <>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center text-violet-700">
-                <Icon size={15} />
-              </span>
+              <MaterialSpine isLink={isLink} />
+              <Icon size={15} className="shrink-0 text-violet-700" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-slate-700">{material.title}</p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate text-xs font-semibold text-slate-700">{material.title}</p>
+                  <MaterialTypeTag label={materialTypeLabel(material.resourceType, material.resourcePath)} />
+                </div>
                 <p className="mt-0.5 truncate text-[10px] text-slate-400">{material.detail}</p>
               </div>
             </>

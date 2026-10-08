@@ -1,4 +1,4 @@
-import { Bell, Languages, LockKeyhole, LogOut, Trash2, User } from "lucide-react";
+import { LockKeyhole, LogOut, Trash2, User } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import DeleteAccountDialog from "./DeleteAccountDialog";
 import ChangePasswordDialog from "./ChangePasswordDialog";
@@ -34,11 +34,9 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h3 className="font-bold">Preferences</h3>
+        <h3 className="font-bold">Change password</h3>
         <div className="mt-4 divide-y divide-slate-100">
-          <ProfileOption icon={<Bell size={18} />} title="Notifications" description="Stay informed about classroom activity" />
           <ProfileOption icon={<LockKeyhole size={18} />} title="Password and security" description="Update your sign-in details" onClick={() => setShowPasswordDialog(true)} />
-          <ProfileOption icon={<Languages size={18} />} title="Language" description="English" />
         </div>
       </section>
 
@@ -48,14 +46,14 @@ export default function TeacherProfileContent({ fullName, initials, loggingOut, 
         <button
           type="button"
           onClick={() => setShowDeleteDialog(true)}
-          className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+          className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:border-rose-600 hover:bg-rose-600 hover:text-white"
         >
           <Trash2 size={18} />
           Delete account
         </button>
       </section>
 
-      <button type="button" onClick={() => void onLogout()} disabled={loggingOut} className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"><LogOut size={18} />{loggingOut ? "Logging out..." : "Log out"}</button>
+      <button type="button" onClick={() => void onLogout()} disabled={loggingOut} className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-rose-200 disabled:hover:bg-white disabled:hover:text-rose-600"><LogOut size={18} />{loggingOut ? "Logging out..." : "Log out"}</button>
 
       <DeleteAccountDialog
         open={showDeleteDialog}

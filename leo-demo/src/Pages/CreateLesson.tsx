@@ -49,7 +49,7 @@ const lessonCoverOptions = [
   { id: "level-one", alt: "Level one learning illustration", path: "lessonImgs/Level1.png" },
   { id: "travel", alt: "Travel vocabulary illustration", path: "lessonImgs/travel-illustration.avif" },
   { id: "business-illustration", alt: "Business illustration", path: "lessonImgs/business-illustration.avif" },
-  { id: "business-eng", alt: "Business English illustration", path: "lessonImgs/businessEng.avif" },
+  { id: "business-commerce", alt: "Business commerce illustration", path: "lessonImgs/business_commerce.avif" },
   { id: "corporate-style", alt: "Corporate style lesson illustration", path: "lessonImgs/corporateStyleLessonIlustration.avif" },
   { id: "cute-brain", alt: "Cute brain illustration", path: "lessonImgs/cuteBrain.png" },
 ].map((cover) => ({

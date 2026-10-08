@@ -22,6 +22,11 @@ const fileExtension = (fileName: string) => {
   return dotIndex > 0 ? fileName.slice(dotIndex + 1).toLowerCase() : "";
 };
 
+// Short tag shown beside a material, e.g. "PDF" or "LINK". Documents are stored
+// by path, so the extension comes from that path.
+export const materialTypeLabel = (resourceType: "document" | "link", path: string) =>
+  resourceType === "link" ? "LINK" : fileExtension(path.split("?")[0]).toUpperCase() || "FILE";
+
 // Returns the content type to upload with, or an error message for a disallowed file.
 export function validateMaterialFile(file: File): { contentType: string } | { error: string } {
   const extension = fileExtension(file.name);

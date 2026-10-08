@@ -10,8 +10,6 @@ import {
   LogOut,
   MoreHorizontal,
   Sparkles,
-  BookOpen,
-  ClipboardCheck,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
@@ -19,7 +17,6 @@ import LoadingScreen from "../Components/LoadingScreen";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
-import StatCard from "../Components/StatCard";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
@@ -32,6 +29,9 @@ type ActiveClassroom = {
   studentCount: number; // calculated from classroom_students table
   lessonCount: number; // calculated from lessons table
 };
+
+// The dashboard previews the newest few; the full lists live on their own pages.
+const DASHBOARD_ROW_LIMIT = 3;
 
 type Lesson = {
   lesson_id: string;
@@ -55,8 +55,6 @@ export default function TeacherDashboard() {
   const [classrooms, setClassrooms] = useState<ActiveClassroom[] | null>(null);
   const [classroomsError, setClassroomsError] = useState<string | null>(null);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
-  const [lessonCount, setLessonCount] = useState<number>(0);
-  const [quizzesCompleted, setQuizzesCompleted] = useState<number>(0);
   const [lessonsError, setLessonsError] = useState<string | null>(null);
   const [isLessonsLoading, setIsLessonsLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -193,8 +191,10 @@ export default function TeacherDashboard() {
         .from("lessons")
         .select("*, classrooms(classroom_name)")
         .in("classroom_id", classroomIds)
-        .order("created_at", { ascending: false })
-        .limit(4); // only show 4 lessons in the dashboard preview
+        // Postgres sorts nulls first when descending, which would push undated
+        // lessons above the newest ones.
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(DASHBOARD_ROW_LIMIT);
 
       if (lessonsError) {
         console.error("Failed to load the lessons:", lessonsError);
@@ -242,43 +242,6 @@ export default function TeacherDashboard() {
           created_at: lesson.created_at,
         }))
       );
-
-      // Step 4: get the REAL total lesson count across all of this
-      // teacher's classrooms, and every lesson's id — we need the ids to
-      // pull quiz stats below. We can't use recentLessons here — that's
-      // capped at 4 by the limit() above and would undercount everything.
-      const { data: allLessons, error: allLessonsError } = await supabase
-        .from("lessons")
-        .select("lesson_id")
-        .in("classroom_id", classroomIds);
-
-      if (allLessonsError) {
-        console.error("Failed to count lessons:", allLessonsError);
-        return;
-      }
-
-      setLessonCount(allLessons?.length ?? 0);
-
-      const allLessonIds = (allLessons ?? []).map((lesson) => lesson.lesson_id);
-      if (!allLessonIds.length) {
-        setQuizzesCompleted(0);
-        
-        return;
-      }
-
-      // Step 5: count completed quiz attempts for the teacher's lessons.
-      const { data: attempts, error: attemptsError } = await supabase
-        .from("lesson_attempts")
-        .select("lesson_id")
-        .in("lesson_id", allLessonIds)
-        .not("completed_at", "is", null);
-
-      if (attemptsError) {
-        console.error("Failed to load quiz stats:", attemptsError);
-        return;
-      }
-
-      setQuizzesCompleted(attempts?.length ?? 0);
     };
 
     // finally: every exit path (including the early error returns) must end
@@ -426,12 +389,7 @@ export default function TeacherDashboard() {
             MY CLASSES
         ========================== */}
         <section className="mt-3 shrink-0 px-4 sm:px-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold">My Classes</h2>
-            <button className="text-xs font-medium text-violet-700">
-              View all
-            </button>
-          </div>
+          <h2 className="mb-3 text-sm font-bold">My Classes</h2>
 
           {classroomsError ? (
             <p role="alert" className="text-xs text-red-700">{classroomsError}</p>
@@ -441,7 +399,7 @@ export default function TeacherDashboard() {
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {classrooms.map((item) => (
+              {classrooms.slice(0, DASHBOARD_ROW_LIMIT).map((item) => (
                 <Link
                   key={item.id}
                   to={`/teacher-classroom/${item.id}`}
@@ -472,13 +430,8 @@ export default function TeacherDashboard() {
         {/* =========================
             RECENT LESSONS
         ========================== */}
-        <section className="mt-3 min-h-0 flex-1 px-4 sm:px-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold">Recent Lessons</h2>
-            <button className="text-xs font-medium text-violet-700">
-              View all
-            </button>
-          </div>
+        <section className="mt-3 min-h-0 flex-1 overflow-y-auto px-4 pb-3 sm:px-6">
+          <h2 className="mb-3 text-sm font-bold">Recent Lessons</h2>
 
           {lessonsError ? (
             <p role="alert" className="text-xs text-red-700">{lessonsError}</p>
@@ -487,7 +440,7 @@ export default function TeacherDashboard() {
               You haven't created any lessons yet.
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
               {lessons.map((lesson) => (
                 <Link
                   key={lesson.lesson_id}
@@ -595,16 +548,9 @@ export default function TeacherDashboard() {
             </div>
           </header>
 
-          <div className="mx-auto flex min-h-[calc(100dvh-65px)] w-full max-w-7xl flex-col p-4">
-            {/* Desktop Stats */}
-            <div className="grid shrink-0 grid-cols-2 gap-3 xl:grid-cols-3">
-              <StatCard icon={<Users />} label="Classrooms" value={String(classrooms?.length ?? 0)} />
-              <StatCard icon={<BookOpen />} label="Lessons Created" value={String(lessonCount)} />
-              <StatCard icon={<ClipboardCheck />} label="Quizzes Completed" value={String(quizzesCompleted)} />
-            </div>
-
+          <div className="mx-auto flex min-h-[calc(100dvh-65px)] w-full max-w-7xl flex-col gap-4 p-4 xl:p-6">
             {/* Main Grid */}
-            <div className="grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
+            <div className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
               {/* Classes */}
               <section className="rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">
@@ -635,7 +581,7 @@ export default function TeacherDashboard() {
                       <Link to="/create-classroom" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create Classroom</Link>
                     </div>
                   ) : (
-                    classrooms.map((item) => (
+                    classrooms.slice(0, DASHBOARD_ROW_LIMIT).map((item) => (
                       <Link
                         key={item.id}
                         to={`/teacher-classroom/${item.id}`}
@@ -704,18 +650,12 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Recent Lessons */}
-            <section className="mt-3 flex min-h-0 flex-1 flex-col rounded-xl border border-slate-100 bg-white p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold">Recent Lessons</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Lessons recently created for your classrooms.
-                  </p>
-                </div>
-
-                <button className="text-xs font-semibold text-violet-700">
-                  View all
-                </button>
+            <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-100 bg-white p-3">
+              <div>
+                <h3 className="font-bold">Recent Lessons</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Lessons recently created for your classrooms.
+                </p>
               </div>
 
               <div className="mt-2 space-y-1.5">
@@ -726,7 +666,7 @@ export default function TeacherDashboard() {
                     You haven't created any lessons yet.
                   </p>
                 ) : (
-                  lessons.slice(0, 2).map((lesson) => (
+                  lessons.map((lesson) => (
                     <Link
                       key={lesson.lesson_id}
                       to={`/teacher-classroom/${lesson.classroom_id}/lesson/${lesson.lesson_id}`}
