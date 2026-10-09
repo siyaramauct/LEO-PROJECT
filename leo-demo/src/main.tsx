@@ -35,6 +35,7 @@ import TeacherProfile from "./Pages/TeacherProfile.tsx";
 import StudentPractice from "./Pages/StudentPractice.tsx";
 import LoadingScreen from "./Components/LoadingScreen.tsx";
 import NotFound from "./Pages/NotFound.tsx";
+import { installBrokenImageFallback } from "./utils/images";
 
 const router = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -83,6 +84,8 @@ const router = createBrowserRouter([
   },
   { path: "*", element: <NotFound /> },
 ]);
+
+installBrokenImageFallback();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

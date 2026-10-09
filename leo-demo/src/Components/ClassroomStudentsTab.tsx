@@ -100,6 +100,8 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
       // Keep each student's best percentage per lesson so retakes don't drag the average down.
       const bestPercent = new Map<string, Map<string, number | null>>();
       for (const attempt of attemptResult.data ?? []) {
+        // Finishing a flashcards-only lesson records an unscored attempt; completion here counts quiz lessons only.
+        if (!mcqResult.error && !ceilings.has(attempt.lesson_id)) continue;
         const ceiling = ceilings.get(attempt.lesson_id);
         const percent = ceiling && attempt.score !== null ? Math.round((Number(attempt.score) / ceiling) * 100) : null;
         const lessons = bestPercent.get(attempt.student_id) ?? new Map<string, number | null>();

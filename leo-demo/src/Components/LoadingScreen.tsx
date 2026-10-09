@@ -1,3 +1,5 @@
+import { projectImageUrl } from "../utils/images";
+
 type LoadingScreenProps = {
   label?: string;
 };
@@ -47,7 +49,7 @@ export default function LoadingScreen({ label = "Preparing your learning space" 
             <div className="absolute inset-x-[8%] bottom-[7%] top-[8%] rounded-[2.25rem] bg-violet-100/70" aria-hidden="true" />
             <div className="relative overflow-hidden rounded-[2rem] border border-violet-100 bg-violet-50/70 p-3 sm:p-5">
               <img
-                src="/girlHoldingWebpages.png"
+                src={projectImageUrl("girlHoldingWebpages.png")}
                 alt="Illustration of a student surrounded by learning pages"
                 className="loading-illustration relative aspect-square w-full object-contain"
               />

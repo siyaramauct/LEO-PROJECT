@@ -3,20 +3,21 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { Role, type Role as RoleType } from "../../context/roles";
 import { supabase } from "../supabase-client.ts";
+import { bucketImageUrl } from "../utils/images";
 
 const roles: { value: RoleType; title: string; description: string; imageSrc: string; imageAlt: string }[] = [
   {
     value: Role.Student,
     title: "Student",
     description: "Practice lessons, build vocabulary, and track your progress through guided activities.",
-    imageSrc: "/travel-illustration.avif",
+    imageSrc: bucketImageUrl("lessonImgs/travel-illustration.avif"),
     imageAlt: "Student learning from digital English lessons",
   },
   {
     value: Role.Teacher,
     title: "Teacher",
     description: "Organize learning paths, guide learners, and manage classroom-focused English practice.",
-    imageSrc: "/businessEng.avif",
+    imageSrc: bucketImageUrl("lessonImgs/businessEng.avif"),
     imageAlt: "Teacher leading an online English learning session",
   },
 ];

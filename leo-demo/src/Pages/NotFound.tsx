@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { projectImageUrl } from "../utils/images";
 
 export default function NotFound() {
   return (
@@ -33,7 +34,7 @@ export default function NotFound() {
             <div className="absolute inset-x-[5%] bottom-[5%] top-[11%] rotate-[-4deg] rounded-[2.5rem] border border-violet-100 bg-violet-50" aria-hidden="true" />
             <div className="relative overflow-hidden rounded-[2rem] border border-violet-100 bg-white p-3 sm:p-5">
               <img
-                src="/girlMagnifyingGlass.png"
+                src={projectImageUrl("girlMagnifyingGlass.png")}
                 alt="Illustration of a student searching with a magnifying glass"
                 className="not-found-illustration aspect-square w-full object-contain"
               />

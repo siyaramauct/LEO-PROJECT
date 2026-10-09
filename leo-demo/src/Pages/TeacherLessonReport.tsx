@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import StatCard from "../Components/StatCard";
 import { supabase } from "../supabase-client";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type ClassroomRow = { classroom_id: string; classroom_name: string; teacher_id: string };
 
@@ -335,7 +336,7 @@ export default function TeacherLessonReport() {
 
   const coverUrl = lesson?.lesson_image_path
     ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
-    : "/classRoomIllustration.png";
+    : BROKEN_IMAGE_URL;
 
   if (isLoading) {
     return (

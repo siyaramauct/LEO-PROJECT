@@ -159,7 +159,9 @@ export default function StudentDashboard() {
         .from("lessons")
         .select("lesson_id, title, lesson_image_path, classrooms(classroom_name)")
         .in("classroom_id", classroomIds)
-        .order("created_at", { ascending: false })
+        // Scheduled lessons stay hidden until their release date, which is also when students see them "added".
+        .lte("release_date", new Date().toISOString())
+        .order("release_date", { ascending: false })
         .limit(RECENTLY_ADDED_LIMIT);
 
       if (lessonsError) {

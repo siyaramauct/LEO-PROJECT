@@ -9,6 +9,7 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
 type Lesson = {
@@ -74,7 +75,7 @@ const LessonList = ({ title, description, items, completed }: { title: string; d
             to={`/lesson/${lesson.lesson_id}`}
             className="flex items-center gap-3 py-3 transition hover:bg-slate-50"
           >
-            <img src={imageUrl(lesson.lesson_image_path, "/Level1.png")} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
+            <img src={imageUrl(lesson.lesson_image_path, BROKEN_IMAGE_URL)} alt="" className="h-12 w-16 shrink-0 rounded-lg object-cover" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
               <span className="mt-1 block truncate text-xs text-slate-500">{lesson.description ?? "Vocabulary practice"}</span>
@@ -134,7 +135,7 @@ export default function StudentClassroomDetail() {
 
       const [classroomResult, lessonsResult, materialsResult] = await Promise.all([
         supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path").eq("classroom_id", classroomId).maybeSingle(),
-        supabase.from("lessons").select("lesson_id, title, description, lesson_image_path, created_at").eq("classroom_id", classroomId).order("created_at", { ascending: false }),
+        supabase.from("lessons").select("lesson_id, title, description, lesson_image_path, created_at").eq("classroom_id", classroomId).lte("release_date", new Date().toISOString()).order("created_at", { ascending: false }),
         supabase.from("learning_resources").select("resource_id, resource_type, resource_url, uploaded_date").eq("classroom_id", classroomId).is("lesson_id", null).order("uploaded_date", { ascending: false }),
       ]);
 
@@ -214,10 +215,9 @@ export default function StudentClassroomDetail() {
 
   const assignedLessons = lessons.filter((lesson) => !completedLessonIds.includes(lesson.lesson_id));
   const completedLessons = lessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id));
-  // Flashcards-only lessons can never be completed, so they sit outside the to-do count.
   const flashcardOnlyCount = lessons.filter((lesson) => !lesson.hasQuiz).length;
-  const toDoCount = assignedLessons.filter((lesson) => lesson.hasQuiz).length;
-  const coverUrl = imageUrl(classroom?.cover_image_path ?? null, "/classRoomIllustration.png");
+  const toDoCount = assignedLessons.length;
+  const coverUrl = imageUrl(classroom?.cover_image_path ?? null, BROKEN_IMAGE_URL);
 
   // Removes the calling student's enrolment row so the classroom no longer appears for them.
   async function leaveClassroom() {

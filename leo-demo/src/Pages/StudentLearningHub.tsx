@@ -1,5 +1,6 @@
 import { ArrowUpRight, BookOpen, Headphones, Library, Mic } from "lucide-react";
 import StudentBottomNav from "../Components/StudentBottomNav";
+import { projectImageUrl } from "../utils/images";
 
 type Resource = {
   title: string;
@@ -85,7 +86,7 @@ export default function StudentLearningHub() {
               </div>
             </div>
             <div className="relative mt-7 h-48 overflow-hidden rounded-xl bg-violet-50 sm:h-60 lg:mt-0 lg:h-64">
-              <img src="/artisticCollage.png" alt="Collage of people collaborating on ideas" className="h-full w-full object-cover object-[50%_42%]" />
+              <img src={projectImageUrl("artisticCollage.png")} alt="Collage of people collaborating on ideas" className="h-full w-full object-cover object-[50%_42%]" />
             </div>
           </section>
 

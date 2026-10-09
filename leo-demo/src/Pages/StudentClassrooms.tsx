@@ -8,6 +8,7 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
 type Lesson = { lesson_id: string; classroom_id: string; title: string; description: string | null; lesson_image_path: string | null };
@@ -42,7 +43,7 @@ export default function StudentClassrooms() {
       }
       const [classroomResult, lessonResult] = await Promise.all([
         supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path").in("classroom_id", classroomIds),
-        supabase.from("lessons").select("lesson_id, classroom_id, title, description, lesson_image_path").in("classroom_id", classroomIds),
+        supabase.from("lessons").select("lesson_id, classroom_id, title, description, lesson_image_path").in("classroom_id", classroomIds).lte("release_date", new Date().toISOString()),
       ]);
       if (classroomResult.error || lessonResult.error) {
         setError(classroomResult.error?.message ?? lessonResult.error?.message ?? "Could not load your classrooms.");
@@ -122,7 +123,7 @@ export default function StudentClassrooms() {
     const completedCount = classroomLessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id)).length;
     const image = classroom.cover_image_path
       ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
-      : "/classRoomIllustration.png";
+      : BROKEN_IMAGE_URL;
 
     return {
       id: classroom.classroom_id,

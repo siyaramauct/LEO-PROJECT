@@ -23,6 +23,7 @@ import { useAuth } from "../../context/AuthContext.tsx";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
 import { formatDateKey, releaseDateToIso, toDateKey } from "../utils/releaseDate";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type ActiveClassroom = {
   id: string;
@@ -154,7 +155,7 @@ export default function TeacherDashboard() {
             ? supabase.storage
                 .from("images")
                 .getPublicUrl(classroom.cover_image_path).data.publicUrl
-            : "/classRoomIllustration.png",
+            : BROKEN_IMAGE_URL,
           imageAlt: `${classroom.classroom_name} classroom cover`,
           studentCount: studentCountByClassroom[classroom.classroom_id] ?? 0,
           lessonCount: lessonCountByClassroom[classroom.classroom_id] ?? 0,
@@ -246,7 +247,7 @@ export default function TeacherDashboard() {
           // Guarded like classroom covers so the "?? fallback" in the JSX actually kicks in.
           lesson_image_path: lesson.lesson_image_path
             ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
-            : "/classRoomIllustration.png",
+            : BROKEN_IMAGE_URL,
           wordCount: wordCountByLesson[lesson.lesson_id] ?? 0,
           imageAlt: `${lesson.title} lesson cover`,
           created_at: lesson.created_at,
@@ -521,7 +522,7 @@ export default function TeacherDashboard() {
                 >
                   <div className="min-h-0 w-full flex-1 overflow-hidden bg-slate-50">
                     <img
-                      src={item.image ?? "/classRoomIllustration.png"}
+                      src={item.image ?? BROKEN_IMAGE_URL}
                       alt={item.imageAlt}
                       className="h-full w-full object-cover"
                     />
@@ -563,7 +564,7 @@ export default function TeacherDashboard() {
                 >
                   <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-slate-50">
                     <img
-                      src={lesson.lesson_image_path ?? "/classRoomIllustration.png"}
+                      src={lesson.lesson_image_path ?? BROKEN_IMAGE_URL}
                       alt={lesson.imageAlt}
                       className="h-full w-full object-cover"
                     />
@@ -704,7 +705,7 @@ export default function TeacherDashboard() {
                       >
                         <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-50 p-1">
                           <img
-                            src={item.image ?? "/classRoomIllustration.png"}
+                            src={item.image ?? BROKEN_IMAGE_URL}
                             alt={item.imageAlt}
                             className="h-full w-full object-contain"
                           />
@@ -849,7 +850,7 @@ export default function TeacherDashboard() {
                     >
                       <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-50">
                         <img
-                          src={lesson.lesson_image_path ?? "/classRoomIllustration.png"}
+                          src={lesson.lesson_image_path ?? BROKEN_IMAGE_URL}
                           alt={lesson.imageAlt}
                           className="h-full w-full object-cover"
                         />

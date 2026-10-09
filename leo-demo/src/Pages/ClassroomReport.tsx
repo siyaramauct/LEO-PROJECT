@@ -1,949 +1,386 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  BarChart3,
-  CheckCircle2,
-  ClipboardCheck,
-  Home,
-  Settings,
-  Sparkles,
-  Users,
-} from "lucide-react";
-
-import { supabase } from "../supabase-client";
+import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import ActivityCalendar from "../Components/ActivityCalendar";
+import LoadingScreen from "../Components/LoadingScreen";
+import ProgressBar from "../Components/ProgressBar";
+import SegmentedControl from "../Components/SegmentedControl";
+import TeacherShell from "../Components/TeacherShell";
 import { useAuth } from "../../context/AuthContext";
-import NavItem from "../Components/NavItem";
-import SidebarItem from "../Components/SidebarItem";
-import StatCard from "../Components/StatCard";
+import usePreloadImages from "../hooks/usePreloadImages";
+import { ACTIVITY_WEEKS, buildActivityWeeks } from "../utils/activityCalendar";
+import {
+  FLAG_LABELS,
+  INACTIVE_DAYS,
+  MASTERY_PERCENT,
+  SUPPORT_PERCENT,
+  inactiveLabel,
+  loadClassReports,
+  scoreBand,
+  type ClassReport,
+  type LessonReport,
+  type StudentReport,
+} from "../utils/classReport";
 
-type Lesson = {
-  lesson_id: string;
-  title: string;
-};
+type LessonSort = "order" | "hardest" | "easiest" | "completion";
+type StudentSort = "attention" | "lowest" | "highest" | "inactive" | "name";
 
-type Student = {
-  id: string;
-  name: string | null;
-  surname: string | null;
-};
+// Mastery bands share one scale everywhere on the page: dark violet is secure, dark slate needs reteaching.
+const BAND_STYLES = {
+  mastered: { bar: "bg-violet-700", cell: "bg-violet-700 text-white", label: `Mastered (${MASTERY_PERCENT}%+)` },
+  developing: { bar: "bg-violet-300", cell: "bg-violet-100 text-violet-900", label: `Developing (${SUPPORT_PERCENT}–${MASTERY_PERCENT - 1}%)` },
+  support: { bar: "bg-slate-700", cell: "bg-slate-700 text-white", label: `Needs support (<${SUPPORT_PERCENT}%)` },
+  notAttempted: { bar: "bg-slate-100", cell: "", label: "Not attempted" },
+} as const;
 
-type Mcq = {
-  lesson_id: string;
-  score_ceiling: number | null;
-};
+const formatPercent = (value: number | null) => (value === null ? "—" : `${value}%`);
 
-type Attempt = {
-  student_id: string;
-  lesson_id: string;
-  score: number | null;
-  completed_at: string | null;
-};
+const lastActiveText = (student: StudentReport) =>
+  student.daysSinceActive === null ? "Not in 12 weeks" : student.daysSinceActive === 0 ? "Today" : student.daysSinceActive === 1 ? "Yesterday" : `${student.daysSinceActive} days ago`;
 
-type LessonProgress = {
-  lessonId: string;
-  title: string;
-  completed: boolean;
-  score: number | null;
-  // False for flashcards-only lessons: no quiz, so no completion or score.
-  hasQuiz: boolean;
-};
+// Nulls (nothing to compare yet) always sort last, whichever direction is chosen.
+const compareNullable = (a: number | null, b: number | null, direction: 1 | -1) =>
+  a === null ? (b === null ? 0 : 1) : b === null ? -1 : direction * (a - b);
 
-type StudentProgress = {
-  id: string;
-  name: string;
-  initials: string;
-  progress: number;
-  averageScore: number | null;
-  lessons: LessonProgress[];
-};
+function sortLessons(lessons: LessonReport[], sort: LessonSort) {
+  const sorted = [...lessons];
+  if (sort === "hardest") sorted.sort((a, b) => compareNullable(a.averagePercent, b.averagePercent, 1));
+  if (sort === "easiest") sorted.sort((a, b) => compareNullable(a.averagePercent, b.averagePercent, -1));
+  if (sort === "completion") sorted.sort((a, b) => a.completedCount - b.completedCount);
+  return sorted;
+}
+
+function sortStudents(students: StudentReport[], sort: StudentSort) {
+  const byName = (a: StudentReport, b: StudentReport) => a.name.localeCompare(b.name);
+  return [...students].sort((a, b) => {
+    if (sort === "attention") return b.flags.length - a.flags.length || compareNullable(a.averagePercent, b.averagePercent, 1) || byName(a, b);
+    if (sort === "lowest") return compareNullable(a.averagePercent, b.averagePercent, 1) || byName(a, b);
+    if (sort === "highest") return compareNullable(a.averagePercent, b.averagePercent, -1) || byName(a, b);
+    if (sort === "inactive") return (b.daysSinceActive ?? Infinity) - (a.daysSinceActive ?? Infinity) || byName(a, b);
+    return byName(a, b);
+  });
+}
+
+function flagText(student: StudentReport) {
+  return student.flags.map((flag) => (flag === "inactive" ? inactiveLabel(student.daysSinceActive) : FLAG_LABELS[flag]));
+}
+
+function KpiCard({ label, value, detail, progress }: { label: string; value: string; detail: string; progress?: number }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-4">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1.5 text-2xl font-bold leading-none">{value}</p>
+      {progress !== undefined && <ProgressBar value={progress} className="mt-3" />}
+      <p className="mt-2 text-[11px] text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function MasteryBar({ lesson, total }: { lesson: LessonReport; total: number }) {
+  const segments = (["mastered", "developing", "support", "notAttempted"] as const).filter((band) => lesson.bands[band] > 0);
+  return (
+    <div className="flex h-2 overflow-hidden rounded-full bg-slate-100" aria-label={segments.map((band) => `${lesson.bands[band]} ${BAND_STYLES[band].label}`).join(", ")}>
+      {total > 0 && segments.map((band) => (
+        <span key={band} className={BAND_STYLES[band].bar} style={{ width: `${(lesson.bands[band] / total) * 100}%` }} />
+      ))}
+    </div>
+  );
+}
 
 export default function ClassroomReport() {
   const { classroomId } = useParams();
   const { session } = useAuth();
-  const navigate = useNavigate();
+  const teacherId = session?.user.id;
 
-  const [classroomName, setClassroomName] =
-    useState("Class Report");
-
-  const [students, setStudents] =
-    useState<StudentProgress[]>([]);
-
-  const [completedStudentCount, setCompletedStudentCount] =
-    useState(0);
-
-  const [averageScore, setAverageScore] =
-    useState<number | null>(null);
-
-  const [quizCount, setQuizCount] = useState(0);
-  const [lessonCount, setLessonCount] = useState(0);
-  const [flashcardOnlyCount, setFlashcardOnlyCount] = useState(0);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [activityWeeks] = useState(() => buildActivityWeeks(new Date()));
+  const [report, setReport] = useState<ClassReport | null | undefined>(undefined);
   const [error, setError] = useState("");
+  const [lessonSort, setLessonSort] = useState<LessonSort>("order");
+  const [studentSort, setStudentSort] = useState<StudentSort>("attention");
 
   useEffect(() => {
-    async function loadReport() {
-      if (!session?.user?.id || !classroomId) {
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError("");
-
-      // =========================
-      // 1. Get classroom
-      // =========================
-      const { data: classroom, error: classroomError } =
-        await supabase
-          .from("classrooms")
-          .select("classroom_id, classroom_name")
-          .eq("classroom_id", classroomId)
-          .eq("teacher_id", session.user.id)
-          .single();
-
-      if (classroomError || !classroom) {
-        console.error(classroomError);
-        setError("Unable to load this classroom.");
-        setIsLoading(false);
-        return;
-      }
-
-      setClassroomName(classroom.classroom_name);
-
-      // =========================
-      // 2. Get classroom lessons
-      // =========================
-      const { data: lessons, error: lessonsError } =
-        await supabase
-          .from("lessons")
-          .select("lesson_id, title")
-          .eq("classroom_id", classroomId)
-          .order("title");
-
-      if (lessonsError) {
-        console.error(lessonsError);
-        setError("Unable to load classroom lessons.");
-        setIsLoading(false);
-        return;
-      }
-
-      const classroomLessons: Lesson[] = lessons ?? [];
-      const lessonIds = classroomLessons.map(
-        (lesson) => lesson.lesson_id
-      );
-
-      setLessonCount(classroomLessons.length);
-
-      // =========================
-      // 3. Get classroom students
-      // =========================
-      const { data: enrolments, error: enrolmentError } =
-        await supabase
-          .from("classroom_students")
-          .select("student_id")
-          .eq("classroom_id", classroomId);
-
-      if (enrolmentError) {
-        console.error(enrolmentError);
-        setError("Unable to load classroom students.");
-        setIsLoading(false);
-        return;
-      }
-
-      const studentIds = (enrolments ?? []).map(
-        (enrolment) => enrolment.student_id
-      );
-
-      // No students
-      if (studentIds.length === 0) {
-        setStudents([]);
-        setCompletedStudentCount(0);
-        setAverageScore(null);
-        setQuizCount(0);
-        setIsLoading(false);
-        return;
-      }
-
-      // =========================
-      // 4. Get student profiles
-      // =========================
-      const { data: profiles, error: profileError } =
-        await supabase
-          .from("profiles")
-          .select("id, name, surname")
-          .in("id", studentIds);
-
-      if (profileError) {
-        console.error(profileError);
-        setError("Unable to load student information.");
-        setIsLoading(false);
-        return;
-      }
-
-      const studentProfiles: Student[] = profiles ?? [];
-
-      let mcqs: Mcq[] = [];
-      let attempts: Attempt[] = [];
-
-      // =========================
-      // 5. Get quizzes and attempts
-      // =========================
-      if (lessonIds.length > 0) {
-        const { data: mcqData, error: mcqError } =
-          await supabase
-            .from("mcqs")
-            .select("lesson_id, score_ceiling")
-            .in("lesson_id", lessonIds);
-
-        if (mcqError) {
-          console.error(mcqError);
-          setError("Unable to load quiz information.");
-          setIsLoading(false);
-          return;
-        }
-
-        mcqs = mcqData ?? [];
-
-        const { data: attemptData, error: attemptError } =
-          await supabase
-            .from("lesson_attempts")
-            .select(
-              "student_id, lesson_id, score, completed_at"
-            )
-            .in("student_id", studentIds)
-            .in("lesson_id", lessonIds)
-            .not("completed_at", "is", null);
-
-        if (attemptError) {
-          console.error(attemptError);
-          setError("Unable to load student progress.");
-          setIsLoading(false);
-          return;
-        }
-
-        attempts = attemptData ?? [];
-      }
-
-      // =========================
-      // 6. Store score ceilings
-      // =========================
-      const scoreCeilings = new Map<string, number>();
-      // Lessons without an mcqs row are flashcards-only and are left out of progress.
-      const quizLessonIds = new Set(mcqs.map((mcq) => mcq.lesson_id));
-      const quizLessonCount = classroomLessons.filter((lesson) => quizLessonIds.has(lesson.lesson_id)).length;
-      setFlashcardOnlyCount(classroomLessons.length - quizLessonCount);
-
-      mcqs.forEach((mcq) => {
-        if (mcq.score_ceiling !== null) {
-          scoreCeilings.set(
-            mcq.lesson_id,
-            Number(mcq.score_ceiling)
-          );
-        }
+    if (!teacherId || !classroomId) return;
+    let isCurrent = true;
+    loadClassReports(teacherId, classroomId)
+      .then((reports) => {
+        if (isCurrent) setReport(reports[0] ?? null);
+      })
+      .catch((loadError) => {
+        console.error("Failed to load the class report:", loadError);
+        if (!isCurrent) return;
+        setError("This class report could not be loaded right now.");
+        setReport(null);
       });
-
-      // =========================
-      // 7. Use latest attempt
-      // =========================
-      const latestAttempts = new Map<string, Attempt>();
-
-      attempts.forEach((attempt) => {
-        const key = `${attempt.student_id}-${attempt.lesson_id}`;
-
-        const existing = latestAttempts.get(key);
-
-        if (
-          !existing ||
-          new Date(
-            attempt.completed_at ?? 0
-          ).getTime() >
-            new Date(
-              existing.completed_at ?? 0
-            ).getTime()
-        ) {
-          latestAttempts.set(key, attempt);
-        }
-      });
-
-      // =========================
-      // 8. Build student progress
-      // =========================
-      const progressData: StudentProgress[] =
-        studentProfiles.map((student) => {
-          const fullName =
-            `${student.name ?? ""} ${
-              student.surname ?? ""
-            }`.trim() || "Student";
-
-          const initials =
-            `${student.name?.[0] ?? ""}${
-              student.surname?.[0] ?? ""
-            }`.toUpperCase() || "S";
-
-          const lessonProgress: LessonProgress[] =
-            classroomLessons.map((lesson) => {
-              const key = `${student.id}-${lesson.lesson_id}`;
-
-              const attempt = latestAttempts.get(key);
-
-              const ceiling =
-                scoreCeilings.get(lesson.lesson_id);
-
-              let percentageScore: number | null = null;
-
-              if (
-                attempt &&
-                attempt.score !== null &&
-                ceiling !== undefined &&
-                ceiling > 0
-              ) {
-                percentageScore = Math.round(
-                  (Number(attempt.score) / ceiling) *
-                    100
-                );
-              }
-
-              return {
-                lessonId: lesson.lesson_id,
-                title: lesson.title,
-                completed: !!attempt,
-                score: percentageScore,
-                hasQuiz: quizLessonIds.has(lesson.lesson_id),
-              };
-            });
-
-          const completedLessons =
-            lessonProgress.filter(
-              (lesson) => lesson.hasQuiz && lesson.completed
-            ).length;
-
-          const progress =
-            quizLessonCount > 0
-              ? Math.round(
-                  (completedLessons /
-                    quizLessonCount) *
-                    100
-                )
-              : 0;
-
-          const scores = lessonProgress
-            .map((lesson) => lesson.score)
-            .filter(
-              (score): score is number =>
-                score !== null
-            );
-
-          const studentAverage =
-            scores.length > 0
-              ? Math.round(
-                  scores.reduce(
-                    (total, score) =>
-                      total + score,
-                    0
-                  ) / scores.length
-                )
-              : null;
-
-          return {
-            id: student.id,
-            name: fullName,
-            initials,
-            progress,
-            averageScore: studentAverage,
-            lessons: lessonProgress,
-          };
-        });
-
-      setStudents(progressData);
-
-      // =========================
-      // 9. Overall class progress
-      // =========================
-      setCompletedStudentCount(
-        progressData.filter(
-          (student) =>
-            quizLessonCount > 0 &&
-            student.progress === 100
-        ).length
-      );
-
-      // =========================
-      // 10. Average class score
-      // =========================
-      const allScores = progressData.flatMap(
-        (student) =>
-          student.lessons
-            .map((lesson) => lesson.score)
-            .filter(
-              (score): score is number =>
-                score !== null
-            )
-      );
-
-      setAverageScore(
-        allScores.length > 0
-          ? Math.round(
-              allScores.reduce(
-                (total, score) =>
-                  total + score,
-                0
-              ) / allScores.length
-            )
-          : null
-      );
-
-      // =========================
-      // 11. Completed lessons
-      // =========================
-      setQuizCount(
-        progressData.reduce(
-          (total, student) =>
-            total +
-            student.lessons.filter(
-              (lesson) => lesson.completed
-            ).length,
-          0
-        )
-      );
-
-      setIsLoading(false);
-    }
-
-    void loadReport();
-  }, [session, classroomId]);
-
-  return (
-    <div className="min-h-dvh bg-white text-slate-900">
-      {/* =========================
-          MOBILE VERSION
-      ========================== */}
-      <div className="min-h-dvh bg-slate-50 pb-16 lg:hidden">
-        <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/class-progress")
-              }
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-            >
-              <ArrowLeft size={18} />
-            </button>
-
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-violet-700">
-                Teacher Portal
-              </p>
-
-              <h1 className="mt-1 truncate text-xl font-bold">
-                {classroomName}
-              </h1>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Class report
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-4xl p-4 sm:p-6">
-          {isLoading ? (
-            <div className="rounded-xl border border-slate-100 bg-white p-8 text-center">
-              <p className="text-sm text-slate-500">
-                Loading report...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-100 bg-white p-8 text-center">
-              <p className="text-sm text-red-600">
-                {error}
-              </p>
-            </div>
-          ) : (
-            <>
-              <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <StatCard
-                  icon={<CheckCircle2 />}
-                  label="Class Progress"
-                  value={`${completedStudentCount} / ${students.length}`}
-                />
-
-                <StatCard
-                  icon={<BarChart3 />}
-                  label="Average Score"
-                  value={
-                    averageScore !== null
-                      ? `${averageScore}%`
-                      : "—"
-                  }
-                  progress={averageScore ?? 0}
-                />
-
-                <StatCard
-                  icon={<ClipboardCheck />}
-                  label="Completed Lessons"
-                  value={String(quizCount)}
-                />
-              </section>
-
-              <section className="mt-4 rounded-xl border border-slate-100 bg-white">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <h2 className="font-bold">
-                    Students
-                  </h2>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {students.length} students ·{" "}
-                    {lessonCount} lessons
-                    {flashcardOnlyCount > 0 && ` · ${flashcardOnlyCount} flashcards only`}
-                  </p>
-                </div>
-
-                {students.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-sm font-semibold text-slate-700">
-                      No students enrolled
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-400">
-                      Students will appear here once
-                      they join this classroom.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {students.map((student) => (
-                      <article
-                        key={student.id}
-                        className="p-4"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
-                            {student.initials}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">
-                              {student.name}
-                            </p>
-
-                            <p className="mt-0.5 text-[11px] text-slate-400">
-                              {
-                                student.lessons.filter(
-                                  (lesson) =>
-                                    lesson.hasQuiz && lesson.completed
-                                ).length
-                              }{" "}
-                              /{" "}
-                              {student.lessons.filter((lesson) => lesson.hasQuiz).length}{" "}
-                              completed
-                            </p>
-                          </div>
-
-                          <div className="text-right">
-                            <p className="text-[10px] text-slate-400">
-                              Average
-                            </p>
-
-                            <p className="text-sm font-bold">
-                              {student.averageScore !==
-                              null
-                                ? `${student.averageScore}%`
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-[10px] text-slate-500">
-                            <span>Progress</span>
-
-                            <span className="font-semibold text-slate-700">
-                              {student.progress}%
-                            </span>
-                          </div>
-
-                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-violet-700"
-                              style={{
-                                width: `${student.progress}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-3 overflow-hidden rounded-lg border border-slate-100">
-                          {student.lessons.length ===
-                          0 ? (
-                            <div className="px-3 py-3 text-xs text-slate-400">
-                              No lessons have been
-                              added to this classroom.
-                            </div>
-                          ) : (
-                            student.lessons.map(
-                              (lesson) => (
-                                <div
-                                  key={
-                                    lesson.lessonId
-                                  }
-                                  className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5 last:border-b-0"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="truncate text-xs font-semibold text-slate-700">
-                                      {lesson.title}
-                                    </p>
-
-                                    <p className="mt-0.5 text-[10px] text-slate-400">
-                                      {!lesson.hasQuiz
-                                        ? "Flashcards only · no score"
-                                        : lesson.completed
-                                        ? "Completed"
-                                        : "Not started"}
-                                    </p>
-                                  </div>
-
-                                  <span
-                                    className={`ml-3 shrink-0 text-xs font-bold ${
-                                      lesson.score !==
-                                      null
-                                        ? "text-violet-700"
-                                        : "text-slate-400"
-                                    }`}
-                                  >
-                                    {lesson.score !==
-                                    null
-                                      ? `${lesson.score}%`
-                                      : lesson.hasQuiz ? "—" : "No quiz"}
-                                  </span>
-                                </div>
-                              )
-                            )
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-        </main>
-
-        {/* Mobile Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem
-            icon={<Home size={19} />}
-            label="Home"
-            to="/teacher-dashboard"
-          />
-
-          <NavItem
-            icon={<Users size={19} />}
-            label="Classes"
-            to="/TeacherClassroom"
-          />
-
-          <NavItem
-            icon={<Sparkles size={19} />}
-            label="Explore"
-            to="/learning-hub"
-          />
-
-          <NavItem
-            icon={<BarChart3 size={19} />}
-            label="Reports"
-            to="/class-progress"
-            active
-          />
-
-          <NavItem
-            icon={<Settings size={19} />}
-            label="Profile"
-            to="/teacher-profile"
-          />
-        </nav>
-      </div>
-
-      {/* =========================
-          DESKTOP VERSION
-      ========================== */}
-      <div className="hidden min-h-dvh lg:flex">
-        {/* Sidebar */}
-        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
-          <div className="mb-10 px-2">
-            <h1 className="text-2xl font-bold tracking-tight">
-              LEO
-            </h1>
-
-            <p className="text-xs text-violet-200">
-              Teacher Portal
-            </p>
-          </div>
-
-          <nav className="space-y-2">
-            <SidebarItem
-              icon={<Home size={18} />}
-              label="Dashboard"
-              to="/teacher-dashboard"
-            />
-
-            <SidebarItem
-              icon={<Users size={18} />}
-              label="Classes"
-              to="/TeacherClassroom"
-            />
-
-            <SidebarItem
-              icon={<Sparkles size={18} />}
-              label="Explore"
-              to="/learning-hub"
-            />
-
-            <SidebarItem
-              icon={<BarChart3 size={18} />}
-              label="Reports"
-              to="/class-progress"
-              active
-            />
-          </nav>
-
-          <div className="mt-auto space-y-2">
-            <SidebarItem
-              icon={<Settings size={18} />}
-              label="Settings"
-              to="/teacher-profile"
-            />
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          {/* Header */}
-          <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-violet-700">
-                Teacher Portal
-              </p>
-
-              <h1 className="mt-1 text-xl font-bold">
-                {classroomName}
-              </h1>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Class report
-              </p>
-            </div>
-          </header>
-
-          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
-            {isLoading ? (
-              <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">
-                <p className="text-sm text-slate-500">
-                  Loading report...
-                </p>
-              </div>
-            ) : error ? (
-              <div className="rounded-xl border border-red-100 bg-white p-10 text-center">
-                <p className="text-sm text-red-600">
-                  {error}
-                </p>
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/class-progress")
-                  }
-                  className="mb-4 flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-violet-700"
-                >
-                  <ArrowLeft size={16} />
-                  Classrooms
-                </button>
-
-                {/* Stats */}
-                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <StatCard
-                    icon={<CheckCircle2 />}
-                    label="Class Progress"
-                    value={`${completedStudentCount} / ${students.length}`}
-                  />
-
-                  <StatCard
-                    icon={<BarChart3 />}
-                    label="Average Score"
-                    value={
-                      averageScore !== null
-                        ? `${averageScore}%`
-                        : "—"
-                    }
-                    progress={averageScore ?? 0}
-                  />
-
-                  <StatCard
-                    icon={<ClipboardCheck />}
-                    label="Completed Lessons"
-                    value={String(quizCount)}
-                  />
-                </section>
-
-                {/* Students */}
-                <section className="mt-4 rounded-xl border border-slate-100 bg-white">
-                  <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-                    <h2 className="font-bold">
-                      Students
-                    </h2>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      {students.length} students ·{" "}
-                      {lessonCount} lessons
-                      {flashcardOnlyCount > 0 && ` · ${flashcardOnlyCount} flashcards only`}
-                    </p>
-                  </div>
-
-                  {students.length === 0 ? (
-                    <div className="p-10 text-center">
-                      <p className="text-sm font-semibold text-slate-700">
-                        No students enrolled
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-400">
-                        Students will appear here once
-                        they join this classroom.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {students.map((student) => (
-                        <article
-                          key={student.id}
-                          className="p-4 sm:p-5"
-                        >
-                          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-                            {/* Student */}
-                            <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
-                                {student.initials}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-slate-800">
-                                  {student.name}
-                                </p>
-
-                                <p className="mt-0.5 text-[11px] text-slate-400">
-                                  {
-                                    student.lessons.filter(
-                                      (lesson) =>
-                                        lesson.hasQuiz && lesson.completed
-                                    ).length
-                                  }{" "}
-                                  /{" "}
-                                  {
-                                    student.lessons.filter((lesson) => lesson.hasQuiz).length
-                                  }{" "}
-                                  completed
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Progress */}
-                            <div className="w-full xl:w-48">
-                              <div className="flex items-center justify-between text-[10px] text-slate-500">
-                                <span>Progress</span>
-
-                                <span className="font-semibold text-slate-700">
-                                  {student.progress}%
-                                </span>
-                              </div>
-
-                              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                  className="h-full rounded-full bg-violet-700"
-                                  style={{
-                                    width: `${student.progress}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Average */}
-                            <div className="xl:w-20 xl:text-right">
-                              <p className="text-[10px] text-slate-400">
-                                Average
-                              </p>
-
-                              <p className="text-sm font-bold text-slate-800">
-                                {student.averageScore !==
-                                null
-                                  ? `${student.averageScore}%`
-                                  : "—"}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Lesson scores */}
-                          <div className="mt-4 overflow-hidden rounded-lg border border-slate-100">
-                            {student.lessons.length ===
-                            0 ? (
-                              <div className="px-3 py-3 text-xs text-slate-400">
-                                No lessons have been
-                                added to this classroom.
-                              </div>
-                            ) : (
-                              student.lessons.map(
-                                (lesson) => (
-                                  <div
-                                    key={
-                                      lesson.lessonId
-                                    }
-                                    className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5 last:border-b-0"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-xs font-semibold text-slate-700">
-                                        {lesson.title}
-                                      </p>
-
-                                      <p className="mt-0.5 text-[10px] text-slate-400">
-                                        {!lesson.hasQuiz
-                                          ? "Flashcards only · no score"
-                                          : lesson.completed
-                                          ? "Completed"
-                                          : "Not started"}
-                                      </p>
-                                    </div>
-
-                                    <span
-                                      className={`ml-4 shrink-0 text-xs font-bold ${
-                                        lesson.score !==
-                                        null
-                                          ? "text-violet-700"
-                                          : "text-slate-400"
-                                      }`}
-                                    >
-                                      {lesson.score !==
-                                      null
-                                        ? `${lesson.score}%`
-                                        : lesson.hasQuiz ? "—" : "No quiz"}
-                                    </span>
-                                  </div>
-                                )
-                              )
-                            )}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </>
-            )}
-          </div>
-        </main>
+    return () => { isCurrent = false; };
+  }, [teacherId, classroomId]);
+
+  const coverUrls = useMemo(() => (report === undefined ? null : report ? [report.coverUrl] : []), [report]);
+  const imagesReady = usePreloadImages(coverUrls);
+
+  if (report === undefined || !imagesReady) return <LoadingScreen label="Loading class report" />;
+
+  const header = (
+    <div className="mx-auto flex max-w-7xl items-center gap-3">
+      <Link to="/class-progress" aria-label="Back to class reports" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100">
+        <ArrowLeft size={18} />
+      </Link>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-violet-700">Class report</p>
+        <h1 className="mt-1 truncate text-xl font-bold">{report?.name ?? "Classroom"}</h1>
       </div>
     </div>
+  );
+
+  if (!report) {
+    return (
+      <TeacherShell active="reports" header={header}>
+        <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error || "This classroom could not be found."}</p>
+        </div>
+      </TeacherShell>
+    );
+  }
+
+  const enrolled = report.students.length;
+  const quizLessons = report.lessons.filter((lesson) => lesson.hasQuiz);
+  const attentionStudents = sortStudents(report.students.filter((student) => student.flags.length > 0), "attention");
+  const sortedLessons = sortLessons(report.lessons, lessonSort);
+  const sortedStudents = sortStudents(report.students, studentSort);
+  const hasScores = report.averagePercent !== null;
+  const totalCompletions = report.students.reduce((total, student) => total + student.completedCount, 0);
+
+  const activityLevel = (dayKey: string) => {
+    const active = report.activeStudentsByDay.get(dayKey) ?? 0;
+    if (!active || !enrolled) return 0;
+    const share = active / enrolled;
+    return share <= 1 / 3 ? 1 : share <= 2 / 3 ? 2 : 3;
+  };
+  const activeDaysInWindow = activityWeeks.flat().filter((day) => report.activeStudentsByDay.has(day.key)).length;
+
+  return (
+    <TeacherShell active="reports" header={header}>
+      <div className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.1fr)_repeat(4,minmax(0,1fr))]">
+          <div className="relative min-h-28 overflow-hidden rounded-xl sm:col-span-2 xl:col-span-1">
+            <img src={report.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-slate-900/50" />
+            <div className="relative flex h-full flex-col justify-end p-4 text-white">
+              <p className="text-lg font-bold leading-tight">{enrolled} student{enrolled === 1 ? "" : "s"}</p>
+              <p className="mt-0.5 text-xs text-white/80">{report.lessons.length} released lesson{report.lessons.length === 1 ? "" : "s"} · {quizLessons.length} with quizzes</p>
+            </div>
+          </div>
+          <KpiCard
+            label="Class average"
+            value={formatPercent(report.averagePercent)}
+            detail={report.masteryRate === null ? "No quiz scores yet" : `${report.masteryRate}% of results at mastery (${MASTERY_PERCENT}%+)`}
+          />
+          <KpiCard
+            label="Lesson completion"
+            value={formatPercent(report.completionRate)}
+            progress={report.completionRate ?? 0}
+            detail={`${totalCompletions} of ${enrolled * report.lessons.length} student-lessons done`}
+          />
+          <KpiCard label="Active in last 7 days" value={`${report.activeThisWeek} / ${enrolled}`} progress={enrolled ? (report.activeThisWeek / enrolled) * 100 : 0} detail="Studied on Leo at least once" />
+          <KpiCard label="Need attention" value={String(report.needsAttention)} detail={report.needsAttention ? "See the list below" : "No students flagged"} />
+        </section>
+
+        <section className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <article className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
+            <h2 className="text-sm font-bold">Students to check in with</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Flagged for an average below {SUPPORT_PERCENT}%, no activity for {INACTIVE_DAYS}+ days, or fewer than half of the released lessons done.
+            </p>
+            {enrolled === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No students have joined this classroom yet.</p>
+            ) : attentionStudents.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">Everyone is active and on track.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-slate-100">
+                {attentionStudents.map((student) => (
+                  <li key={student.id} className="flex items-start gap-3 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">{student.initials}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{student.name}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {flagText(student).map((text) => (
+                          <span key={text} className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{text}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold">{formatPercent(student.averagePercent)}</p>
+                      <p className="text-[11px] text-slate-400">{student.completedCount}/{report.lessons.length} done</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-bold">Class activity</h2>
+                <p className="mt-1 text-xs text-slate-500">Share of students who studied each day, last {ACTIVITY_WEEKS} weeks</p>
+              </div>
+              <p className="text-right">
+                <span className="block text-lg font-bold leading-none">{activeDaysInWindow}</span>
+                <span className="text-[11px] text-slate-400">active day{activeDaysInWindow === 1 ? "" : "s"}</span>
+              </p>
+            </div>
+            <div className="mt-5">
+              <ActivityCalendar
+                weeks={activityWeeks}
+                getLevel={activityLevel}
+                getTitle={(day) => `${day.date.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" })} · ${report.activeStudentsByDay.get(day.key) ?? 0} of ${enrolled} students`}
+                label={`Class activity over the last ${ACTIVITY_WEEKS} weeks`}
+                legend={[
+                  { level: 0, label: "None" },
+                  { level: 1, label: "Up to a third" },
+                  { level: 2, label: "Up to two thirds" },
+                  { level: 3, label: "Most of the class" },
+                ]}
+              />
+            </div>
+            <p className="mt-3 text-[11px] text-slate-400">Activity counts study anywhere on Leo, not only in this classroom.</p>
+          </article>
+        </section>
+
+        <section className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold">Lessons</h2>
+              <p className="mt-1 text-xs text-slate-500">Where the class is secure and which lessons to revisit. Scores use each student's best attempt.</p>
+            </div>
+            <SegmentedControl
+              label="Sort lessons"
+              value={lessonSort}
+              onChange={setLessonSort}
+              options={[
+                { value: "order", label: "Course order" },
+                { value: "hardest", label: "Hardest", disabled: !hasScores },
+                { value: "easiest", label: "Easiest", disabled: !hasScores },
+                { value: "completion", label: "Least completed" },
+              ]}
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+            {(["mastered", "developing", "support", "notAttempted"] as const).map((band) => (
+              <span key={band} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-sm ${BAND_STYLES[band].bar}`} /> {BAND_STYLES[band].label}</span>
+            ))}
+          </div>
+
+          {report.lessons.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">No lessons have been released in this classroom yet.</p>
+          ) : (
+            <div className="mt-2 divide-y divide-slate-100">
+              {sortedLessons.map((lesson) => (
+                <Link
+                  key={lesson.lessonId}
+                  to={`/teacher-classroom/${report.classroomId}/lesson/${lesson.lessonId}`}
+                  className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-3 transition hover:bg-slate-50 sm:px-2 md:grid-cols-[3.5rem_minmax(0,1.2fr)_minmax(0,1fr)_auto]"
+                >
+                  <img src={lesson.imageUrl} alt="" className="h-11 w-14 rounded-lg object-cover" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{lesson.title}</span>
+                    <span className="mt-1 block truncate text-xs text-slate-500">
+                      {lesson.completedCount}/{enrolled} completed
+                      {lesson.medianMinutes !== null && ` · ~${lesson.medianMinutes} min`}
+                      {lesson.retakes > 0 && ` · ${lesson.retakes} retake${lesson.retakes === 1 ? "" : "s"}`}
+                    </span>
+                  </span>
+                  <span className="col-span-3 row-start-2 md:col-span-1 md:row-start-auto">
+                    {lesson.hasQuiz ? <MasteryBar lesson={lesson} total={enrolled} /> : <span className="text-xs text-slate-400">Flashcards only · no quiz</span>}
+                  </span>
+                  <span className="col-start-3 row-start-1 w-20 text-right md:col-start-auto md:row-start-auto">
+                    <span className="block text-sm font-bold">{lesson.hasQuiz ? formatPercent(lesson.averagePercent) : <ChevronRight size={16} className="ml-auto text-slate-300" />}</span>
+                    {lesson.hasQuiz && lesson.firstAttemptAverage !== null && lesson.firstAttemptAverage !== lesson.averagePercent && (
+                      <span className="block text-[11px] text-slate-400">first try {lesson.firstAttemptAverage}%</span>
+                    )}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold">Gradebook</h2>
+              <p className="mt-1 text-xs text-slate-500">Each student's best score per lesson. Scroll sideways for more lessons.</p>
+            </div>
+            <SegmentedControl
+              label="Sort students"
+              value={studentSort}
+              onChange={setStudentSort}
+              options={[
+                { value: "attention", label: "Needs attention" },
+                { value: "lowest", label: "Lowest avg", disabled: !hasScores },
+                { value: "highest", label: "Highest avg", disabled: !hasScores },
+                { value: "inactive", label: "Least active" },
+                { value: "name", label: "Name" },
+              ]}
+            />
+          </div>
+
+          {enrolled === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">Students will appear here once they join this classroom.</p>
+          ) : (
+            <div className="mt-4 overflow-x-auto rounded-lg border border-slate-100">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead className="bg-slate-50 text-[11px] text-slate-500">
+                  <tr>
+                    <th scope="col" className="sticky left-0 z-[1] min-w-44 bg-slate-50 px-3 py-2 font-semibold">Student</th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">Avg</th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">Done</th>
+                    <th scope="col" className="whitespace-nowrap px-3 py-2 font-semibold">Last active</th>
+                    {report.lessons.map((lesson) => (
+                      <th key={lesson.lessonId} scope="col" title={lesson.title} className="max-w-24 px-2 py-2 font-semibold">
+                        <span className="block w-20 truncate">{lesson.title}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sortedStudents.map((student) => (
+                    <tr key={student.id}>
+                      <th scope="row" className="sticky left-0 z-[1] min-w-44 bg-white px-3 py-2 font-normal">
+                        <span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span>
+                        {student.flags.length > 0 && <span className="block truncate text-[11px] text-slate-500">{flagText(student).join(" · ")}</span>}
+                      </th>
+                      <td className="px-3 py-2 text-right text-sm font-bold">{formatPercent(student.averagePercent)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right text-slate-600">{student.completedCount}/{report.lessons.length}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">{lastActiveText(student)}</td>
+                      {report.lessons.map((lesson) => {
+                        const result = student.results.get(lesson.lessonId);
+                        const band = result?.bestPercent != null ? scoreBand(result.bestPercent) : null;
+                        return (
+                          <td key={lesson.lessonId} className="px-2 py-2">
+                            {band && result ? (
+                              <span
+                                title={result.attempts > 1 ? `${result.attempts} attempts · first try ${result.firstPercent ?? "—"}%` : "1 attempt"}
+                                className={`flex h-7 w-14 items-center justify-center rounded-md text-[11px] font-semibold ${BAND_STYLES[band].cell}`}
+                              >
+                                {result.bestPercent}%
+                              </span>
+                            ) : result ? (
+                              <span title="Completed, no quiz" className="flex h-7 w-14 items-center justify-center rounded-md bg-slate-50 text-slate-500"><Check size={14} /></span>
+                            ) : (
+                              <span title="Not attempted" className="flex h-7 w-14 items-center justify-center text-slate-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    </TeacherShell>
   );
 }

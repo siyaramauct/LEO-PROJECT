@@ -14,6 +14,7 @@ import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import UserIdentity from "../Components/UserIdentity";
+import { bucketImageUrl } from "../utils/images";
   
 
   export default function CreateClassroom() {
@@ -30,7 +31,7 @@ import UserIdentity from "../Components/UserIdentity";
             <div className="absolute -right-7 -top-8 h-28 w-28 rounded-full bg-white/10" />
             <div className="absolute bottom-0 left-8 h-10 w-24 rounded-t-full bg-white/10" />
             <div className="relative pr-20"><p className="text-xs font-medium text-white">Teacher Portal</p><h1 className="mt-2 text-xl font-bold">Create a classroom</h1><p className="mt-1 text-xs text-white">Set up a focused space for your learners.</p></div>
-            <div className="absolute inset-y-0 right-0 w-20 overflow-hidden bg-white"><img src="/classRoomIllustration.png" alt="Classroom illustration" className="block h-full w-full object-cover" /></div>
+            <div className="absolute inset-y-0 right-0 w-20 overflow-hidden bg-white"><img src={bucketImageUrl("classroomImgs/classRoomIllustration.png")} alt="Classroom illustration" className="block h-full w-full object-cover" /></div>
           </section>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-4"><ClassroomForm idPrefix="mobile" /></section>

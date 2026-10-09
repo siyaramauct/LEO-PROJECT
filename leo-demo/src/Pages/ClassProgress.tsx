@@ -13,6 +13,7 @@ import { supabase } from "../supabase-client";
 import { useAuth } from "../../context/AuthContext";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Classroom = {
   classroom_id: string;
@@ -110,7 +111,7 @@ export default function ClassProgress() {
                   ? supabase.storage
                       .from("images")
                       .getPublicUrl(classroom.cover_image_path).data.publicUrl
-                  : "/classRoomIllustration.png";
+                  : BROKEN_IMAGE_URL;
 
                 return (
                   <button
@@ -306,7 +307,7 @@ export default function ClassProgress() {
                           .getPublicUrl(
                             classroom.cover_image_path
                           ).data.publicUrl
-                      : "/classRoomIllustration.png";
+                      : BROKEN_IMAGE_URL;
 
                     return (
                       <button

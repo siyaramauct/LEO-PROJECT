@@ -30,6 +30,8 @@ export default function LessonSummary() {
         .from("lesson_attempts")
         .select("score, lesson_id")
         .eq("student_id", session.user.id)
+        // Flashcards-only completions have no score to summarise.
+        .not("score", "is", null)
         .order("completed_at", { ascending: false })
         .limit(1)
         .maybeSingle();

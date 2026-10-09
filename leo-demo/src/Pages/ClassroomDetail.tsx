@@ -34,6 +34,7 @@ import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
 import UserIdentity from "../Components/UserIdentity";
 import { validateMaterialFile } from "../utils/materialFileTypes";
 import { supabase } from "../supabase-client";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type ClassroomRow = {
   classroom_id: string;
@@ -97,7 +98,7 @@ const toLessonDisplay = (row: LessonRow, hasQuiz: boolean): ClassroomLesson => (
   title: row.title,
   image: row.lesson_image_path
     ? supabase.storage.from("images").getPublicUrl(row.lesson_image_path).data.publicUrl
-    : "/classRoomIllustration.png",
+    : BROKEN_IMAGE_URL,
   imageAlt: row.title,
   status: row.status ?? "Draft",
   words: row.word_count ?? 0,
@@ -392,7 +393,7 @@ export default function ClassroomDetail() {
 
   const coverUrl = classroom?.cover_image_path
     ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
-    : "/classRoomIllustration.png";
+    : BROKEN_IMAGE_URL;
 
   const classroomName = classroom?.classroom_name ?? "Classroom";
   const description = classroom?.description ?? "";

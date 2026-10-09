@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../supabase-client";
+import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Lesson = {
   lesson_id: string;
@@ -75,6 +76,7 @@ export default function StudentPractice() {
             "lesson_id, classroom_id, title, description, lesson_image_path"
           )
           .in("classroom_id", classroomIds)
+          .lte("release_date", new Date().toISOString())
           .order("title");
 
         if (lessonError) {
@@ -203,7 +205,7 @@ export default function StudentPractice() {
                           .from("images")
                           .getPublicUrl(lesson.lesson_image_path)
                           .data.publicUrl
-                      : "/Level1.png";
+                      : BROKEN_IMAGE_URL;
 
                     return (
                       <article

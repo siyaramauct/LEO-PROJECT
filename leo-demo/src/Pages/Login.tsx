@@ -3,6 +3,7 @@ import GoogleSignInButton from "../Components/GoogleSignInButton";
 import { oauthErrorFromUrl } from "../utils/oauthError";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { projectImageUrl } from "../utils/images";
 
 export default function Login() {
   const { session, loading } = useAuth();
@@ -14,7 +15,7 @@ export default function Login() {
       {/* Mobile-only header image */}
       <div className="lg:hidden w-full h-56 flex-shrink-0 overflow-hidden">
         <img
-          src="/language-header-signup.jpg"
+          src={projectImageUrl("language-header-signup.jpg")}
           alt="Language learning"
           className="w-full h-full object-cover brightness-[1.04] contrast-[1.06]"
         />
@@ -43,7 +44,7 @@ export default function Login() {
         <div className="hidden lg:flex flex-1 w-full items-center justify-center">
           <div className="w-[88%] h-[70%] rounded-3xl overflow-hidden shadow-2xl shadow-violet-900/40">
             <img
-              src="/stockPhotoHandCards.png"
+              src={projectImageUrl("stockPhotoHandCards.png")}
               alt="Language learning illustration"
               className="w-full h-full object-cover"
             />
