@@ -16,10 +16,13 @@ import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "../Components/LoadingScreen";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
+import ScheduledLessonCard, { type ScheduledLesson, type ScheduledLessonEdits } from "../Components/ScheduledLessonCard";
 import SidebarItem from "../Components/SidebarItem";
+import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
+import { formatDateKey, releaseDateToIso, toDateKey } from "../utils/releaseDate";
 
 type ActiveClassroom = {
   id: string;
@@ -58,6 +61,13 @@ export default function TeacherDashboard() {
   const [lessonsError, setLessonsError] = useState<string | null>(null);
   const [isLessonsLoading, setIsLessonsLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  // Calendar day picked on the dashboard; today means "create now", a later day schedules the lesson.
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
+  // Lessons whose release date is still ahead; null while loading.
+  const [scheduledLessons, setScheduledLessons] = useState<ScheduledLesson[] | null>(null);
+  const [scheduledLessonsError, setScheduledLessonsError] = useState<string | null>(null);
+  const [scheduledLessonToDelete, setScheduledLessonToDelete] = useState<ScheduledLesson | null>(null);
+  const [isDeletingScheduledLesson, setIsDeletingScheduledLesson] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -249,6 +259,92 @@ export default function TeacherDashboard() {
     void loadLessons().finally(() => setIsLessonsLoading(false));
   }, [session?.user]);
 
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const loadScheduledLessons = async () => {
+      // The inner join keeps only lessons in this teacher's classrooms.
+      const { data, error } = await supabase
+        .from("lessons")
+        .select("lesson_id, classroom_id, title, description, release_date, classrooms!inner(classroom_name, teacher_id)")
+        .eq("classrooms.teacher_id", session.user.id)
+        .gt("release_date", new Date().toISOString())
+        .order("release_date", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load scheduled lessons:", error);
+        setScheduledLessonsError("Scheduled lessons could not be loaded right now.");
+        setScheduledLessons([]);
+        return;
+      }
+
+      setScheduledLessons(
+        data.map((lesson) => {
+          const classroom = Array.isArray(lesson.classrooms) ? lesson.classrooms[0] : lesson.classrooms;
+          return {
+            lessonId: lesson.lesson_id,
+            classroomId: lesson.classroom_id,
+            classroomName: classroom?.classroom_name ?? "Unknown classroom",
+            title: lesson.title,
+            description: lesson.description ?? "",
+            // Grouped by the teacher's local calendar day, matching how it was picked.
+            releaseDateKey: toDateKey(new Date(lesson.release_date)),
+          };
+        })
+      );
+    };
+
+    void loadScheduledLessons();
+  }, [session?.user]);
+
+  async function saveScheduledLesson(lesson: ScheduledLesson, edits: ScheduledLessonEdits): Promise<string | null> {
+    const { error } = await supabase
+      .from("lessons")
+      .update({ title: edits.title, description: edits.description, release_date: releaseDateToIso(edits.releaseDateKey) })
+      .eq("lesson_id", lesson.lessonId);
+
+    if (error) {
+      console.error("Failed to update the scheduled lesson:", error);
+      return "The lesson could not be updated. Please try again.";
+    }
+
+    setScheduledLessons((current) =>
+      (current ?? [])
+        .map((item) => (item.lessonId === lesson.lessonId ? { ...item, ...edits } : item))
+        .sort((a, b) => a.releaseDateKey.localeCompare(b.releaseDateKey))
+    );
+    setLessons((current) =>
+      current?.map((item) => (item.lesson_id === lesson.lessonId ? { ...item, title: edits.title, description: edits.description } : item)) ?? null
+    );
+    // Follow a rescheduled lesson to its new day so the change is visible.
+    setSelectedDateKey(edits.releaseDateKey);
+    return null;
+  }
+
+  async function deleteScheduledLesson() {
+    if (!scheduledLessonToDelete) return;
+    const { lessonId, classroomId } = scheduledLessonToDelete;
+
+    setIsDeletingScheduledLesson(true);
+    setScheduledLessonsError(null);
+    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonId);
+    setIsDeletingScheduledLesson(false);
+
+    if (error) {
+      console.error("Failed to delete the scheduled lesson:", error);
+      setScheduledLessonsError("The lesson could not be deleted. Please try again.");
+      setScheduledLessonToDelete(null);
+      return;
+    }
+
+    setScheduledLessons((current) => (current ?? []).filter((item) => item.lessonId !== lessonId));
+    setLessons((current) => current?.filter((item) => item.lesson_id !== lessonId) ?? null);
+    setClassrooms((current) =>
+      current?.map((item) => (item.id === classroomId ? { ...item, lessonCount: Math.max(0, item.lessonCount - 1) } : item)) ?? null
+    );
+    setScheduledLessonToDelete(null);
+  }
+
   const imageUrls = useMemo(
     () =>
       classrooms === null || isLessonsLoading
@@ -258,17 +354,35 @@ export default function TeacherDashboard() {
   );
   const imagesReady = usePreloadImages(imageUrls);
 
+  // Two-week planner: this week and next, each running Monday to Sunday.
   const today = new Date();
+  const todayKey = toDateKey(today);
   const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const mondayOffset = (today.getDay() + 6) % 7; // Sunday is 0, so shift the week to start on Monday
-  const weekDays = weekdayLabels.map((label, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - mondayOffset + index);
-    return { label, day: date.getDate(), isToday: date.toDateString() === today.toDateString() };
+  const plannerWeeks = ["This week", "Next week"].map((label, weekIndex) => ({
+    label,
+    days: weekdayLabels.map((_, dayIndex) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - mondayOffset + weekIndex * 7 + dayIndex);
+      const dateKey = toDateKey(date);
+      return { dateKey, day: date.getDate(), isToday: dateKey === todayKey, isPast: dateKey < todayKey };
+    }),
+  }));
+  // Two weeks can cross into the next month, e.g. "October – November 2026".
+  const plannerLastDay = new Date(`${plannerWeeks[1].days[6].dateKey}T00:00:00`);
+  const monthLabel = plannerLastDay.getMonth() === today.getMonth()
+    ? today.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : `${today.toLocaleDateString("en-US", { month: "long" })} – ${plannerLastDay.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+  // The selection is stored as a key, so it can go stale if the dashboard stays open past midnight.
+  const isScheduling = selectedDateKey > todayKey;
+  const activeDateKey = selectedDateKey < todayKey ? todayKey : selectedDateKey;
+  const scheduledCountByDay: Record<string, number> = {};
+  (scheduledLessons ?? []).forEach((lesson) => {
+    scheduledCountByDay[lesson.releaseDateKey] = (scheduledCountByDay[lesson.releaseDateKey] ?? 0) + 1;
   });
-  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const selectedDayLessons = (scheduledLessons ?? []).filter((lesson) => lesson.releaseDateKey === activeDateKey);
 
-  if (classrooms === null || isLessonsLoading || !imagesReady) {
+  if (classrooms === null || isLessonsLoading || scheduledLessons === null || !imagesReady) {
     return <LoadingScreen label="Loading your dashboard" />;
   }
 
@@ -552,7 +666,8 @@ export default function TeacherDashboard() {
             {/* Main Grid */}
             <div className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,26rem)] xl:items-stretch">
               {/* Classes */}
-              <section className="rounded-xl border border-slate-100 bg-white p-3">
+              {/* self-start: keep its own height when the planner grows with scheduled lessons. */}
+              <section className="self-start rounded-xl border border-slate-100 bg-white p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-bold">My Classes</h3>
@@ -615,37 +730,97 @@ export default function TeacherDashboard() {
               <section className="flex min-h-[17rem] flex-col rounded-xl border border-slate-100 bg-white p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold text-violet-700">This week</p>
+                    <p className="text-xs font-semibold text-violet-700">Lesson planner</p>
                     <h3 className="mt-1 text-lg font-bold">{monthLabel}</h3>
                   </div>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg  text-violet-700">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-violet-700">
                     <Calendar size={20} />
                   </span>
                 </div>
 
-                <div className="mt-5 grid grid-cols-7 gap-2">
-                  {weekDays.map((weekDay) => (
-                    <div
-                      key={weekDay.label}
-                      className={`flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 ${
-                        weekDay.isToday ? "bg-violet-700 text-white" : "border border-slate-100 bg-white text-slate-700"
-                      }`}
-                    >
-                      <span className={`text-[10px] font-semibold uppercase tracking-wide ${weekDay.isToday ? "text-violet-100" : "text-slate-400"}`}>
-                        {weekDay.label}
-                      </span>
-                      <span className="text-sm font-bold">{weekDay.day}</span>
+                <div className="mt-4 space-y-3">
+                  {plannerWeeks.map((week) => (
+                    <div key={week.label}>
+                      <p className="mb-1.5 text-[11px] font-medium text-slate-400">{week.label}</p>
+                      <div className="grid grid-cols-7 gap-2">
+                        {week.days.map((day, dayIndex) => {
+                          const isSelected = day.dateKey === activeDateKey;
+                          const scheduledCount = scheduledCountByDay[day.dateKey] ?? 0;
+                          const dayLabel = day.isToday ? `Create a lesson today, ${formatDateKey(day.dateKey)}` : formatDateKey(day.dateKey);
+                          return (
+                            <button
+                              key={day.dateKey}
+                              type="button"
+                              disabled={day.isPast}
+                              aria-pressed={day.isPast ? undefined : isSelected}
+                              aria-label={scheduledCount > 0 ? `${dayLabel}, ${scheduledCount} lesson${scheduledCount === 1 ? "" : "s"} scheduled` : dayLabel}
+                              onClick={() => setSelectedDateKey(day.dateKey)}
+                              className={`relative flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 pb-2.5 transition ${
+                                isSelected
+                                  ? "bg-violet-700 text-white"
+                                  : day.isPast
+                                    ? "cursor-not-allowed border border-slate-100 bg-white text-slate-300"
+                                    : day.isToday
+                                      ? "border border-slate-100 bg-white text-violet-700 hover:border-slate-200"
+                                      : "border border-slate-100 bg-white text-slate-700 hover:border-slate-200"
+                              }`}
+                            >
+                              <span className={`text-[10px] font-semibold uppercase tracking-wide ${isSelected ? "text-violet-100" : day.isPast ? "text-slate-300" : "text-slate-400"}`}>
+                                {weekdayLabels[dayIndex]}
+                              </span>
+                              <span className="text-sm font-bold">{day.day}</span>
+                              {scheduledCount > 0 && (
+                                <span
+                                  aria-hidden="true"
+                                  className={`absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${isSelected ? "bg-white" : "bg-violet-700"}`}
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                <Link
-                  to="/create-lesson"
-                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
-                >
-                  Create lesson
-                  <ChevronRight size={17} />
-                </Link>
+                {scheduledLessonsError && (
+                  <p role="alert" className="mt-3 text-xs text-red-700">{scheduledLessonsError}</p>
+                )}
+
+                {selectedDayLessons.length > 0 && (
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-700">
+                      Scheduled for {formatDateKey(activeDateKey)}
+                    </p>
+                    <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                      {selectedDayLessons.map((lesson) => (
+                        <ScheduledLessonCard
+                          key={lesson.lessonId}
+                          lesson={lesson}
+                          onSave={saveScheduledLesson}
+                          onDelete={setScheduledLessonToDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Today needs no explanation; only a later day gets a note about its release. */}
+                {isScheduling && (
+                  <p className="mt-4 text-xs text-slate-500">
+                    New lessons will release on {formatDateKey(activeDateKey)}.
+                  </p>
+                )}
+
+                <div className="mt-auto pt-5">
+                  <Link
+                    to={isScheduling ? `/create-lesson?releaseDate=${activeDateKey}` : "/create-lesson"}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
+                  >
+                    {isScheduling ? "Schedule lesson" : "Create lesson"}
+                    <ChevronRight size={17} />
+                  </Link>
+                </div>
               </section>
             </div>
 
@@ -698,6 +873,17 @@ export default function TeacherDashboard() {
           </div>
         </main>
       </div>
+
+      <DeleteAccountDialog
+        open={Boolean(scheduledLessonToDelete)}
+        isDeleting={isDeletingScheduledLesson}
+        onCancel={() => setScheduledLessonToDelete(null)}
+        onConfirm={() => void deleteScheduledLesson()}
+        title={`Delete ${scheduledLessonToDelete?.title ?? "this lesson"}?`}
+        description="This will permanently remove this scheduled lesson from the classroom. This action cannot be undone."
+        confirmLabel="Delete lesson"
+        deletingLabel="Deleting lesson..."
+      />
     </div>
   );
 }
