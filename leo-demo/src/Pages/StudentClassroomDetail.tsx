@@ -1,3 +1,17 @@
+// -----------------------------------------------------------------------------
+// Student Classroom Detail
+//
+// One classroom from the student's side: a banner with lesson counts, the
+// lessons still to do, completed lessons with their latest score, and the
+// files and links the teacher has shared. The student can also leave the
+// classroom from here.
+//
+// The page first checks the student is enrolled, so a shared or guessed link
+// to someone else's classroom shows "unavailable" instead of its content.
+//
+// Route: /student/classrooms/:classroomId || Access: students
+// -----------------------------------------------------------------------------
+
 import {
   ArrowLeft,
   BookOpen,
@@ -10,17 +24,19 @@ import {
   Link as LinkIcon,
   LogOut,
 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { MaterialSpine, MaterialTypeTag } from "../Components/MaterialTypeMarks";
-import { materialTypeLabel } from "../utils/materialFileTypes";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { notifyUser } from "../utils/notifications";
-import { supabase } from "../supabase-client";
 import { useAuth } from "../context/AuthContext";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { supabase } from "../supabase-client";
+import { bucketImageUrlOrBroken } from "../utils/images";
+import { materialTypeLabel } from "../utils/materialFileTypes";
+import { notifyUser } from "../utils/notifications";
+
+// -- Types --------------------------------------------------------------------
 
 type Classroom = {
   classroom_id: string;
@@ -37,8 +53,7 @@ type Lesson = {
   score: number | null;
   totalQuestions: number | null;
   percentage: number | null;
-  // False for flashcards-only lessons (no mcqs row): they have no quiz, so no score or completion.
-  hasQuiz: boolean;
+  hasQuiz: boolean; // False for flashcards-only lessons, which have no score.
 };
 type Material = {
   resource_id: string;
@@ -47,20 +62,17 @@ type Material = {
   uploaded_date: string | null;
 };
 
-const imageUrl = (path: string | null, fallback: string) =>
-  path ? supabase.storage.from("images").getPublicUrl(path).data.publicUrl : fallback;
-// `resource_url` stores the object key, for example:
-// classroom_documents/AI_Workshop_RYNTIM003.pdf
-// Keep that key unchanged when resolving the file from the documents bucket.
+// -- Material helpers ---------------------------------------------------------
+
+// resource_url holds the storage key, e.g. classroom_documents/<id>/<file>.pdf.
+// Older rows may hold a complete URL, which is used as it is.
 const documentUrl = (path: string | null) => {
   if (!path) return "#";
-
-  // Older records may contain the complete public URL. In that case, use it
-  // directly instead of passing the URL back to Storage as an object key.
   if (/^https?:\/\//i.test(path)) return path;
 
   return supabase.storage.from("documents").getPublicUrl(path, { download: false }).data.publicUrl;
 };
+// Uploaded files are stored as "<uuid>-<name>"; show just the name.
 const documentFileName = (path: string) => {
   const storedFileName = decodeURIComponent(path.split("/").pop() || path);
   return storedFileName.replace(
@@ -69,7 +81,7 @@ const documentFileName = (path: string) => {
   );
 };
 
-// Documents have no title column, so the display name is derived from the storage path.
+// Materials have no title column: links show their website, documents their file name.
 const materialTitle = (material: Material) => {
   if (material.resource_type === "link") {
     try {
@@ -81,6 +93,13 @@ const materialTitle = (material: Material) => {
   return documentFileName(material.resource_url);
 };
 
+// -- Lesson list --------------------------------------------------------------
+
+// One card listing lessons. The right-hand marker depends on the lesson:
+//   flashcards-only lesson     a "Flashcards only" tag
+//   completed with a score     "score / total" (and the percentage from sm up)
+//   completed without a score  a tick
+//   not yet done               an arrow
 const LessonList = ({
   title,
   description,
@@ -114,7 +133,7 @@ const LessonList = ({
             className="flex items-center gap-3 py-3 transition hover:bg-slate-50"
           >
             <img
-              src={imageUrl(lesson.lesson_image_path, BROKEN_IMAGE_URL)}
+              src={bucketImageUrlOrBroken(lesson.lesson_image_path)}
               alt=""
               className="h-12 w-16 shrink-0 rounded-lg object-cover"
             />
@@ -151,6 +170,8 @@ const LessonList = ({
   </section>
 );
 
+// -- Page ---------------------------------------------------------------------
+
 export default function StudentClassroomDetail() {
   const { classroomId } = useParams<{ classroomId: string }>();
   const { session, profile } = useAuth();
@@ -164,6 +185,12 @@ export default function StudentClassroomDetail() {
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
 
+  // -- Load the classroom --
+  //
+  // 1. Confirm the student is enrolled.
+  // 2. Load the classroom, its released lessons and its shared materials.
+  // 3. Load the student's attempts and each lesson's quiz size, then work out
+  //    the latest score per lesson.
   useEffect(() => {
     if (!session?.user || !classroomId) return;
     let isCurrent = true;
@@ -207,7 +234,7 @@ export default function StudentClassroomDetail() {
 
       if (classroomResult.error) console.error("Failed to load classroom:", classroomResult.error);
       if (lessonsResult.error) console.error("Failed to load lessons:", lessonsResult.error);
-      // Materials are a secondary feature, a missing/failed materials table should not block the rest of the page.
+      // Materials are secondary: a failure there must not block the rest of the page.
       if (materialsResult.error)
         console.error("Failed to load classroom materials:", materialsResult.error);
 
@@ -247,6 +274,7 @@ export default function StudentClassroomDetail() {
         console.error("Failed to load lesson progress:", attemptsError);
         if (isCurrent) setError("Lesson progress could not be loaded right now.");
       } else if (isCurrent) {
+        // Attempts are newest first, so the first one per lesson is the latest.
         const latestAttemptByLesson = new Map<string, { score: number | null }>();
         attempts.forEach((attempt) => {
           if (!latestAttemptByLesson.has(attempt.lesson_id)) {
@@ -263,7 +291,7 @@ export default function StudentClassroomDetail() {
           const score = attempt?.score ?? null;
           return {
             ...lesson,
-            // If the quiz lookup failed, assume a quiz exists rather than mislabel lessons.
+            // If the quiz lookup failed, assume a quiz rather than mislabel lessons.
             hasQuiz: mcqsResult.error ? true : totalQuestionsByLesson.has(lesson.lesson_id),
             score,
             totalQuestions,
@@ -285,6 +313,8 @@ export default function StudentClassroomDetail() {
     };
   }, [classroomId, session?.user]);
 
+  // -- Derived values --
+
   const assignedLessons = lessons.filter(
     (lesson) => !completedLessonIds.includes(lesson.lesson_id),
   );
@@ -293,9 +323,11 @@ export default function StudentClassroomDetail() {
   );
   const flashcardOnlyCount = lessons.filter((lesson) => !lesson.hasQuiz).length;
   const toDoCount = assignedLessons.length;
-  const coverUrl = imageUrl(classroom?.cover_image_path ?? null, BROKEN_IMAGE_URL);
+  const coverUrl = bucketImageUrlOrBroken(classroom?.cover_image_path);
 
-  // Removes the calling student's enrolment row so the classroom no longer appears for them.
+  // -- Leave the classroom --
+  // Runs after the student confirms. Deletes their enrolment, tells the
+  // teacher, then returns to the classroom list.
   async function leaveClassroom() {
     if (!classroomId || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
@@ -342,6 +374,8 @@ export default function StudentClassroomDetail() {
     navigate("/student/classrooms");
   }
 
+  // -- Loading and error screens --
+
   if (isLoading)
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -354,6 +388,8 @@ export default function StudentClassroomDetail() {
         <p className="text-sm text-red-700">{error}</p>
       </main>
     );
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -378,9 +414,11 @@ export default function StudentClassroomDetail() {
               <button
                 type="button"
                 onClick={() => setIsLeaveDialogOpen(true)}
+                aria-label="Leave classroom"
                 className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
               >
-                <LogOut size={15} /> Leave classroom
+                <LogOut size={15} />
+                <span className="hidden sm:inline">Leave classroom</span>
               </button>
               <NotificationBell />
             </div>
@@ -504,7 +542,7 @@ export default function StudentClassroomDetail() {
         onCancel={() => setIsLeaveDialogOpen(false)}
         onConfirm={() => void leaveClassroom()}
         title={`Leave ${classroom?.classroom_name ?? "this classroom"}?`}
-        description="You will lose access to its lessons and materials. Your teacher can re-add you later using your username."
+        description="You will lose access to its lessons and materials. You can rejoin later with the classroom code."
         confirmLabel="Leave classroom"
         deletingLabel="Leaving..."
       />

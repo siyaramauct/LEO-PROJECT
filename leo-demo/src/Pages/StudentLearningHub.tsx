@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Student Learning Hub
+//
+// A page of trusted, free English-learning websites (BBC, British Council,
+// VOA, Cambridge). Each card opens the site in a new tab. The content is fixed
+// in this file; nothing is loaded from the database.
+//
+// Route: /student/hub || Access: students
+// -----------------------------------------------------------------------------
+
 import { ArrowUpRight, BookOpen, Headphones, Library, Mic } from "lucide-react";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { projectImageUrl } from "../utils/images";
@@ -12,6 +22,8 @@ type Resource = {
   label: string;
   icon: typeof Headphones;
 };
+
+// -- Resources ----------------------------------------------------------------
 
 const resources: Resource[] = [
   {
@@ -64,6 +76,15 @@ const resources: Resource[] = [
   },
 ];
 
+// The three small labels under the banner heading.
+const focusAreas = [
+  { label: "Listen", icon: Headphones },
+  { label: "Read", icon: BookOpen },
+  { label: "Build words", icon: Library },
+];
+
+// -- Page ---------------------------------------------------------------------
+
 export default function StudentLearningHub() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -97,19 +118,12 @@ export default function StudentLearningHub() {
                 Trusted places to listen, read and build vocabulary whenever you have a few minutes.
               </p>
               <div className="mt-6 flex items-center gap-5 text-xs font-semibold text-slate-600">
-                {[
-                  ["Listen", Headphones],
-                  ["Read", BookOpen],
-                  ["Build words", Library],
-                ].map(([label, Icon]) => {
-                  const ResourceIcon = Icon as typeof Headphones;
-                  return (
-                    <span key={label as string} className="inline-flex items-center gap-1.5">
-                      <ResourceIcon size={14} className="text-violet-700" />
-                      {label as string}
-                    </span>
-                  );
-                })}
+                {focusAreas.map(({ label, icon: Icon }) => (
+                  <span key={label} className="inline-flex items-center gap-1.5">
+                    <Icon size={14} className="text-violet-700" />
+                    {label}
+                  </span>
+                ))}
               </div>
             </div>
             <div className="relative mt-7 h-48 overflow-hidden rounded-xl bg-violet-50 sm:h-60 lg:mt-0 lg:h-64">

@@ -1,3 +1,14 @@
+// -----------------------------------------------------------------------------
+// Student Classrooms
+//
+// Every classroom the student has joined, with overall counts, a form to join
+// a new classroom by code, and a search box. Each card shows the classroom's
+// lessons and how many the student has completed, and has a leave button that
+// asks for confirmation first.
+//
+// Route: /student/classrooms || Access: students
+// -----------------------------------------------------------------------------
+
 import { BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -8,9 +19,12 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, {
   type StudentClassroomCardData,
 } from "../Components/StudentClassroomCard";
-import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { bucketImageUrlOrBroken } from "../utils/images";
+import { matchesSearch } from "../utils/listControls";
+import { notifyUser } from "../utils/notifications";
+
+// -- Types --------------------------------------------------------------------
 
 type Classroom = {
   classroom_id: string;
@@ -26,6 +40,8 @@ type Lesson = {
   lesson_image_path: string | null;
 };
 
+// -- Page ---------------------------------------------------------------------
+
 export default function StudentClassrooms() {
   const { session, profile } = useAuth();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -36,8 +52,14 @@ export default function StudentClassrooms() {
   const [classroomSearch, setClassroomSearch] = useState("");
   const [classroomToLeave, setClassroomToLeave] = useState<StudentClassroomCardData | null>(null);
   const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
+
+  // -- Load classrooms, lessons and completions --
+  // 1. The student's enrolments.
+  // 2. Those classrooms and their released lessons, in parallel.
+  // 3. Which of those lessons the student has completed.
   useEffect(() => {
     if (!session?.user) return;
+
     const loadClassrooms = async () => {
       setIsLoading(true);
       setError("");
@@ -96,7 +118,9 @@ export default function StudentClassrooms() {
     void loadClassrooms();
   }, [session?.user]);
 
-  // Removes the calling student's enrolment row so the classroom no longer appears for them.
+  // -- Leave a classroom --
+  // Runs after the student confirms in the dialog. Deletes their enrolment,
+  // tells the teacher, then removes the classroom from the page without a reload.
   async function leaveClassroom() {
     if (!classroomToLeave || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
@@ -151,16 +175,15 @@ export default function StudentClassrooms() {
     setIsLeavingClassroom(false);
   }
 
-  const normalisedSearch = classroomSearch.trim().toLowerCase();
+  // -- Derived values --
+
   const lessonCount = lessons.length;
   const completedLessons = completedLessonIds.length;
   const visibleClassrooms = classrooms.filter((classroom) =>
-    `${classroom.classroom_name} ${classroom.description ?? ""}`
-      .toLowerCase()
-      .includes(normalisedSearch),
+    matchesSearch(classroomSearch, classroom.classroom_name, classroom.description),
   );
 
-  // Builds the card's display data (stats + cover image) for a single classroom.
+  // Turns a classroom row into what its card displays.
   const toCardData = (classroom: Classroom): StudentClassroomCardData => {
     const classroomLessons = lessons.filter(
       (lesson) => lesson.classroom_id === classroom.classroom_id,
@@ -168,9 +191,7 @@ export default function StudentClassrooms() {
     const completedCount = classroomLessons.filter((lesson) =>
       completedLessonIds.includes(lesson.lesson_id),
     ).length;
-    const image = classroom.cover_image_path
-      ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
-      : BROKEN_IMAGE_URL;
+    const image = bucketImageUrlOrBroken(classroom.cover_image_path);
 
     return {
       id: classroom.classroom_id,
@@ -183,12 +204,13 @@ export default function StudentClassrooms() {
     };
   };
 
+  // -- Layout --
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
 
       <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
-        {/* Header */}
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <div>
@@ -203,21 +225,20 @@ export default function StudentClassrooms() {
         </header>
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-          {/* Overview stats */}
-          <section className="grid gap-3 sm:grid-cols-3">
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
+          <section className="grid grid-cols-3 gap-2 sm:gap-3">
+            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
               <Users size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{classrooms.length}</p>
+              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{classrooms.length}</p>
               <p className="mt-1 text-xs text-slate-500">Classrooms</p>
             </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
+            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
               <BookOpen size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{lessonCount}</p>
+              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{lessonCount}</p>
               <p className="mt-1 text-xs text-slate-500">Available lessons</p>
             </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-4">
+            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
               <Check size={19} className="text-violet-700" />
-              <p className="mt-4 text-2xl font-bold">{completedLessons}</p>
+              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{completedLessons}</p>
               <p className="mt-1 text-xs text-slate-500">Completed lessons</p>
             </article>
           </section>
@@ -248,7 +269,6 @@ export default function StudentClassrooms() {
               </section>
             ) : (
               <>
-                {/* Search */}
                 <section className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-sm font-bold">Find a classroom</h2>
@@ -281,7 +301,6 @@ export default function StudentClassrooms() {
                   </div>
                 </section>
 
-                {/* Classroom grid, responsive like the teacher classroom list */}
                 {visibleClassrooms.length === 0 ? (
                   <section className="mt-4 rounded-xl border border-violet-100 bg-white px-5 py-10 text-center">
                     <Search size={22} className="mx-auto text-violet-300" />

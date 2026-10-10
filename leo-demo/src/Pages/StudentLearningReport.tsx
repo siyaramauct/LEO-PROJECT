@@ -1,5 +1,23 @@
+// -----------------------------------------------------------------------------
+// Student Learning Report
+//
+// The student's own progress across every classroom:
+//   Overview    lessons completed, average score, quizzes done, streak and
+//               this week's goal
+//   Activity    a 12-week calendar with each studied day filled in
+//   Classrooms  a sortable list; picking one shows its lessons with best
+//               scores, sortable by course order or score
+//
+// Scores are each lesson's best attempt, so a retake never lowers them.
+//
+// On phones, choosing a classroom scrolls its details into view, because they
+// sit below the list rather than beside it.
+//
+// Route: /student/report || Access: students
+// -----------------------------------------------------------------------------
+
 import { CheckCircle2, ChevronRight, Layers } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ActivityCalendar from "../Components/ActivityCalendar";
 import LoadingScreen from "../Components/LoadingScreen";
@@ -12,6 +30,9 @@ import { supabase } from "../supabase-client";
 import { bucketImageUrlOrBroken, projectImageUrl } from "../utils/images";
 import { ACTIVITY_WEEKS, buildActivityWeeks } from "../utils/activityCalendar";
 
+// -- Types --------------------------------------------------------------------
+
+// Returned by the get_student_progress database function.
 type StudentProgress = {
   current_streak: number;
   longest_streak: number;
@@ -27,8 +48,7 @@ type LessonReport = {
   hasQuiz: boolean;
   completed: boolean;
   attempts: number;
-  // Best attempt, so a retake never lowers what the student sees.
-  bestScore: number | null;
+  bestScore: number | null; // Best attempt.
   scoreCeiling: number | null;
   bestPercent: number | null;
 };
@@ -60,12 +80,16 @@ type ClassroomRow = {
 };
 type McqRow = { lesson_id: string; score_ceiling: number | null };
 
+// -- Helpers ------------------------------------------------------------------
+
 const average = (values: number[]) =>
   values.length
     ? Math.round(values.reduce((total, value) => total + value, 0) / values.length)
     : null;
 
-// Unscored lessons (flashcards only, or not attempted yet) always sit after the scored ones.
+// Sorts a classroom's lessons. Course order is by release date. Score sorts
+// split the list: unscored lessons (flashcards only, or not attempted) are
+// returned separately and shown after the scored ones.
 function sortLessons(lessons: LessonReport[], sort: LessonSort) {
   const byOrder = [...lessons].sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
   if (sort === "order") return { scored: byOrder, unscored: [] as LessonReport[] };
@@ -78,6 +102,7 @@ function sortLessons(lessons: LessonReport[], sort: LessonSort) {
   };
 }
 
+// One lesson row: cover, title, status and the best score with a bar.
 function LessonRowItem({ lesson }: { lesson: LessonReport }) {
   const status = lesson.hasQuiz
     ? lesson.completed
@@ -119,11 +144,14 @@ function LessonRowItem({ lesson }: { lesson: LessonReport }) {
   );
 }
 
+// -- Page ---------------------------------------------------------------------
+
 export default function StudentLearningReport() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const studentId = session?.user.id;
 
+  // The 12-week grid is built once, when the page opens.
   const [activityWeeks] = useState(() => buildActivityWeeks(new Date()));
   const [classrooms, setClassrooms] = useState<ClassroomReport[] | null>(null);
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set());
@@ -132,6 +160,22 @@ export default function StudentLearningReport() {
   const [classroomSort, setClassroomSort] = useState<ClassroomSort>("highest");
   const [lessonSort, setLessonSort] = useState<LessonSort>("order");
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const classroomDetailRef = useRef<HTMLElement>(null);
+
+  // Below 768px the details sit under the list, so bring them into view.
+  const selectClassroom = (classroomId: string) => {
+    setSelectedClassroomId(classroomId);
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      classroomDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  // -- Load the report --
+  //
+  // 1. Enrolments, the activity calendar days and the streak, in parallel.
+  // 2. The classrooms and their released lessons.
+  // 3. The student's attempts and each lesson's quiz size.
+  // Then each lesson gets its best score, and each classroom its average.
 
   useEffect(() => {
     if (!studentId) return;
@@ -156,11 +200,14 @@ export default function StudentLearningReport() {
       ]);
       if (!isCurrent) return;
 
-      // Activity is secondary: a failure here leaves the grid empty rather than hiding the report.
-      if (activityResult.error)
+      // Activity is secondary: a failure leaves the calendar empty instead of
+      // hiding the whole report.
+      if (activityResult.error) {
         console.error("Could not load learning activity:", activityResult.error);
-      if (progressResult.error)
+      }
+      if (progressResult.error) {
         console.error("Could not load learning progress:", progressResult.error);
+      }
       setActiveDays(new Set((activityResult.data ?? []).map((row) => row.activity_date as string)));
       setProgress((progressResult.data?.[0] as StudentProgress | undefined) ?? null);
 
@@ -204,6 +251,7 @@ export default function StudentLearningReport() {
       if (!isCurrent) return;
       if (attemptResult.error || mcqResult.error) return failed();
 
+      // Group attempts by lesson, then build each lesson's report.
       const ceilings = new Map(
         ((mcqResult.data ?? []) as McqRow[]).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]),
       );
@@ -269,13 +317,16 @@ export default function StudentLearningReport() {
     };
   }, [studentId, activityWeeks]);
 
+  // -- Wait for cover images --
+
   const coverUrls = useMemo(
     () => (classrooms ? classrooms.map((classroom) => classroom.coverUrl) : null),
     [classrooms],
   );
   const imagesReady = usePreloadImages(coverUrls);
 
-  // Classrooms without any scores yet sit at the end whichever way the list is sorted.
+  // -- Sorting --
+  // Classrooms without scores sit at the end whichever way the list is sorted.
   const sortedClassrooms = useMemo(() => {
     const direction = classroomSort === "highest" ? -1 : 1;
     return [...(classrooms ?? [])].sort((a, b) => {
@@ -293,6 +344,9 @@ export default function StudentLearningReport() {
   if (classrooms === null || !imagesReady)
     return <LoadingScreen label="Loading your learning report" />;
 
+  // -- Derived values --
+
+  // Defaults to the first classroom in the list until one is picked.
   const selectedClassroom =
     sortedClassrooms.find((classroom) => classroom.classroomId === selectedClassroomId) ??
     sortedClassrooms[0] ??
@@ -314,7 +368,7 @@ export default function StudentLearningReport() {
   const selectedHasScores = Boolean(
     selectedClassroom?.lessons.some((lesson) => lesson.bestPercent !== null),
   );
-  // A score sort means nothing for a classroom with no scores yet, so fall back to course order.
+  // Score sorts mean nothing without scores, so fall back to course order.
   const effectiveLessonSort = selectedHasScores ? lessonSort : "order";
   const { scored, unscored } = sortLessons(selectedClassroom?.lessons ?? [], effectiveLessonSort);
 
@@ -344,6 +398,8 @@ export default function StudentLearningReport() {
       detail: progress ? `${Math.min(100, weeklyPercent)}% of weekly goal` : "Goal unavailable",
     },
   ];
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -415,6 +471,7 @@ export default function StudentLearningReport() {
               <div className="mt-5">
                 <ActivityCalendar
                   weeks={activityWeeks}
+                  // A day is either studied (darkest) or not.
                   getLevel={(dayKey) => (activeDays.has(dayKey) ? 3 : 0)}
                   getTitle={(day) =>
                     `${day.date.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" })}${activeDays.has(day.key) ? " · studied" : ""}`
@@ -449,7 +506,7 @@ export default function StudentLearningReport() {
               </button>
             </section>
           ) : (
-            <section className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+            <section className="grid items-start gap-4 sm:gap-6 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
               <article className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-sm font-bold">Classrooms</h2>
@@ -475,7 +532,7 @@ export default function StudentLearningReport() {
                         key={classroom.classroomId}
                         type="button"
                         aria-pressed={isSelected}
-                        onClick={() => setSelectedClassroomId(classroom.classroomId)}
+                        onClick={() => selectClassroom(classroom.classroomId)}
                         className={`flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition ${isSelected ? "border-violet-700 bg-violet-50/60" : "border-slate-100 hover:bg-slate-50"}`}
                       >
                         <img
@@ -507,7 +564,10 @@ export default function StudentLearningReport() {
               </article>
 
               {selectedClassroom && (
-                <article className="overflow-hidden rounded-xl border border-slate-100 bg-white">
+                <article
+                  ref={classroomDetailRef}
+                  className="scroll-mt-4 overflow-hidden rounded-xl border border-slate-100 bg-white"
+                >
                   <div className="relative h-28 sm:h-32">
                     <img
                       src={selectedClassroom.coverUrl}

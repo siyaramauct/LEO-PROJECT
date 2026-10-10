@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Student Profile
+//
+// The student's account page. It loads their name and username, and handles
+// logging out and deleting the account; the page body is ProfileContent.
+//
+// Route: /student/profile || Access: students
+// -----------------------------------------------------------------------------
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
@@ -44,6 +53,7 @@ export default function StudentProfile() {
     }
   }
 
+  // Deletes the profile row, then signs out.
   async function handleDeleteAccount() {
     if (!session?.user) return;
     setDeletingAccount(true);
@@ -59,6 +69,7 @@ export default function StudentProfile() {
     }
   }
 
+  // Until the profile loads, fall back to the sign-up name or the email address.
   const fallbackName =
     session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "Student";
   const fullName = [studentProfile?.name ?? fallbackName, studentProfile?.surname]

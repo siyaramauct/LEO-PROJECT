@@ -1,3 +1,18 @@
+// -----------------------------------------------------------------------------
+// Student Dashboard
+//
+// The student's home screen. It shows:
+//   a banner for their most recently joined classroom (or a prompt to join one)
+//   a learning overview with this week's lessons and their streak
+//   their two newest classrooms
+//   the four newest lessons released to their classrooms
+//
+// The page stays on the loading screen until all data and cover images are
+// ready, so it appears in one piece.
+//
+// Route: /student/dashboard || Access: students
+// -----------------------------------------------------------------------------
+
 import { ChevronRight, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -5,10 +20,14 @@ import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import LoadingScreen from "../Components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
+import { supabase } from "../supabase-client";
+import { bucketImageUrl } from "../utils/images";
+
+// -- Types --------------------------------------------------------------------
 
 type StudentProfile = { name: string | null; surname: string | null };
+// Returned by the get_student_progress database function (db/2026-08-28_student_progress.sql).
 type StudentProgress = {
   current_streak: number;
   longest_streak: number;
@@ -20,9 +39,11 @@ type Classroom = {
   classroom_id: string;
   classroom_name: string;
   description: string | null;
-  cover_image_path: string | null;
+  cover_image_path: string | null; // Replaced with the full image URL once loaded.
   created_date: string | null;
 };
+
+// -- Settings -----------------------------------------------------------------
 
 const DASHBOARD_CLASSROOM_LIMIT = 2;
 const RECENTLY_ADDED_LIMIT = 4;
@@ -31,8 +52,10 @@ type RecentlyAddedLesson = {
   lesson_id: string;
   title: string;
   classroomName: string;
-  lesson_image_path: string | null;
+  lesson_image_path: string | null; // Full image URL.
 };
+
+// -- Page ---------------------------------------------------------------------
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -41,7 +64,7 @@ export default function StudentDashboard() {
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(() => Boolean(session?.user));
   const [studentClassroom, setStudentClassroom] = useState<Classroom | null>(null);
-  // null = still loading; an empty array means the student genuinely has none.
+  // For both lists: null while loading, an empty array when there is nothing to show.
   const [classrooms, setClassrooms] = useState<Classroom[] | null>(null);
   const [classroomError, setClassroomError] = useState<string | null>(null);
   const [recentlyAddedLessons, setRecentlyAddedLessons] = useState<RecentlyAddedLesson[] | null>(
@@ -59,10 +82,9 @@ export default function StudentDashboard() {
       )
     : 0;
 
+  // -- Load: name and weekly progress --
   useEffect(() => {
-    if (!session?.user) {
-      return;
-    }
+    if (!session?.user) return;
 
     const loadProfile = async () => {
       const [{ data }, { data: progressData }] = await Promise.all([
@@ -76,10 +98,13 @@ export default function StudentDashboard() {
     void loadProfile().finally(() => setIsProfileLoading(false));
   }, [session?.user]);
 
+  // -- Load: newest classrooms --
+  // Enrolments first (newest first), then the classroom details, put back in
+  // enrolment order.
   useEffect(() => {
     if (!session?.user) return;
 
-    let isCurrent = true;
+    let isCurrent = true; // Ignore results if the page has moved on.
 
     const loadClassroom = async () => {
       setClassroomError(null);
@@ -129,14 +154,13 @@ export default function StudentDashboard() {
         .map((classroom) => ({
           ...classroom,
           cover_image_path: classroom.cover_image_path
-            ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data
-                .publicUrl
+            ? bucketImageUrl(classroom.cover_image_path)
             : null,
         }));
 
       if (isCurrent) {
         setClassrooms(orderedClassrooms);
-        // Enrolments are newest-first, so the mobile/desktop banner always shows the latest class.
+        // The banner always shows the newest classroom.
         setStudentClassroom(orderedClassrooms[0] ?? null);
       }
     };
@@ -147,6 +171,7 @@ export default function StudentDashboard() {
     };
   }, [session?.user]);
 
+  // -- Load: recently added lessons --
   useEffect(() => {
     if (!session?.user) return;
 
@@ -177,7 +202,7 @@ export default function StudentDashboard() {
         .from("lessons")
         .select("lesson_id, title, lesson_image_path, classrooms(classroom_name)")
         .in("classroom_id", classroomIds)
-        // Scheduled lessons stay hidden until their release date, which is also when students see them "added".
+        // A scheduled lesson counts as "added" on its release date.
         .lte("release_date", new Date().toISOString())
         .order("release_date", { ascending: false })
         .limit(RECENTLY_ADDED_LIMIT);
@@ -201,8 +226,7 @@ export default function StudentDashboard() {
               title: lesson.title,
               classroomName: classroom?.classroom_name ?? "Classroom",
               lesson_image_path: lesson.lesson_image_path
-                ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data
-                    .publicUrl
+                ? bucketImageUrl(lesson.lesson_image_path)
                 : null,
             };
           }),
@@ -216,6 +240,8 @@ export default function StudentDashboard() {
     };
   }, [session?.user]);
 
+  // -- Wait for images --
+  // Collect every cover the page will show and preload them before revealing it.
   const imageUrls = useMemo(
     () =>
       classrooms === null || recentlyAddedLessons === null
@@ -235,6 +261,8 @@ export default function StudentDashboard() {
   if (isProfileLoading || classrooms === null || recentlyAddedLessons === null || !imagesReady) {
     return <LoadingScreen label="Loading your dashboard" />;
   }
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -356,7 +384,7 @@ export default function StudentDashboard() {
             </button>
           </section>
 
-          <section className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <section className="grid gap-4 sm:gap-6 md:grid-cols-2">
             <article className="rounded-xl border border-slate-100 bg-white p-5">
               <div className="flex items-center justify-between">
                 <div>

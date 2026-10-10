@@ -1,13 +1,25 @@
+// -----------------------------------------------------------------------------
+// Student Flashcards (demo)
+//
+// An early flashcard prototype that uses three built-in sample cards rather
+// than lesson data. Nothing in the app links here; the real study screen is
+// FlashActivity (/lesson/:lessonId). Kept for reference.
+//
+// Route: /student/flashcards || Access: students
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Volume2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
+
 const speak = (text: string) => {
   window.speechSynthesis.cancel();
   const speech = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(speech);
 };
 
+// Sample cards for the prototype.
 const cards = [
   {
     word: "Nucleus",
@@ -31,6 +43,7 @@ export default function StudentFlashcards() {
   const card = cards[index];
   const progress = ((index + 1) / cards.length) * 100;
 
+  // Moves one card back or forward, staying within the deck, and hides the definition.
   function advance(direction: -1 | 1) {
     setIndex((current) => Math.min(Math.max(current + direction, 0), cards.length - 1));
     setShowDefinition(false);

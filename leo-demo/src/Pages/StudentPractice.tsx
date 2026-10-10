@@ -1,10 +1,23 @@
-import { Bell, BookOpen, ChevronRight } from "lucide-react";
+// -----------------------------------------------------------------------------
+// Student Practice
+//
+// Every released lesson across the student's classrooms, as cards with a
+// "Start Practice" button. Opened from the raised Practice button in the
+// student navigation.
+//
+// Route: /student/practice || Access: students
+// -----------------------------------------------------------------------------
+
+import { BookOpen, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { bucketImageUrlOrBroken } from "../utils/images";
+
+// -- Types --------------------------------------------------------------------
 
 type Lesson = {
   lesson_id: string;
@@ -19,6 +32,8 @@ type Classroom = {
   classroom_name: string;
 };
 
+// -- Page ---------------------------------------------------------------------
+
 export default function StudentPractice() {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -27,26 +42,26 @@ export default function StudentPractice() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Loading until data has been fetched for the signed-in user.
   const isLoading = Boolean(session?.user && loadedUserId !== session.user.id);
+
+  // Enrolments, then classroom names, then released lessons.
 
   useEffect(() => {
     if (!session?.user) return;
 
     const loadLessons = async () => {
       try {
-        // Find all classrooms that this student belongs to
         const { data: enrolments, error: enrolmentError } = await supabase
           .from("classroom_students")
           .select("classroom_id")
           .eq("student_id", session.user.id);
 
-        if (enrolmentError) {
-          throw enrolmentError;
-        }
+        if (enrolmentError) throw enrolmentError;
 
         const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
 
-        // Student is not enrolled in any classrooms
         if (classroomIds.length === 0) {
           setLessons([]);
           setClassrooms([]);
@@ -54,20 +69,16 @@ export default function StudentPractice() {
           return;
         }
 
-        // Get the student's classrooms
         const { data: classroomData, error: classroomError } = await supabase
           .from("classrooms")
           .select("classroom_id, classroom_name")
           .in("classroom_id", classroomIds)
           .order("classroom_name");
 
-        if (classroomError) {
-          throw classroomError;
-        }
+        if (classroomError) throw classroomError;
 
         setClassrooms(classroomData ?? []);
 
-        // Get lessons belonging to those classrooms
         const { data: lessonData, error: lessonError } = await supabase
           .from("lessons")
           .select("lesson_id, classroom_id, title, description, lesson_image_path")
@@ -75,9 +86,7 @@ export default function StudentPractice() {
           .lte("release_date", new Date().toISOString())
           .order("title");
 
-        if (lessonError) {
-          throw lessonError;
-        }
+        if (lessonError) throw lessonError;
 
         setLessons(lessonData ?? []);
         setErrorMessage("");
@@ -92,12 +101,11 @@ export default function StudentPractice() {
     void loadLessons();
   }, [session?.user]);
 
-  const getClassroomName = (classroomId: string) => {
-    return (
-      classrooms.find((classroom) => classroom.classroom_id === classroomId)?.classroom_name ??
-      "Your classroom"
-    );
-  };
+  const getClassroomName = (classroomId: string) =>
+    classrooms.find((classroom) => classroom.classroom_id === classroomId)?.classroom_name ??
+    "Your classroom";
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -116,13 +124,7 @@ export default function StudentPractice() {
               </p>
             </div>
 
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
-            >
-              <Bell size={19} />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 
@@ -173,10 +175,7 @@ export default function StudentPractice() {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {lessons.map((lesson) => {
-                    const image = lesson.lesson_image_path
-                      ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data
-                          .publicUrl
-                      : BROKEN_IMAGE_URL;
+                    const image = bucketImageUrlOrBroken(lesson.lesson_image_path);
 
                     return (
                       <article
