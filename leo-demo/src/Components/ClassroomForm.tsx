@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 import ClassroomFormField from "./ClassroomFormField";
 

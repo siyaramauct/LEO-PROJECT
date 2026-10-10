@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flashcard from "../Components/Flashcard";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 type FlashcardData = {

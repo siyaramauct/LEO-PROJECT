@@ -1,6 +1,6 @@
 import { BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import JoinClassroomForm from "../Components/JoinClassroomForm";
 import NotificationBell from "../Components/NotificationBell";

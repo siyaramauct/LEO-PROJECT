@@ -19,7 +19,7 @@ import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Classroom = {

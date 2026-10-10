@@ -1,6 +1,6 @@
 import { LockKeyhole, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 type Props = { onClose: () => void };

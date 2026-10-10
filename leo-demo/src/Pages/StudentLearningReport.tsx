@@ -6,7 +6,7 @@ import LoadingScreen from "../Components/LoadingScreen";
 import ProgressBar from "../Components/ProgressBar";
 import SegmentedControl from "../Components/SegmentedControl";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import usePreloadImages from "../hooks/usePreloadImages";
 import { supabase } from "../supabase-client";
 import { bucketImageUrlOrBroken, projectImageUrl } from "../utils/images";

@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEventHandler } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext.tsx";
+import { useAuth } from "../context/AuthContext";
 
 type Inputs = {
   firstName: string;

@@ -1,5 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../Components/LoadingScreen";
 import { oauthErrorFromUrl } from "../utils/oauthError";
 

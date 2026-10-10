@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";

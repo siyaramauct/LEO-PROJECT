@@ -9,7 +9,7 @@ import {
   BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },

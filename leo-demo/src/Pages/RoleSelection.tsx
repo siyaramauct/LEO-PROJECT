@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext.tsx";
-import { Role, type Role as RoleType } from "../../context/roles";
+import { useAuth } from "../context/AuthContext";
+import { Role, type Role as RoleType } from "../context/roles";
 import { supabase } from "../supabase-client.ts";
 import { bucketImageUrl } from "../utils/images";
 

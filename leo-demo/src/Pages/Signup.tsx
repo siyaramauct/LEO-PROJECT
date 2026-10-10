@@ -1,7 +1,7 @@
 import SignupForm from "../Components/Signupform";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { projectImageUrl } from "../utils/images";
 
 export default function SignUp() {

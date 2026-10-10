@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import ClassroomLessonRow, { type ClassroomLesson } from "../Components/ClassroomLessonRow";
 import ClassroomMaterialsPanel, {
   type ClassroomMaterial,

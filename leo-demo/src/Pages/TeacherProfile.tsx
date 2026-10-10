@@ -5,7 +5,7 @@ import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
 import TeacherProfileContent from "../Components/TeacherProfileContent";
-import { useAuth } from "../../context/AuthContext.tsx";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 export default function TeacherProfile() {

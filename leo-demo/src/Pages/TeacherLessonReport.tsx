@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import StatCard from "../Components/StatCard";
 import { supabase } from "../supabase-client";

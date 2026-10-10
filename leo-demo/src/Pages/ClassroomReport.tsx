@@ -6,7 +6,7 @@ import LoadingScreen from "../Components/LoadingScreen";
 import ProgressBar from "../Components/ProgressBar";
 import SegmentedControl from "../Components/SegmentedControl";
 import TeacherShell from "../Components/TeacherShell";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import usePreloadImages from "../hooks/usePreloadImages";
 import { ACTIVITY_WEEKS, buildActivityWeeks } from "../utils/activityCalendar";
 import {

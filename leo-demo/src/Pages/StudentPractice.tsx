@@ -2,7 +2,7 @@ import { Bell, BookOpen, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 import { BROKEN_IMAGE_URL } from "../utils/images";
 

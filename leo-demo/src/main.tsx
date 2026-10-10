@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
-import { AuthContextProvider } from "../context/AuthContext.tsx";
+import { AuthContextProvider } from "./context/AuthContext";
 import { GuardRoute } from "./Components/GuardRoute";
 import ClassroomDetail from "./Pages/ClassroomDetail.tsx";
 import ClassProgress from "./Pages/ClassProgress";

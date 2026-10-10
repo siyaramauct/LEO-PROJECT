@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BarChart3, Home, Settings, Sparkles, Users, ChevronRight } from "lucide-react";
 
 import { supabase } from "../supabase-client";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import NavItem from "../Components/NavItem";
 import SidebarItem from "../Components/SidebarItem";
 import { BROKEN_IMAGE_URL } from "../utils/images";

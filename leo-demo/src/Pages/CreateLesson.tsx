@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import {
   MAX_FLASHCARD_IMAGE_BYTES,
   MAX_FLASHCARDS_PER_LESSON,

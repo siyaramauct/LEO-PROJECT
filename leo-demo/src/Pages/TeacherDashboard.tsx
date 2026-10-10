@@ -22,7 +22,7 @@ import ScheduledLessonCard, {
 } from "../Components/ScheduledLessonCard";
 import SidebarItem from "../Components/SidebarItem";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
-import { useAuth } from "../../context/AuthContext.tsx";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
 import { formatDateKey, releaseDateToIso, toDateKey } from "../utils/releaseDate";

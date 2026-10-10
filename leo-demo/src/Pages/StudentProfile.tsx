@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentProfileContent from "../Components/StudentProfileContent";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 type StudentProfileRow = { name: string | null; surname: string | null; username: string | null };

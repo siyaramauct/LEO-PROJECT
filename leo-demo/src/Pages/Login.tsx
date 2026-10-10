@@ -2,7 +2,7 @@ import LoginForm from "../Components/Loginform";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
 import { oauthErrorFromUrl } from "../utils/oauthError";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { projectImageUrl } from "../utils/images";
 
 export default function Login() {

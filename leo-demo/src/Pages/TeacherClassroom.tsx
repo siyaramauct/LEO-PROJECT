@@ -1,7 +1,7 @@
 import { Plus, Sparkles, Users, Home, BarChart3, User, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, { type Classroom } from "../Components/ClassroomMobileCard";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";

@@ -1,7 +1,7 @@
 import { LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
 export default function ResetPassword() {
