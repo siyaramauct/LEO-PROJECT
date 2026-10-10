@@ -1,3 +1,26 @@
+// -----------------------------------------------------------------------------
+// Create Lesson
+//
+// A four-step form for building a lesson:
+//   1. Details      classroom, title, description, release date, PDFs, cover
+//   2. Flashcards   up to 15 words with definitions and optional images
+//   3. Activity     pick a quiz format, or turn the quiz off for a
+//                   flashcards-only lesson
+//   4. Review       edit the AI-generated quiz before saving
+//
+// How the AI quiz is made:
+//   The flashcards are turned into a prompt and sent to the gemini-API-Query
+//   edge function. The reply must be JSON with exactly one question per
+//   flashcard; parseGeneratedMcq checks that before step 4 opens. If anything
+//   fails, a red notice offers to try again or save the lesson without a quiz.
+//
+// Nothing is saved until the final button, so leaving part way discards the
+// draft. A release date picked on the dashboard planner arrives as
+// ?releaseDate=YYYY-MM-DD, and a classroom opened beforehand as ?classroomId=.
+//
+// Route: /create-lesson || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -14,12 +37,14 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import {
   MAX_FLASHCARD_IMAGE_BYTES,
   MAX_FLASHCARDS_PER_LESSON,
   MAX_LESSONS_PER_CLASSROOM,
 } from "../config/limits";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../supabase-client";
+import { bucketImageUrl } from "../utils/images";
 import { notifyClassroomStudents } from "../utils/notifications";
 import {
   formatDateKey,
@@ -27,14 +52,9 @@ import {
   releaseDateToIso,
   tomorrowDateKey,
 } from "../utils/releaseDate";
-import { supabase } from "../supabase-client";
 
-/* ------------------------------------------------------------------------ */
-/*  Types                                                                    */
-/* ------------------------------------------------------------------------ */
+// -- Types --------------------------------------------------------------------
 
-// Added "review" as a 4th step: the AI-generated MCQ lands here so the
-// teacher can edit it before anything is written to the database.
 type Step = "details" | "flashcards" | "activity" | "review";
 
 type Flashcard = {
@@ -59,13 +79,11 @@ type GeneratedQuestion = {
 };
 type GeneratedMcq = { title: string; questions: GeneratedQuestion[] };
 
-// Local, editable copy of a generated question. The `id` is only used for
-// React keys and field updates in the review step — it is never sent to the DB.
+// An editable copy of a generated question. The id only exists in the browser
+// (for React keys and edits) and is never saved.
 type EditableQuestion = GeneratedQuestion & { id: number };
 
-/* ------------------------------------------------------------------------ */
-/*  Constants                                                                */
-/* ------------------------------------------------------------------------ */
+// -- Options and styles -------------------------------------------------------
 
 const lessonCoverOptions = [
   { id: "typing", alt: "Learner typing illustration", path: "lessonImgs/girlTypingLANG.png" },
@@ -91,10 +109,7 @@ const lessonCoverOptions = [
     path: "lessonImgs/corporateStyleLessonIlustration.avif",
   },
   { id: "cute-brain", alt: "Cute brain illustration", path: "lessonImgs/cuteBrain.png" },
-].map((cover) => ({
-  ...cover,
-  image: supabase.storage.from("images").getPublicUrl(cover.path).data.publicUrl,
-}));
+].map((cover) => ({ ...cover, image: bucketImageUrl(cover.path) }));
 
 const stepLabels = ["Lesson details", "Flashcards", "MCQ activity", "Review & edit"];
 
@@ -114,8 +129,15 @@ const mcqFormatOptions: { id: McqFormat; name: string; description: string }[] =
 const optionKeys: OptionKey[] = ["option_a", "option_b", "option_c", "option_d"];
 const correctOptions: CorrectOption[] = ["A", "B", "C", "D"];
 
+const PRIMARY_BUTTON =
+  "flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300";
+const BACK_BUTTON =
+  "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100";
+
 const inputClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-700 focus:ring-2 focus:ring-slate-100";
+
+// -- Helpers ------------------------------------------------------------------
 
 function emptyFlashcard(id: number): Flashcard {
   return { id, term: "", definition: "", imageFile: null, imagePreview: null };
@@ -125,12 +147,11 @@ function safeImageName(fileName: string): string {
   return fileName.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
 }
 
-/* ------------------------------------------------------------------------ */
-/*  Helpers                                                                  */
-/* ------------------------------------------------------------------------ */
-
-// Parses and validates the raw AI response into a well-formed GeneratedMcq.
-// Throws if the shape doesn't match what the form (and the DB) expects.
+// Checks the AI reply before the review step trusts it.
+//   1. Strip a ```json code fence if Gemini added one, then parse the JSON.
+//   2. Require a title and exactly one question per flashcard.
+//   3. Require every question to have text, four options and a valid answer.
+// Throws if any check fails, which shows the "something went wrong" notice.
 function parseGeneratedMcq(result: unknown, expectedQuestions: number): GeneratedMcq {
   const content = typeof result === "string" ? result : JSON.stringify(result);
   const json = content.replace(/^```json\s*|^```|```$/g, "").trim();
@@ -159,12 +180,13 @@ function parseGeneratedMcq(result: unknown, expectedQuestions: number): Generate
   return generated;
 }
 
-// Builds the Gemini prompt from the current flashcards + chosen format.
+// The prompt sent to Gemini: the chosen format, the exact JSON shape to return,
+// and the flashcards themselves.
 function buildMcqPrompt(format: McqFormat, flashcards: Flashcard[]): string {
   return `You are an experienced language educator and teacher. Create a strictly language learning  ${format === "basic-mcq" ? "multiple-choice" : "fill-in-the-blank multiple-choice"} activity from the ${flashcards.length} flashcards below. Create exactly one question per flashcard and use each flashcard once. Every question must have one correct answer and three plausible but clearly incorrect filler answers. Return only valid JSON with no Markdown or code fences, using this exact schema: {"title":"string","questions":[{"question_text":"string","option_a":"string","option_b":"string","option_c":"string","option_d":"string","correct_option":"A|B|C|D"}]}. The questions array must contain exactly ${flashcards.length} items. The value of correct_option must match the option that contains the correct answer. Flashcards: ${JSON.stringify(flashcards.map(({ term, definition }) => ({ term, definition })))} . Focus on the language learning aspect of the activity not the general concepts themselves.`;
 }
 
-// Validates the teacher-edited questions before they're saved to the DB.
+// True when the teacher's edits left the title or any question incomplete.
 function findIncompleteQuestion(title: string, questions: EditableQuestion[]): boolean {
   if (!title.trim() || !questions.length) return true;
   return questions.some(
@@ -178,9 +200,44 @@ function findIncompleteQuestion(title: string, questions: EditableQuestion[]): b
   );
 }
 
-/* ------------------------------------------------------------------------ */
-/*  Component                                                                */
-/* ------------------------------------------------------------------------ */
+// -- Small building blocks ----------------------------------------------------
+
+function FormError({ message, className = "" }: { message: string; className?: string }) {
+  return (
+    <p
+      role="alert"
+      className={`rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 ${className}`}
+    >
+      {message}
+    </p>
+  );
+}
+
+// Shown when quiz generation fails, in step 3 or after "Regenerate" in step 4.
+function GenerationFailedNotice({ onUseFlashcardsOnly }: { onUseFlashcardsOnly: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+    >
+      <AlertCircle size={18} className="mt-0.5 shrink-0" />
+      <p className="leading-5">
+        <span className="font-semibold">Something went wrong generating the activity.</span> Please
+        try again, or{" "}
+        <button
+          type="button"
+          onClick={onUseFlashcardsOnly}
+          className="font-semibold underline underline-offset-2 transition hover:text-red-800"
+        >
+          create the lesson with flashcards only
+        </button>
+        .
+      </p>
+    </div>
+  );
+}
+
+// -- Page ---------------------------------------------------------------------
 
 export default function CreateLesson() {
   const { session } = useAuth();
@@ -188,39 +245,41 @@ export default function CreateLesson() {
   const navigate = useNavigate();
   const requestedClassroomId = searchParams.get("classroomId") ?? "";
 
-  // ---- Step / navigation state ----
+  // -- State: which step is showing --
   const [step, setStep] = useState<Step>("details");
 
-  // ---- Step 1: lesson details state ----
+  // -- State: step 1, details --
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [classroomId, setClassroomId] = useState(requestedClassroomId);
   const [classrooms, setClassrooms] = useState<ClassroomOption[]>([]);
   const [coverId, setCoverId] = useState(lessonCoverOptions[0].id);
   const [lessonDocuments, setLessonDocuments] = useState<File[]>([]);
-  // "" releases the lesson immediately; a day picked on the dashboard arrives via ?releaseDate=.
+  // "" releases the lesson immediately; a day picked on the dashboard arrives in the URL.
   const [releaseDate, setReleaseDate] = useState(() =>
     parseFutureDateKey(searchParams.get("releaseDate")),
   );
 
-  // ---- Step 2: flashcards state ----
+  // -- State: step 2, flashcards --
   const [flashcards, setFlashcards] = useState<Flashcard[]>([emptyFlashcard(1)]);
 
-  // ---- Step 3: activity format state ----
-  // When off, the lesson is saved with flashcards only: no mcqs/questions rows.
+  // -- State: step 3, activity --
+  // With includeMcq off, the lesson is saved without a quiz.
   const [includeMcq, setIncludeMcq] = useState(true);
   const [selectedMcqFormat, setSelectedMcqFormat] = useState<McqFormat | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
 
-  // ---- Step 4: review & edit AI-generated MCQ state ----
+  // -- State: step 4, review --
   const [generatedTitle, setGeneratedTitle] = useState("");
   const [generatedQuestions, setGeneratedQuestions] = useState<EditableQuestion[]>([]);
 
-  // ---- Shared state ----
+  // -- State: shared --
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingLessonLimit, setIsCheckingLessonLimit] = useState(false);
+
+  // -- Derived values --
 
   const activeStep =
     step === "details" ? 0 : step === "flashcards" ? 1 : step === "activity" ? 2 : 3;
@@ -238,6 +297,7 @@ export default function CreateLesson() {
       ? "Creating..."
       : "Create lesson";
 
+  // The teacher's classrooms, for the classroom picker.
   useEffect(() => {
     if (!session?.user) return;
     const loadClassrooms = async () => {
@@ -255,9 +315,7 @@ export default function CreateLesson() {
     void loadClassrooms();
   }, [session?.user]);
 
-  /* ---------------------------------------------------------------------- */
-  /*  Step 2 handlers: flashcards                                           */
-  /* ---------------------------------------------------------------------- */
+  // -- Step 2: flashcards --
 
   function updateFlashcard(id: number, field: "term" | "definition", value: string) {
     setFlashcards((cards) =>
@@ -266,8 +324,9 @@ export default function CreateLesson() {
   }
 
   function addFlashcard() {
-    if (flashcards.length < MAX_FLASHCARDS_PER_LESSON)
+    if (flashcards.length < MAX_FLASHCARDS_PER_LESSON) {
       setFlashcards((cards) => [...cards, emptyFlashcard(Date.now())]);
+    }
   }
 
   function removeFlashcard(id: number) {
@@ -280,6 +339,8 @@ export default function CreateLesson() {
     }
   }
 
+  // Sets or clears a card's image. Previews are temporary browser URLs, so
+  // the old one is released whenever it is replaced.
   function setFlashcardImage(id: number, file: File | null) {
     setError("");
     if (file && (!file.type.startsWith("image/") || file.size > MAX_FLASHCARD_IMAGE_BYTES)) {
@@ -295,6 +356,7 @@ export default function CreateLesson() {
     );
   }
 
+  // Adds PDFs, skipping any already in the list (same name, size and date).
   function addLessonDocuments(files: File[]) {
     setError("");
     const invalidFile = files.find(
@@ -321,10 +383,9 @@ export default function CreateLesson() {
     setLessonDocuments((current) => current.filter((file) => file !== fileToRemove));
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Step navigation                                                       */
-  /* ---------------------------------------------------------------------- */
+  // -- Moving between steps --
 
+  // Step 1 to 2: check the details, and that the classroom isn't at its lesson limit.
   async function continueToFlashcards() {
     if (!classroomId) {
       setError("Choose the classroom where this lesson will be created.");
@@ -352,6 +413,7 @@ export default function CreateLesson() {
     setStep("flashcards");
   }
 
+  // Step 2 to 3: blank cards are dropped; half-filled ones block moving on.
   function continueToActivities() {
     const completedCards = flashcards.filter((card) => card.term.trim() || card.definition.trim());
     const hasIncompleteCard = completedCards.some(
@@ -366,12 +428,10 @@ export default function CreateLesson() {
     setStep("activity");
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Step 3 -> Step 4: generate the MCQ activity with AI                   */
-  /* ---------------------------------------------------------------------- */
+  // -- Step 3 to 4: generate the quiz with AI --
 
-  // Calls the Gemini edge function and, on success, loads the result into the
-  // editable review-step state instead of saving it straight to the database.
+  // Asks Gemini for the quiz and, if the reply checks out, opens it in the
+  // review step. Nothing is saved yet.
   async function generateActivity() {
     if (!selectedMcqFormat) return;
     setIsGenerating(true);
@@ -405,12 +465,9 @@ export default function CreateLesson() {
     setStep("activity");
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Step 4 handlers: review & edit the generated MCQ                      */
-  /* ---------------------------------------------------------------------- */
+  // -- Step 4: review --
 
-  // Generic field updater for a single generated question — handles the
-  // question text, any of the four options, and the correct-option marker.
+  // Updates one field of one question: its text, an option, or the correct answer.
   function updateGeneratedQuestion(id: number, field: keyof GeneratedQuestion, value: string) {
     setGeneratedQuestions((questions) =>
       questions.map((question) =>
@@ -419,13 +476,14 @@ export default function CreateLesson() {
     );
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Final save: persist lesson, flashcards, and the edited MCQ            */
-  /* ---------------------------------------------------------------------- */
-
-  // Note: the AI call has already happened in generateActivity(). This
-  // function only persists whatever the teacher has reviewed/edited.
-  // Flashcards-only lessons (includeMcq off) skip the mcqs/questions inserts.
+  // -- Final save --
+  //
+  // Saves everything in order, stopping at the first failure:
+  //   1. the lesson row (with a release date if scheduled)
+  //   2. any PDFs, uploaded then recorded (uploads are removed if recording fails)
+  //   3. flashcard images, then the flashcard rows
+  //   4. the quiz and its questions, unless this is a flashcards-only lesson
+  //   5. a notification to the students, if the lesson is released now
   async function createLesson() {
     if (!classroomId) return;
     if (includeMcq && findIncompleteQuestion(generatedTitle, generatedQuestions)) {
@@ -449,8 +507,9 @@ export default function CreateLesson() {
         .select("lesson_id")
         .single();
 
-      if (lessonError || !lesson)
+      if (lessonError || !lesson) {
         throw new Error(lessonError?.message ?? "The lesson could not be created.");
+      }
 
       if (lessonDocuments.length) {
         const uploadedDocumentPaths = await Promise.all(
@@ -463,8 +522,9 @@ export default function CreateLesson() {
                 contentType: "application/pdf",
                 upsert: false,
               });
-            if (uploadError)
+            if (uploadError) {
               throw new Error(`Could not upload "${file.name}": ${uploadError.message}`);
+            }
             return storagePath;
           }),
         );
@@ -494,10 +554,11 @@ export default function CreateLesson() {
                 contentType: flashcard.imageFile.type,
                 upsert: false,
               });
-            if (uploadError)
+            if (uploadError) {
               throw new Error(
                 `Could not upload the image for "${flashcard.term}": ${uploadError.message}`,
               );
+            }
           }
           return {
             lesson_id: lesson.lesson_id,
@@ -524,8 +585,9 @@ export default function CreateLesson() {
           .select("mcq_id")
           .single();
 
-        if (mcqError || !mcq)
+        if (mcqError || !mcq) {
           throw new Error(mcqError?.message ?? "The MCQ activity could not be created.");
+        }
         const { error: questionError } = await supabase.from("questions").insert(
           generatedQuestions.map((question) => ({
             mcq_id: mcq.mcq_id,
@@ -541,8 +603,8 @@ export default function CreateLesson() {
         if (questionError) throw new Error(questionError.message);
       }
 
-      // Best-effort: notification delivery should never block lesson creation.
-      // Scheduled lessons aren't available yet, so students aren't notified now.
+      // Best effort: a failed notification never blocks the lesson. Scheduled
+      // lessons aren't open yet, so students aren't told about them now.
       if (!releaseDate) {
         await notifyClassroomStudents(classroomId, {
           type: "new_lesson",
@@ -562,9 +624,7 @@ export default function CreateLesson() {
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Render                                                                 */
-  /* ---------------------------------------------------------------------- */
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -592,7 +652,8 @@ export default function CreateLesson() {
         </div>
 
         {
-          // Stepper — 4 steps with the review stage, 3 when the lesson has no MCQ
+          // Step indicator: four steps, or three when the lesson has no quiz.
+          // Phones show only the numbered circles.
         }
         <ol
           className={`relative mb-6 grid gap-2 before:absolute before:top-3.5 before:h-px before:bg-slate-200 sm:gap-4 sm:before:hidden ${includeMcq ? "grid-cols-4 before:left-[12.5%] before:right-[12.5%]" : "grid-cols-3 before:left-[16.67%] before:right-[16.67%]"}`}
@@ -628,7 +689,7 @@ export default function CreateLesson() {
           // Step 1: lesson details
         }
         {step === "details" && (
-          <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="mb-6">
                 <h3 className="text-lg font-bold">Lesson details</h3>
@@ -759,20 +820,13 @@ export default function CreateLesson() {
                     </div>
                   )}
                 </div>
-                {error && (
-                  <p
-                    role="alert"
-                    className="rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
-                  >
-                    {error}
-                  </p>
-                )}
+                {error && <FormError message={error} className="" />}
                 <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={() => void continueToFlashcards()}
                     disabled={isCheckingLessonLimit}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className={`${PRIMARY_BUTTON} w-full sm:w-auto`}
                   >
                     {isCheckingLessonLimit ? "Checking..." : "Continue"} <ChevronRight size={17} />
                   </button>
@@ -921,14 +975,7 @@ export default function CreateLesson() {
                 <Plus size={17} /> Add flashcard
               </button>
             )}
-            {error && (
-              <p
-                role="alert"
-                className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
-              >
-                {error}
-              </p>
-            )}
+            {error && <FormError message={error} className="mt-4" />}
             <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row">
               <button
                 type="button"
@@ -936,15 +983,11 @@ export default function CreateLesson() {
                   setError("");
                   setStep("details");
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                className={BACK_BUTTON}
               >
                 <ChevronLeft size={17} /> Back
               </button>
-              <button
-                type="button"
-                onClick={continueToActivities}
-                className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
-              >
+              <button type="button" onClick={continueToActivities} className={PRIMARY_BUTTON}>
                 Choose activity <ChevronRight size={17} />
               </button>
             </div>
@@ -1017,35 +1060,9 @@ export default function CreateLesson() {
               </div>
             )}
             {generationFailed && (
-              <div
-                role="alert"
-                className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              >
-                <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                <p className="leading-5">
-                  <span className="font-semibold">
-                    Something went wrong generating the activity.
-                  </span>{" "}
-                  Please try again, or{" "}
-                  <button
-                    type="button"
-                    onClick={switchToFlashcardsOnly}
-                    className="font-semibold underline underline-offset-2 transition hover:text-red-800"
-                  >
-                    create the lesson with flashcards only
-                  </button>
-                  .
-                </p>
-              </div>
+              <GenerationFailedNotice onUseFlashcardsOnly={switchToFlashcardsOnly} />
             )}
-            {error && (
-              <p
-                role="alert"
-                className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
-              >
-                {error}
-              </p>
-            )}
+            {error && <FormError message={error} className="mt-4" />}
             <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
               <button
                 type="button"
@@ -1053,7 +1070,7 @@ export default function CreateLesson() {
                   setGenerationFailed(false);
                   setStep("flashcards");
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                className={BACK_BUTTON}
               >
                 <ChevronLeft size={17} /> Edit flashcards
               </button>
@@ -1062,7 +1079,7 @@ export default function CreateLesson() {
                   type="button"
                   disabled={!selectedMcqFormat || isGenerating}
                   onClick={generateActivity}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className={PRIMARY_BUTTON}
                 >
                   {isGenerating ? "Generating..." : "Generate activity"}{" "}
                   {!isGenerating && <ChevronRight size={17} />}
@@ -1072,7 +1089,7 @@ export default function CreateLesson() {
                   type="button"
                   disabled={isSaving}
                   onClick={createLesson}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className={PRIMARY_BUTTON}
                 >
                   {saveLabel}
                 </button>
@@ -1082,7 +1099,7 @@ export default function CreateLesson() {
         )}
 
         {
-          // Step 4 (new): review and edit the AI-generated MCQ before saving
+          // Step 4: review and edit the generated quiz before saving
         }
         {step === "review" && (
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -1138,7 +1155,7 @@ export default function CreateLesson() {
                     />
                   </label>
                   <span className="mb-1.5 block text-xs font-semibold text-slate-600">
-                    Options — mark the correct answer
+                    Options: mark the correct answer
                   </span>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {optionKeys.map((optionKey, optionIndex) => {
@@ -1179,35 +1196,9 @@ export default function CreateLesson() {
             </div>
 
             {generationFailed && (
-              <div
-                role="alert"
-                className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-              >
-                <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                <p className="leading-5">
-                  <span className="font-semibold">
-                    Something went wrong generating the activity.
-                  </span>{" "}
-                  Please try again, or{" "}
-                  <button
-                    type="button"
-                    onClick={switchToFlashcardsOnly}
-                    className="font-semibold underline underline-offset-2 transition hover:text-red-800"
-                  >
-                    create the lesson with flashcards only
-                  </button>
-                  .
-                </p>
-              </div>
+              <GenerationFailedNotice onUseFlashcardsOnly={switchToFlashcardsOnly} />
             )}
-            {error && (
-              <p
-                role="alert"
-                className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
-              >
-                {error}
-              </p>
-            )}
+            {error && <FormError message={error} className="mt-4" />}
             <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
               <button
                 type="button"
@@ -1216,7 +1207,7 @@ export default function CreateLesson() {
                   setGenerationFailed(false);
                   setStep("activity");
                 }}
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                className={BACK_BUTTON}
               >
                 <ChevronLeft size={17} /> Back
               </button>
@@ -1224,7 +1215,7 @@ export default function CreateLesson() {
                 type="button"
                 disabled={isSaving || isGenerating}
                 onClick={createLesson}
-                className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className={PRIMARY_BUTTON}
               >
                 {saveLabel}
               </button>

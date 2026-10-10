@@ -1,3 +1,19 @@
+// -----------------------------------------------------------------------------
+// Teacher Lesson Report
+//
+// One lesson from the teacher's side:
+//   Summary     cover, title, word count and quiz name
+//   Statistics  enrolled students, quiz completion, average and highest score
+//               (flashcards-only lessons show a note instead, as nothing is scored)
+//   Documents   PDFs attached to this lesson, with upload and delete
+//   Flashcards  every card, editable in place (word, definition, image)
+//   Results     each enrolled student's latest quiz score
+//
+// One layout for all screens: a centred column that stacks on phones.
+//
+// Route: /teacher-classroom/:classroomId/lesson/:lessonId || Access: teachers
+// -----------------------------------------------------------------------------
+
 import {
   ArrowLeft,
   BarChart3,
@@ -16,11 +32,14 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import StatCard from "../Components/StatCard";
+import { MAX_FLASHCARD_IMAGE_BYTES } from "../config/limits";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
+
+// -- Types --------------------------------------------------------------------
 
 type ClassroomRow = { classroom_id: string; classroom_name: string; teacher_id: string };
 
@@ -64,6 +83,8 @@ type StudentResult = {
   completedAt: string | null;
 };
 
+// -- Small building blocks ----------------------------------------------------
+
 const NoScoresNotice = () => (
   <div className="flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
@@ -86,6 +107,14 @@ const formatDate = (value: string | null) =>
       )
     : null;
 
+// Uploaded files are stored as "<uuid>-<name>"; show just the name.
+function documentName(path: string) {
+  const storedName = decodeURIComponent(path.split("/").pop() ?? path);
+  return storedName.replace(/^[0-9a-f-]{36}-/i, "");
+}
+
+// -- Page ---------------------------------------------------------------------
+
 export default function TeacherLessonReport() {
   const { session } = useAuth();
   const { classroomId, lessonId } = useParams<{ classroomId: string; lessonId: string }>();
@@ -95,12 +124,13 @@ export default function TeacherLessonReport() {
   const [lesson, setLesson] = useState<LessonRow | null>(null);
   const [flashcards, setFlashcards] = useState<FlashcardRow[]>([]);
   const [mcq, setMcq] = useState<McqRow | null>(null);
-  // Only trust "no quiz" when the mcqs lookup itself succeeded.
+  // Only true when the quiz lookup succeeded and found no quiz.
   const [isFlashcardsOnly, setIsFlashcardsOnly] = useState(false);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Flashcard editing: only one card is edited at a time.
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editWord, setEditWord] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
@@ -111,10 +141,18 @@ export default function TeacherLessonReport() {
   const [cardError, setCardError] = useState("");
   const [cardToDelete, setCardToDelete] = useState<FlashcardRow | null>(null);
   const [isDeletingCard, setIsDeletingCard] = useState(false);
+  // Lesson documents.
   const [documents, setDocuments] = useState<LessonDocument[]>([]);
   const [isSavingDocument, setIsSavingDocument] = useState(false);
   const [documentError, setDocumentError] = useState("");
 
+  // -- Load the lesson --
+  //
+  // 1. In parallel: the classroom (checked to belong to this teacher), the
+  //    lesson, enrolments, flashcards and documents. Documents get signed
+  //    links that last an hour.
+  // 2. Student profiles and the lesson's quiz.
+  // 3. Completed attempts, reduced to each student's latest one.
   useEffect(() => {
     if (!classroomId || !lessonId || !teacherId) return;
 
@@ -215,7 +253,7 @@ export default function TeacherLessonReport() {
         }
       }
 
-      // A student may have retaken the quiz — keep only their most recent attempt.
+      // A student may have retaken the quiz; keep only their latest attempt.
       const latestByStudent: Record<string, AttemptRow> = {};
       for (const attempt of attempts) {
         const existing = latestByStudent[attempt.student_id];
@@ -254,6 +292,7 @@ export default function TeacherLessonReport() {
         };
       });
 
+      // Students who attempted come first, highest score first.
       studentResults.sort((a, b) => {
         if (a.attempted !== b.attempted) return a.attempted ? -1 : 1;
         return (b.scorePercent ?? b.score ?? 0) - (a.scorePercent ?? a.score ?? 0);
@@ -265,6 +304,8 @@ export default function TeacherLessonReport() {
 
     void load();
   }, [classroomId, lessonId, teacherId]);
+
+  // -- Statistics --
 
   const enrolledCount = results.length;
   const attemptedResults = results.filter((student) => student.attempted);
@@ -281,6 +322,9 @@ export default function TeacherLessonReport() {
     ? Math.max(...scoredResults.map((student) => student.scorePercent ?? 0))
     : null;
 
+  // -- Flashcard editing --
+
+  // Copies the card's current values into the edit form.
   function startEditingCard(card: FlashcardRow) {
     setCardError("");
     setEditingCardId(card.flashcard_id);
@@ -291,6 +335,7 @@ export default function TeacherLessonReport() {
     setRemoveExistingImage(false);
   }
 
+  // Closes the form. Preview images are temporary browser URLs and must be released.
   function cancelEditingCard() {
     if (editImagePreview) URL.revokeObjectURL(editImagePreview);
     setEditingCardId(null);
@@ -303,7 +348,7 @@ export default function TeacherLessonReport() {
 
   function chooseEditImage(file: File | null) {
     setCardError("");
-    if (file && (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024)) {
+    if (file && (!file.type.startsWith("image/") || file.size > MAX_FLASHCARD_IMAGE_BYTES)) {
       setCardError("Flashcard images must be image files smaller than 5 MB.");
       return;
     }
@@ -313,6 +358,10 @@ export default function TeacherLessonReport() {
     setRemoveExistingImage(false);
   }
 
+  // Saves the edit in three steps:
+  //   1. upload a new image, if one was chosen
+  //   2. update the flashcard row
+  //   3. remove the old image from storage once nothing points to it
   async function saveEditingCard() {
     if (!editingCardId || isSavingCard) return;
     const word = editWord.trim();
@@ -365,6 +414,7 @@ export default function TeacherLessonReport() {
     cancelEditingCard();
   }
 
+  // Runs after the teacher confirms. Deletes the card, then its image.
   async function deleteFlashcard() {
     if (!cardToDelete || isDeletingCard) return;
     setIsDeletingCard(true);
@@ -382,8 +432,9 @@ export default function TeacherLessonReport() {
       const { error: imageDeleteError } = await supabase.storage
         .from("images")
         .remove([cardToDelete.image_path]);
-      if (imageDeleteError)
+      if (imageDeleteError) {
         console.error("Could not remove the deleted flashcard image:", imageDeleteError);
+      }
     }
     setFlashcards((cards) =>
       cards.filter((card) => card.flashcard_id !== cardToDelete.flashcard_id),
@@ -391,6 +442,10 @@ export default function TeacherLessonReport() {
     setCardToDelete(null);
   }
 
+  // -- Lesson documents --
+
+  // Uploads a PDF to lesson_documents/<classroom>/<lesson>/ and records it.
+  // If recording fails, the uploaded file is removed again.
   async function uploadLessonDocument(file: File) {
     if (!classroomId || !lessonId || isSavingDocument) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -431,8 +486,9 @@ export default function TeacherLessonReport() {
     const { data: signedData, error: signedError } = await supabase.storage
       .from("documents")
       .createSignedUrl(storagePath, 60 * 60);
-    if (signedError)
+    if (signedError) {
       setDocumentError("The document was uploaded but its preview link could not be created.");
+    }
     setDocuments((current) => [
       { ...data, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument,
       ...current,
@@ -457,14 +513,9 @@ export default function TeacherLessonReport() {
     setDocuments((current) => current.filter((item) => item.resource_id !== document.resource_id));
   }
 
-  function documentName(path: string) {
-    const storedName = decodeURIComponent(path.split("/").pop() ?? path);
-    return storedName.replace(/^[0-9a-f-]{36}-/i, "");
-  }
+  const coverUrl = bucketImageUrlOrBroken(lesson?.lesson_image_path);
 
-  const coverUrl = lesson?.lesson_image_path
-    ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data.publicUrl
-    : BROKEN_IMAGE_URL;
+  // -- Loading and error screens --
 
   if (isLoading) {
     return (
@@ -487,6 +538,8 @@ export default function TeacherLessonReport() {
       </main>
     );
   }
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -529,7 +582,7 @@ export default function TeacherLessonReport() {
         </section>
 
         {
-          // General statistics — flashcards-only lessons have no quiz, so there is nothing to score
+          // Statistics. Flashcards-only lessons have no quiz, so nothing is scored.
         }
         {isFlashcardsOnly ? (
           <section className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
@@ -537,7 +590,7 @@ export default function TeacherLessonReport() {
             <NoScoresNotice />
           </section>
         ) : (
-          <section className="mt-4 grid gap-3 sm:grid-cols-4">
+          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
             <StatCard
               icon={<CheckCircle2 />}
@@ -688,10 +741,7 @@ export default function TeacherLessonReport() {
                               />
                             ) : !removeExistingImage && card.image_path ? (
                               <img
-                                src={
-                                  supabase.storage.from("images").getPublicUrl(card.image_path).data
-                                    .publicUrl
-                                }
+                                src={bucketImageUrl(card.image_path)}
                                 alt="Current flashcard"
                                 className="h-20 w-28 rounded-lg object-cover"
                               />
@@ -747,10 +797,7 @@ export default function TeacherLessonReport() {
                         <div className="flex min-w-0 items-center gap-3">
                           {card.image_path && (
                             <img
-                              src={
-                                supabase.storage.from("images").getPublicUrl(card.image_path).data
-                                  .publicUrl
-                              }
+                              src={bucketImageUrl(card.image_path)}
                               alt=""
                               className="h-12 w-16 shrink-0 rounded-lg object-cover"
                             />

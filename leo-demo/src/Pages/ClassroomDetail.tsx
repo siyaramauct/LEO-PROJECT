@@ -1,7 +1,30 @@
+// -----------------------------------------------------------------------------
+// Classroom Detail (teacher)
+//
+// One classroom from the teacher's side. Everything about the classroom is
+// managed here: its lessons, the files and links shared with students, the
+// invite code, and the student roster.
+//
+// Phones and tablets (under 1024px): one scrolling page with a banner, the
+// materials list, the invite code with the roster, and the lessons. On tablets
+// the materials and invite panels sit side by side.
+//
+// Desktop (1024px and up): a banner with an "Invite students" popover, then
+// three tabs: Lessons, Classroom material and Students. The open tab is kept
+// in the URL (?tab=materials) so refreshing or sharing the link keeps it.
+//
+// Popups on this page:
+//   ConfirmDialog       before deleting a lesson or material, or removing a student
+//   Invite popover      opens under the banner; closes on an outside click,
+//                       the Escape key or its X button
+//
+// Route: /teacher-classroom/:classroomId || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, BookOpen, FolderOpen, Plus, UserPlus, Users, X } from "lucide-react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ClassroomInvitePanel, { type StudentProfile } from "../Components/ClassroomInvitePanel";
 import ClassroomLessonRow, { type ClassroomLesson } from "../Components/ClassroomLessonRow";
 import ClassroomMaterialsPanel, {
   type ClassroomMaterial,
@@ -12,33 +35,29 @@ import ClassroomTabs, { ClassroomTabPanel } from "../Components/ClassroomTabs";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NotificationBell from "../Components/NotificationBell";
-import ClassroomInvitePanel, { type StudentProfile } from "../Components/ClassroomInvitePanel";
-import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
-import UserIdentity from "../Components/UserIdentity";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
-import { validateMaterialFile } from "../utils/materialFileTypes";
+import UserIdentity from "../Components/UserIdentity";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { bucketImageUrlOrBroken } from "../utils/images";
+import { validateMaterialFile } from "../utils/materialFileTypes";
+import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
+
+// -- Types --------------------------------------------------------------------
 
 type ClassroomRow = {
   classroom_id: string;
   classroom_name: string;
   description: string | null;
   cover_image_path: string | null;
-  proficiency_level: string | null;
-  language: string | null;
-  student_count: number | null;
-  lesson_count: number | null;
 };
 
 type LessonRow = {
   lesson_id: string;
   title: string;
-  description: string | null;
   lesson_image_path: string | null;
-  status: string | null;
-  word_count: number | null;
+  release_date: string;
 };
 
 type MaterialRow = {
@@ -51,8 +70,10 @@ type MaterialRow = {
 type DesktopTab = "lessons" | "materials" | "students";
 const DESKTOP_TABS: DesktopTab[] = ["lessons", "materials", "students"];
 
-// Documents have no title column, so the display name is derived from the stored path or link.
-// Uploads are prefixed with a UUID to keep storage keys unique; strip it for display.
+// -- Display helpers ----------------------------------------------------------
+
+// Materials have no title column: links show their website, documents their
+// file name without the "<uuid>-" prefix added on upload.
 const materialTitle = (row: MaterialRow) => {
   if (row.resource_type === "link") {
     try {
@@ -68,6 +89,7 @@ const materialTitle = (row: MaterialRow) => {
   );
 };
 
+// Links open as they are; documents open from the documents bucket.
 const materialUrl = (row: MaterialRow) =>
   row.resource_type === "link" || /^https?:\/\//i.test(row.resource_url)
     ? row.resource_url
@@ -84,18 +106,19 @@ const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
   uploadedDate: row.uploaded_date,
 });
 
-const toLessonDisplay = (row: LessonRow, hasQuiz: boolean): ClassroomLesson => ({
+// One flashcard is one word. Lessons with a release date ahead are "Scheduled".
+const toLessonDisplay = (row: LessonRow, hasQuiz: boolean, words: number): ClassroomLesson => ({
   id: row.lesson_id,
   title: row.title,
-  image: row.lesson_image_path
-    ? supabase.storage.from("images").getPublicUrl(row.lesson_image_path).data.publicUrl
-    : BROKEN_IMAGE_URL,
+  image: bucketImageUrlOrBroken(row.lesson_image_path),
   imageAlt: row.title,
-  status: row.status ?? "Draft",
-  words: row.word_count ?? 0,
+  status: new Date(row.release_date) > new Date() ? "Scheduled" : "Published",
+  words,
   completion: 0,
   hasQuiz,
 });
+
+// -- Page ---------------------------------------------------------------------
 
 export default function ClassroomDetail() {
   const { session } = useAuth();
@@ -126,6 +149,12 @@ export default function ClassroomDetail() {
   const [materialToDelete, setMaterialToDelete] = useState<ClassroomMaterial | null>(null);
   const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
 
+  // -- Load the classroom --
+  //
+  // 1. In parallel: the classroom, its lessons, enrolments, shared materials
+  //    and the private invite code.
+  // 2. For the lessons: which have a quiz, and how many flashcards each has.
+  // 3. For the enrolments: the students' profiles.
   useEffect(() => {
     if (!classroomId || !teacherId) return;
 
@@ -135,8 +164,15 @@ export default function ClassroomDetail() {
 
       const [classroomResult, lessonsResult, enrollmentResult, materialsResult, inviteResult] =
         await Promise.all([
-          supabase.from("classrooms").select("*").eq("classroom_id", classroomId).single(),
-          supabase.from("lessons").select("*").eq("classroom_id", classroomId),
+          supabase
+            .from("classrooms")
+            .select("classroom_id, classroom_name, description, cover_image_path")
+            .eq("classroom_id", classroomId)
+            .single(),
+          supabase
+            .from("lessons")
+            .select("lesson_id, title, lesson_image_path, release_date")
+            .eq("classroom_id", classroomId),
           supabase
             .from("classroom_students")
             .select("student_id, enrolled_at")
@@ -166,21 +202,35 @@ export default function ClassroomDetail() {
 
       if (!lessonsResult.error && lessonsResult.data) {
         const lessonRows = lessonsResult.data as LessonRow[];
-        // Lessons without an mcqs row are flashcards-only. If the lookup fails, don't mislabel them.
-        const mcqResult = lessonRows.length
-          ? await supabase
-              .from("mcqs")
-              .select("lesson_id")
-              .in(
-                "lesson_id",
-                lessonRows.map((row) => row.lesson_id),
-              )
-          : { data: [], error: null };
+        const lessonIds = lessonRows.map((row) => row.lesson_id);
+        const noRows = { data: [], error: null };
+
+        const [mcqResult, flashcardResult] = lessonIds.length
+          ? await Promise.all([
+              supabase.from("mcqs").select("lesson_id").in("lesson_id", lessonIds),
+              supabase.from("flashcards").select("lesson_id").in("lesson_id", lessonIds),
+            ])
+          : [noRows, noRows];
         if (mcqResult.error) console.error("Failed to load lesson quizzes:", mcqResult.error);
+        if (flashcardResult.error) {
+          console.error("Failed to load lesson word counts:", flashcardResult.error);
+        }
+
+        // Lessons without an mcqs row are flashcards-only. If that lookup
+        // failed, assume a quiz rather than mislabel them.
         const quizLessonIds = new Set((mcqResult.data ?? []).map((mcq) => mcq.lesson_id as string));
+        const wordCounts: Record<string, number> = {};
+        for (const card of flashcardResult.data ?? []) {
+          wordCounts[card.lesson_id] = (wordCounts[card.lesson_id] ?? 0) + 1;
+        }
+
         setLessons(
           lessonRows.map((row) =>
-            toLessonDisplay(row, Boolean(mcqResult.error) || quizLessonIds.has(row.lesson_id)),
+            toLessonDisplay(
+              row,
+              Boolean(mcqResult.error) || quizLessonIds.has(row.lesson_id),
+              wordCounts[row.lesson_id] ?? 0,
+            ),
           ),
         );
       }
@@ -214,7 +264,6 @@ export default function ClassroomDetail() {
               `Students are enrolled, but their profiles could not be loaded: ${enrolledProfilesError.message}`,
             );
           } else {
-            console.log("Loaded enrolled student profiles:", enrolledProfiles);
             setStudentProfiles((enrolledProfiles ?? []) as StudentProfile[]);
           }
         } else {
@@ -232,7 +281,9 @@ export default function ClassroomDetail() {
     enrolledStudentIds.includes(student.id),
   );
 
-  // The active desktop tab lives in the URL so refresh, back navigation and shared links keep it.
+  // -- Desktop tabs --
+  // The open tab lives in the URL, so refresh, back navigation and shared
+  // links keep it. "lessons" is the default and leaves the URL clean.
   const requestedTab = searchParams.get("tab") as DesktopTab | null;
   const activeTab: DesktopTab =
     requestedTab && DESKTOP_TABS.includes(requestedTab) ? requestedTab : "lessons";
@@ -248,6 +299,9 @@ export default function ClassroomDetail() {
     );
   };
 
+  // -- Invite popover --
+  // While open, a click anywhere outside the banner area or the Escape key
+  // closes it. The listeners are removed again when it closes.
   useEffect(() => {
     if (!isInviteOpen) return;
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -264,6 +318,7 @@ export default function ClassroomDetail() {
     };
   }, [isInviteOpen]);
 
+  // Replaces the invite code; the old one stops working straight away.
   async function rotateInviteCode() {
     if (
       !classroomId ||
@@ -284,6 +339,10 @@ export default function ClassroomDetail() {
     setInviteCode(data);
   }
 
+  // -- Materials --
+
+  // Uploads a file to the documents bucket, records it as a classroom
+  // material, then tells the students.
   const addFile = async (file: File) => {
     if (!classroomId || !teacherId) return;
     const validation = validateMaterialFile(file);
@@ -294,8 +353,8 @@ export default function ClassroomDetail() {
     setIsSavingMaterial(true);
     setMaterialError(null);
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    // Supabase Storage has no real folders; this prefix auto-creates a per-classroom folder on upload.
-    // The UUID keeps re-uploads of the same filename from overwriting a file another resource row still points to.
+    // Storage "folders" are just path prefixes. The random id stops a second
+    // upload with the same name overwriting a file another row still uses.
     const storagePath = `classroom_documents/${classroomId}/${crypto.randomUUID()}-${safeFileName}`;
     const { error: uploadError } = await supabase.storage
       .from("documents")
@@ -335,12 +394,22 @@ export default function ClassroomDetail() {
     });
   };
 
+  // Shares a web link with the class. Only http and https addresses are
+  // accepted; "example.com" is treated as "https://example.com".
   const addLink = async (url: string) => {
     if (!classroomId || !teacherId) return;
-    setIsSavingMaterial(true);
     setMaterialError(null);
+
     const externalUrl = url.includes("://") ? url : `https://${url}`;
-    new URL(externalUrl); // validates the link before it is shared with learners
+    try {
+      const { protocol } = new URL(externalUrl);
+      if (protocol !== "http:" && protocol !== "https:") throw new Error("Unsupported link");
+    } catch {
+      setMaterialError("Enter a web address that starts with http:// or https://.");
+      return;
+    }
+
+    setIsSavingMaterial(true);
     const { data, error } = await supabase
       .from("learning_resources")
       .insert({
@@ -363,6 +432,8 @@ export default function ClassroomDetail() {
       link_url: `/student/classrooms/${classroomId}`,
     });
   };
+
+  // -- Confirmed deletions (each runs after its ConfirmDialog) --
 
   const deleteLesson = async () => {
     if (!lessonToDelete) return;
@@ -416,6 +487,7 @@ export default function ClassroomDetail() {
     setStudentToRemove(null);
   };
 
+  // Removes the stored file first (if any), then the material row.
   const deleteMaterial = async () => {
     if (!materialToDelete) return;
 
@@ -444,14 +516,16 @@ export default function ClassroomDetail() {
     setMaterialToDelete(null);
   };
 
-  const coverUrl = classroom?.cover_image_path
-    ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
-    : BROKEN_IMAGE_URL;
+  // -- Derived values --
+
+  const coverUrl = bucketImageUrlOrBroken(classroom?.cover_image_path);
 
   const classroomName = classroom?.classroom_name ?? "Classroom";
   const description = classroom?.description ?? "";
   const studentCount = enrolledStudentIds.length;
   const lessonCount = lessons.length;
+
+  // -- Loading and error screens --
 
   if (isLoading) {
     return (
@@ -472,7 +546,7 @@ export default function ClassroomDetail() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       {
-        // Mobile
+        // -- Phone and tablet layout (under 1024px) --
       }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
@@ -504,30 +578,32 @@ export default function ClassroomDetail() {
             </div>
           </section>
 
-          <div className="mt-3">
-            <ClassroomMaterialsPanel
-              materials={materials}
-              onFileUpload={addFile}
-              onAddLink={addLink}
-              onDeleteMaterial={setMaterialToDelete}
-              isSaving={isSavingMaterial}
-              error={materialError}
-            />
-            {materials.length === 0 && <EmptyMaterials />}
-          </div>
+          <div className="md:grid md:grid-cols-2 md:items-start md:gap-3">
+            <div className="mt-3">
+              <ClassroomMaterialsPanel
+                materials={materials}
+                onFileUpload={addFile}
+                onAddLink={addLink}
+                onDeleteMaterial={setMaterialToDelete}
+                isSaving={isSavingMaterial}
+                error={materialError}
+              />
+              {materials.length === 0 && <EmptyMaterials />}
+            </div>
 
-          <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
-            <ClassroomInvitePanel
-              classroomName={classroomName}
-              code={inviteCode}
-              codeError={inviteCodeError}
-              students={enrolledStudents}
-              enrolledAt={enrolledAt}
-              rosterError={enrollmentError}
-              isRotating={isRotatingCode}
-              onRotate={() => void rotateInviteCode()}
-            />
-          </section>
+            <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
+              <ClassroomInvitePanel
+                classroomName={classroomName}
+                code={inviteCode}
+                codeError={inviteCodeError}
+                students={enrolledStudents}
+                enrolledAt={enrolledAt}
+                rosterError={enrollmentError}
+                isRotating={isRotatingCode}
+                onRotate={() => void rotateInviteCode()}
+              />
+            </section>
+          </div>
 
           <section className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
             <div className="flex items-center justify-between">
@@ -567,7 +643,7 @@ export default function ClassroomDetail() {
       </div>
 
       {
-        // Desktop
+        // -- Desktop layout (1024px and up) --
       }
       <div className="hidden min-h-dvh lg:flex">
         <TeacherSidebar active="classes" />
@@ -762,7 +838,7 @@ export default function ClassroomDetail() {
         onCancel={() => setStudentToRemove(null)}
         onConfirm={() => void removeStudent()}
         title={`Remove ${[studentToRemove?.name, studentToRemove?.surname].filter(Boolean).join(" ") || "this student"}?`}
-        description="This will unenrol the student from this classroom. They can be re-added later by searching their username."
+        description="This will unenrol the student from this classroom. They can rejoin later with the classroom code."
         confirmLabel="Remove student"
         deletingLabel="Removing..."
       />

@@ -64,7 +64,7 @@ function buildPlannerWeeks(today: Date) {
   }));
 }
 
-// "October 2026", or "October – November 2026" when the fortnight spans two months.
+// "October 2026", or "October to November 2026" style when the fortnight spans two months.
 function plannerMonthLabel(today: Date, lastDayKey: string) {
   const lastDay = new Date(`${lastDayKey}T00:00:00`);
   if (lastDay.getMonth() === today.getMonth()) {
