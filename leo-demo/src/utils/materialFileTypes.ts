@@ -13,7 +13,9 @@ const MATERIAL_FILE_TYPES: Record<string, string> = {
 
 // For the file picker's `accept` attribute. It only filters the dialog,
 // so uploads are still checked with validateMaterialFile.
-export const MATERIAL_FILE_ACCEPT = Object.keys(MATERIAL_FILE_TYPES).map((extension) => `.${extension}`).join(",");
+export const MATERIAL_FILE_ACCEPT = Object.keys(MATERIAL_FILE_TYPES)
+  .map((extension) => `.${extension}`)
+  .join(",");
 
 export const MATERIAL_FILE_LABEL = "PNG, JPG, PDF, DOC, DOCX or XLSX";
 

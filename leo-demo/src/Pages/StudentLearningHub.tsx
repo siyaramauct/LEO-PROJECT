@@ -17,9 +17,11 @@ const resources: Resource[] = [
   {
     title: "Listen to English used in the real world",
     source: "BBC Learning English",
-    description: "Short videos, pronunciation practice and news-based lessons for a regular listening habit.",
+    description:
+      "Short videos, pronunciation practice and news-based lessons for a regular listening habit.",
     url: "https://www.bbc.co.uk/learningenglish/",
-    image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
+    image:
+      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
     imageAlt: "Learners studying together with a laptop",
     label: "Listening",
     icon: Headphones,
@@ -27,9 +29,11 @@ const resources: Resource[] = [
   {
     title: "Find practice that matches your level",
     source: "British Council LearnEnglish",
-    description: "Free reading, listening, grammar and vocabulary activities arranged by English level.",
+    description:
+      "Free reading, listening, grammar and vocabulary activities arranged by English level.",
     url: "https://learnenglish.britishcouncil.org/free-resources",
-    image: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=900&q=80",
+    image:
+      "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=900&q=80",
     imageAlt: "Open books on a study desk",
     label: "Practice",
     icon: BookOpen,
@@ -37,9 +41,11 @@ const resources: Resource[] = [
   {
     title: "Learn through clear news and stories",
     source: "VOA Learning English",
-    description: "Slow-paced news, video lessons and beginner courses that make everyday English easier to follow.",
+    description:
+      "Slow-paced news, video lessons and beginner courses that make everyday English easier to follow.",
     url: "https://learningenglish.voanews.com/",
-    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
+    image:
+      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
     imageAlt: "Laptop and notebook prepared for an online lesson",
     label: "Watch",
     icon: Mic,
@@ -47,9 +53,11 @@ const resources: Resource[] = [
   {
     title: "Look up words, hear them, use them",
     source: "Cambridge Learner’s Dictionary",
-    description: "Clear definitions, examples and British and American audio pronunciations for everyday study.",
+    description:
+      "Clear definitions, examples and British and American audio pronunciations for everyday study.",
     url: "https://dictionary.cambridge.org/us/dictionary/learner-english/",
-    image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=900&q=80",
+    image:
+      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=900&q=80",
     imageAlt: "Handwriting notes in a notebook",
     label: "Vocabulary",
     icon: Library,
@@ -66,49 +74,100 @@ export default function StudentLearningHub() {
             <div>
               <p className="text-xs font-medium text-violet-700">Student portal</p>
               <h1 className="mt-1 text-xl font-bold tracking-[-0.025em]">Learning hub</h1>
-              <p className="mt-1 text-xs text-slate-500">Free tools for practising beyond the classroom.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Free tools for practising beyond the classroom.
+              </p>
             </div>
-            <span className="hidden text-[10px] font-bold uppercase tracking-[0.1em] text-violet-600 sm:inline-flex">Free resources</span>
+            <span className="hidden text-[10px] font-bold uppercase tracking-[0.1em] text-violet-600 sm:inline-flex">
+              Free resources
+            </span>
           </div>
         </header>
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
           <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white px-5 py-7 sm:px-8 sm:py-9 lg:grid lg:min-h-[292px] lg:grid-cols-[1fr_0.78fr] lg:items-center lg:gap-8 lg:px-10">
             <div className="relative z-10 max-w-xl">
-              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-600">Resource library</p>
-              <h2 className="mt-3 max-w-lg text-3xl font-black leading-[1.02] tracking-[-0.045em] text-slate-900 sm:text-[2.6rem]">Make room for English in your everyday life.</h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">Trusted places to listen, read and build vocabulary whenever you have a few minutes.</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-600">
+                Resource library
+              </p>
+              <h2 className="mt-3 max-w-lg text-3xl font-black leading-[1.02] tracking-[-0.045em] text-slate-900 sm:text-[2.6rem]">
+                Make room for English in your everyday life.
+              </h2>
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">
+                Trusted places to listen, read and build vocabulary whenever you have a few minutes.
+              </p>
               <div className="mt-6 flex items-center gap-5 text-xs font-semibold text-slate-600">
-                {[["Listen", Headphones], ["Read", BookOpen], ["Build words", Library]].map(([label, Icon]) => {
+                {[
+                  ["Listen", Headphones],
+                  ["Read", BookOpen],
+                  ["Build words", Library],
+                ].map(([label, Icon]) => {
                   const ResourceIcon = Icon as typeof Headphones;
-                  return <span key={label as string} className="inline-flex items-center gap-1.5"><ResourceIcon size={14} className="text-violet-700" />{label as string}</span>;
+                  return (
+                    <span key={label as string} className="inline-flex items-center gap-1.5">
+                      <ResourceIcon size={14} className="text-violet-700" />
+                      {label as string}
+                    </span>
+                  );
                 })}
               </div>
             </div>
             <div className="relative mt-7 h-48 overflow-hidden rounded-xl bg-violet-50 sm:h-60 lg:mt-0 lg:h-64">
-              <img src={projectImageUrl("artisticCollage.png")} alt="Collage of people collaborating on ideas" className="h-full w-full object-cover object-[50%_42%]" />
+              <img
+                src={projectImageUrl("artisticCollage.png")}
+                alt="Collage of people collaborating on ideas"
+                className="h-full w-full object-cover object-[50%_42%]"
+              />
             </div>
           </section>
 
           <section className="mt-7">
             <div className="flex items-end justify-between gap-4">
-              <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-600">Choose a focus</p><h2 className="mt-1 text-xl font-bold tracking-[-0.025em]">Free study resources</h2></div>
-              <p className="hidden max-w-xs text-right text-xs leading-5 text-slate-500 sm:block">Choose one small thing to practise today. Consistency matters more than cramming.</p>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-600">
+                  Choose a focus
+                </p>
+                <h2 className="mt-1 text-xl font-bold tracking-[-0.025em]">Free study resources</h2>
+              </div>
+              <p className="hidden max-w-xs text-right text-xs leading-5 text-slate-500 sm:block">
+                Choose one small thing to practise today. Consistency matters more than cramming.
+              </p>
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {resources.map((resource) => {
                 const Icon = resource.icon;
                 return (
-                  <a key={resource.url} href={resource.url} target="_blank" rel="noopener noreferrer" className="group flex min-h-[274px] flex-col overflow-hidden rounded-xl border border-violet-100 bg-white transition-colors hover:border-violet-300">
+                  <a
+                    key={resource.url}
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex min-h-[274px] flex-col overflow-hidden rounded-xl border border-violet-100 bg-white transition-colors hover:border-violet-300"
+                  >
                     <div className="h-28 overflow-hidden bg-violet-50">
-                      <img src={resource.image} alt={resource.imageAlt} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
+                      <img
+                        src={resource.image}
+                        alt={resource.imageAlt}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
                     </div>
                     <div className="flex flex-1 flex-col p-4">
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-violet-700"><Icon size={12} />{resource.label}</div>
-                      <p className="mt-3 text-[11px] font-semibold text-slate-400">{resource.source}</p>
-                      <h3 className="mt-1.5 text-sm font-bold leading-snug tracking-[-0.015em] text-slate-900">{resource.title}</h3>
-                      <p className="mt-2 text-xs leading-5 text-slate-500">{resource.description}</p>
-                      <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-bold text-violet-700">Open resource <ArrowUpRight size={14} /></span>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-violet-700">
+                        <Icon size={12} />
+                        {resource.label}
+                      </div>
+                      <p className="mt-3 text-[11px] font-semibold text-slate-400">
+                        {resource.source}
+                      </p>
+                      <h3 className="mt-1.5 text-sm font-bold leading-snug tracking-[-0.015em] text-slate-900">
+                        {resource.title}
+                      </h3>
+                      <p className="mt-2 text-xs leading-5 text-slate-500">
+                        {resource.description}
+                      </p>
+                      <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-bold text-violet-700">
+                        Open resource <ArrowUpRight size={14} />
+                      </span>
                     </div>
                   </a>
                 );
@@ -117,7 +176,10 @@ export default function StudentLearningHub() {
           </section>
 
           <section className="mt-6 border-y border-violet-100 py-4 sm:py-5">
-            <p className="text-sm leading-6 text-slate-600"><span className="font-bold tracking-[-0.01em] text-slate-900">One useful habit:</span> save a phrase from every resource you visit, then use it in your next lesson.</p>
+            <p className="text-sm leading-6 text-slate-600">
+              <span className="font-bold tracking-[-0.01em] text-slate-900">One useful habit:</span>{" "}
+              save a phrase from every resource you visit, then use it in your next lesson.
+            </p>
           </section>
         </div>
       </main>

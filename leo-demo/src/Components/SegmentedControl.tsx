@@ -6,9 +6,18 @@ type SegmentedControlProps<T extends string> = {
 };
 
 // Compact toggle for switching a list's sort order; scrolls sideways rather than wrapping on narrow screens.
-export default function SegmentedControl<T extends string>({ label, options, value, onChange }: SegmentedControlProps<T>) {
+export default function SegmentedControl<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: SegmentedControlProps<T>) {
   return (
-    <div role="group" aria-label={label} className="inline-flex max-w-full shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-0.5">
+    <div
+      role="group"
+      aria-label={label}
+      className="inline-flex max-w-full shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-0.5"
+    >
       {options.map((option) => (
         <button
           key={option.value}

@@ -5,13 +5,26 @@ import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import JoinClassroomForm from "../Components/JoinClassroomForm";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import StudentClassroomCard, { type StudentClassroomCardData } from "../Components/StudentClassroomCard";
+import StudentClassroomCard, {
+  type StudentClassroomCardData,
+} from "../Components/StudentClassroomCard";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
 import { BROKEN_IMAGE_URL } from "../utils/images";
 
-type Classroom = { classroom_id: string; classroom_name: string; description: string | null; cover_image_path: string | null };
-type Lesson = { lesson_id: string; classroom_id: string; title: string; description: string | null; lesson_image_path: string | null };
+type Classroom = {
+  classroom_id: string;
+  classroom_name: string;
+  description: string | null;
+  cover_image_path: string | null;
+};
+type Lesson = {
+  lesson_id: string;
+  classroom_id: string;
+  title: string;
+  description: string | null;
+  lesson_image_path: string | null;
+};
 
 export default function StudentClassrooms() {
   const { session, profile } = useAuth();
@@ -28,7 +41,10 @@ export default function StudentClassrooms() {
     const loadClassrooms = async () => {
       setIsLoading(true);
       setError("");
-      const { data: enrolments, error: enrolmentError } = await supabase.from("classroom_students").select("classroom_id").eq("student_id", session.user.id);
+      const { data: enrolments, error: enrolmentError } = await supabase
+        .from("classroom_students")
+        .select("classroom_id")
+        .eq("student_id", session.user.id);
       if (enrolmentError) {
         setError(enrolmentError.message);
         setIsLoading(false);
@@ -42,18 +58,34 @@ export default function StudentClassrooms() {
         return;
       }
       const [classroomResult, lessonResult] = await Promise.all([
-        supabase.from("classrooms").select("classroom_id, classroom_name, description, cover_image_path").in("classroom_id", classroomIds),
-        supabase.from("lessons").select("lesson_id, classroom_id, title, description, lesson_image_path").in("classroom_id", classroomIds).lte("release_date", new Date().toISOString()),
+        supabase
+          .from("classrooms")
+          .select("classroom_id, classroom_name, description, cover_image_path")
+          .in("classroom_id", classroomIds),
+        supabase
+          .from("lessons")
+          .select("lesson_id, classroom_id, title, description, lesson_image_path")
+          .in("classroom_id", classroomIds)
+          .lte("release_date", new Date().toISOString()),
       ]);
       if (classroomResult.error || lessonResult.error) {
-        setError(classroomResult.error?.message ?? lessonResult.error?.message ?? "Could not load your classrooms.");
+        setError(
+          classroomResult.error?.message ??
+            lessonResult.error?.message ??
+            "Could not load your classrooms.",
+        );
       } else {
         const enrolledLessons = (lessonResult.data ?? []) as Lesson[];
         setClassrooms((classroomResult.data ?? []) as Classroom[]);
         setLessons(enrolledLessons);
         const lessonIds = enrolledLessons.map((lesson) => lesson.lesson_id);
         if (lessonIds.length) {
-          const { data: attempts } = await supabase.from("lesson_attempts").select("lesson_id").eq("student_id", session.user.id).in("lesson_id", lessonIds).not("completed_at", "is", null);
+          const { data: attempts } = await supabase
+            .from("lesson_attempts")
+            .select("lesson_id")
+            .eq("student_id", session.user.id)
+            .in("lesson_id", lessonIds)
+            .not("completed_at", "is", null);
           setCompletedLessonIds([...new Set((attempts ?? []).map((attempt) => attempt.lesson_id))]);
         } else {
           setCompletedLessonIds([]);
@@ -92,7 +124,10 @@ export default function StudentClassrooms() {
       return;
     }
 
-    const studentName = [profile?.name, profile?.surname].filter(Boolean).join(" ") || session.user.email || "A student";
+    const studentName =
+      [profile?.name, profile?.surname].filter(Boolean).join(" ") ||
+      session.user.email ||
+      "A student";
     await notifyUser({
       recipient_id: teacher.data.teacher_id,
       type: "student_left_classroom",
@@ -105,9 +140,13 @@ export default function StudentClassrooms() {
       .filter((lesson) => lesson.classroom_id !== classroomToLeave.id)
       .map((lesson) => lesson.lesson_id);
 
-    setClassrooms((prev) => prev.filter((classroom) => classroom.classroom_id !== classroomToLeave.id));
+    setClassrooms((prev) =>
+      prev.filter((classroom) => classroom.classroom_id !== classroomToLeave.id),
+    );
     setLessons((prev) => prev.filter((lesson) => lesson.classroom_id !== classroomToLeave.id));
-    setCompletedLessonIds((prev) => prev.filter((lessonId) => remainingLessonIds.includes(lessonId)));
+    setCompletedLessonIds((prev) =>
+      prev.filter((lessonId) => remainingLessonIds.includes(lessonId)),
+    );
     setClassroomToLeave(null);
     setIsLeavingClassroom(false);
   }
@@ -115,12 +154,20 @@ export default function StudentClassrooms() {
   const normalisedSearch = classroomSearch.trim().toLowerCase();
   const lessonCount = lessons.length;
   const completedLessons = completedLessonIds.length;
-  const visibleClassrooms = classrooms.filter((classroom) => `${classroom.classroom_name} ${classroom.description ?? ""}`.toLowerCase().includes(normalisedSearch));
+  const visibleClassrooms = classrooms.filter((classroom) =>
+    `${classroom.classroom_name} ${classroom.description ?? ""}`
+      .toLowerCase()
+      .includes(normalisedSearch),
+  );
 
   // Builds the card's display data (stats + cover image) for a single classroom.
   const toCardData = (classroom: Classroom): StudentClassroomCardData => {
-    const classroomLessons = lessons.filter((lesson) => lesson.classroom_id === classroom.classroom_id);
-    const completedCount = classroomLessons.filter((lesson) => completedLessonIds.includes(lesson.lesson_id)).length;
+    const classroomLessons = lessons.filter(
+      (lesson) => lesson.classroom_id === classroom.classroom_id,
+    );
+    const completedCount = classroomLessons.filter((lesson) =>
+      completedLessonIds.includes(lesson.lesson_id),
+    ).length;
     const image = classroom.cover_image_path
       ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data.publicUrl
       : BROKEN_IMAGE_URL;
@@ -147,7 +194,9 @@ export default function StudentClassrooms() {
             <div>
               <p className="text-xs font-medium text-violet-700">Student portal</p>
               <h1 className="mt-1 text-xl font-bold">My classrooms</h1>
-              <p className="mt-1 text-xs text-slate-500">Open a classroom to see lessons and teacher resources.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Open a classroom to see lessons and teacher resources.
+              </p>
             </div>
             <NotificationBell />
           </div>
@@ -173,17 +222,29 @@ export default function StudentClassrooms() {
             </article>
           </section>
 
-          <JoinClassroomForm inputId="classroom-code" className="mt-5 border-b border-slate-200 bg-white px-4 py-5 sm:px-6" />
+          <JoinClassroomForm
+            inputId="classroom-code"
+            className="mt-5 border-b border-slate-200 bg-white px-4 py-5 sm:px-6"
+          />
 
-          {isLoading && <p className="py-12 text-center text-sm text-slate-500">Loading your classrooms...</p>}
-          {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {isLoading && (
+            <p className="py-12 text-center text-sm text-slate-500">Loading your classrooms...</p>
+          )}
+          {error && (
+            <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </p>
+          )}
 
-          {!isLoading && !error && (
-            classrooms.length === 0 ? (
+          {!isLoading &&
+            !error &&
+            (classrooms.length === 0 ? (
               <section className="rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
                 <Users size={26} className="mx-auto text-slate-300" />
                 <h2 className="mt-3 text-sm font-semibold">No classrooms yet</h2>
-                <p className="mt-1 text-xs text-slate-500">Ask your teacher for an invitation code, then enter it above.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Ask your teacher for an invitation code, then enter it above.
+                </p>
               </section>
             ) : (
               <>
@@ -191,10 +252,15 @@ export default function StudentClassrooms() {
                 <section className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-sm font-bold">Find a classroom</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">Search by classroom name or topic.</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Search by classroom name or topic.
+                    </p>
                   </div>
                   <div className="relative w-full sm:w-72">
-                    <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-violet-600" />
+                    <Search
+                      size={16}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-violet-600"
+                    />
                     <input
                       value={classroomSearch}
                       onChange={(event) => setClassroomSearch(event.target.value)}
@@ -220,18 +286,23 @@ export default function StudentClassrooms() {
                   <section className="mt-4 rounded-xl border border-violet-100 bg-white px-5 py-10 text-center">
                     <Search size={22} className="mx-auto text-violet-300" />
                     <h2 className="mt-3 text-sm font-semibold">No classrooms match that search</h2>
-                    <p className="mt-1 text-xs text-slate-500">Try a class name, subject, or a broader keyword.</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Try a class name, subject, or a broader keyword.
+                    </p>
                   </section>
                 ) : (
                   <section className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {visibleClassrooms.map((classroom) => (
-                      <StudentClassroomCard key={classroom.classroom_id} classroom={toCardData(classroom)} onLeave={setClassroomToLeave} />
+                      <StudentClassroomCard
+                        key={classroom.classroom_id}
+                        classroom={toCardData(classroom)}
+                        onLeave={setClassroomToLeave}
+                      />
                     ))}
                   </section>
                 )}
               </>
-            )
-          )}
+            ))}
         </div>
       </main>
 

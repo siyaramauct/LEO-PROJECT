@@ -2,7 +2,11 @@ import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-reac
 import { useId, useState } from "react";
 import type { ClassroomMaterial } from "./ClassroomMaterialsPanel";
 import { MaterialSpine, MaterialTypeTag } from "./MaterialTypeMarks";
-import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL, materialTypeLabel } from "../utils/materialFileTypes";
+import {
+  MATERIAL_FILE_ACCEPT,
+  MATERIAL_FILE_LABEL,
+  materialTypeLabel,
+} from "../utils/materialFileTypes";
 
 type ClassroomMaterialsTimelineProps = {
   materials: ClassroomMaterial[];
@@ -22,7 +26,8 @@ const groupLabel = (uploaded: Date, now: Date) => {
   if (time >= startOfToday) return "Today";
   if (time >= startOfToday - DAY_MS) return "Yesterday";
   if (time >= startOfToday - 6 * DAY_MS) return "This week";
-  if (uploaded.getFullYear() === now.getFullYear() && uploaded.getMonth() === now.getMonth()) return "Earlier this month";
+  if (uploaded.getFullYear() === now.getFullYear() && uploaded.getMonth() === now.getMonth())
+    return "Earlier this month";
   return uploaded.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 };
 
@@ -30,7 +35,9 @@ const groupMaterials = (materials: ClassroomMaterial[]) => {
   const now = new Date();
   const groups: { label: string; items: ClassroomMaterial[] }[] = [];
   for (const material of materials) {
-    const label = material.uploadedDate ? groupLabel(new Date(material.uploadedDate), now) : "Undated";
+    const label = material.uploadedDate
+      ? groupLabel(new Date(material.uploadedDate), now)
+      : "Undated";
     const last = groups[groups.length - 1];
     if (last?.label === label) last.items.push(material);
     else groups.push({ label, items: [material] });
@@ -39,7 +46,15 @@ const groupMaterials = (materials: ClassroomMaterial[]) => {
 };
 
 const formatTimestamp = (value?: string) =>
-  value ? new Date(value).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  value
+    ? new Date(value).toLocaleString(undefined, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
 // Desktop materials feed: composer on top, newest uploads first, grouped by date.
 export default function ClassroomMaterialsTimeline({
@@ -67,7 +82,9 @@ export default function ClassroomMaterialsTimeline({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold">Share with the class</h2>
-            <p className="mt-1 text-sm text-slate-500">Students are notified when you post a document or link.</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Students are notified when you post a document or link.
+            </p>
             <p className="mt-0.5 text-xs text-slate-400">Accepted files: {MATERIAL_FILE_LABEL}</p>
           </div>
           <div className="flex gap-2">
@@ -129,7 +146,14 @@ export default function ClassroomMaterialsTimeline({
           </form>
         )}
 
-        {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
+        {error && (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+          >
+            {error}
+          </p>
+        )}
       </section>
 
       {materials.length === 0 ? (
@@ -139,7 +163,9 @@ export default function ClassroomMaterialsTimeline({
       ) : (
         groupMaterials(materials).map((group) => (
           <section key={group.label} aria-label={group.label}>
-            <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</h3>
+            <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {group.label}
+            </h3>
             <ol className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
               {group.items.map((material) => {
                 const isLink = material.kind === "Link";
@@ -151,17 +177,34 @@ export default function ClassroomMaterialsTimeline({
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
                         {material.url ? (
-                          <a href={material.url} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-slate-800 hover:text-violet-700 hover:underline">
+                          <a
+                            href={material.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="truncate text-sm font-semibold text-slate-800 hover:text-violet-700 hover:underline"
+                          >
                             {material.title}
                           </a>
                         ) : (
-                          <p className="truncate text-sm font-semibold text-slate-800">{material.title}</p>
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {material.title}
+                          </p>
                         )}
-                        <MaterialTypeTag label={materialTypeLabel(material.resourceType, material.resourcePath)} />
+                        <MaterialTypeTag
+                          label={materialTypeLabel(material.resourceType, material.resourcePath)}
+                        />
                       </div>
                       <p className="mt-0.5 text-xs text-slate-400">
                         {material.detail}
-                        {material.uploadedDate && <> · <time dateTime={material.uploadedDate}>{formatTimestamp(material.uploadedDate)}</time></>}
+                        {material.uploadedDate && (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <time dateTime={material.uploadedDate}>
+                              {formatTimestamp(material.uploadedDate)}
+                            </time>
+                          </>
+                        )}
                       </p>
                     </div>
                     <button

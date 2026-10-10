@@ -11,16 +11,32 @@ type DeleteDialogProps = {
   deletingLabel: string;
 };
 
-export default function DeleteAccountDialog({ open, isDeleting, onCancel, onConfirm, title, description, confirmLabel, deletingLabel }: DeleteDialogProps) {
+export default function DeleteAccountDialog({
+  open,
+  isDeleting,
+  onCancel,
+  onConfirm,
+  title,
+  description,
+  confirmLabel,
+  deletingLabel,
+}: DeleteDialogProps) {
   if (!open) return null;
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-dialog-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+    >
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-600 text-white">
           <AlertTriangle size={22} />
         </div>
-        <h2 id="delete-dialog-title" className="mt-4 text-base font-bold text-slate-900">{title}</h2>
+        <h2 id="delete-dialog-title" className="mt-4 text-base font-bold text-slate-900">
+          {title}
+        </h2>
         <p className="mt-2 text-sm text-slate-500">{description}</p>
         <div className="mt-6 flex gap-3">
           <button

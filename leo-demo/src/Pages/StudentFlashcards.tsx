@@ -1,11 +1,4 @@
-import {
-  ArrowLeft,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Volume2,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Volume2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
@@ -23,13 +16,11 @@ const cards = [
   },
   {
     word: "Mitochondria",
-    definition:
-      "The part of a cell that releases energy from food for the cell to use.",
+    definition: "The part of a cell that releases energy from food for the cell to use.",
   },
   {
     word: "Cytoplasm",
-    definition:
-      "The jelly-like material inside a cell where many chemical reactions take place.",
+    definition: "The jelly-like material inside a cell where many chemical reactions take place.",
   },
 ];
 
@@ -41,9 +32,7 @@ export default function StudentFlashcards() {
   const progress = ((index + 1) / cards.length) * 100;
 
   function advance(direction: -1 | 1) {
-    setIndex((current) =>
-      Math.min(Math.max(current + direction, 0), cards.length - 1),
-    );
+    setIndex((current) => Math.min(Math.max(current + direction, 0), cards.length - 1));
     setShowDefinition(false);
   }
 
@@ -62,9 +51,7 @@ export default function StudentFlashcards() {
               <ArrowLeft size={19} />
             </button>
             <div>
-              <p className="text-xs font-medium text-violet-700">
-                Student portal
-              </p>
+              <p className="text-xs font-medium text-violet-700">Student portal</p>
               <h1 className="mt-1 text-base font-bold">Flashcard practice</h1>
             </div>
           </div>
@@ -116,8 +103,7 @@ export default function StudentFlashcards() {
                   </button>
                 )}
                 <p className="mt-7 text-xs text-slate-500">
-                  Select the card to{" "}
-                  {showDefinition ? "show the word" : "reveal the definition"}.
+                  Select the card to {showDefinition ? "show the word" : "reveal the definition"}.
                 </p>
               </div>
             </button>

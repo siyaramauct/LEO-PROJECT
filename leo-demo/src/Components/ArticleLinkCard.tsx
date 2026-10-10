@@ -26,19 +26,30 @@ export default function ArticleLinkCard({ article }: ArticleLinkCardProps) {
       className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-0.5 hover:shadow-lg"
     >
       <div className="relative h-32 w-full overflow-hidden">
-        <img src={article.image} alt={article.imageAlt} className="block h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-        <span className={`absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white ${article.accentClassName}`}>
+        <img
+          src={article.image}
+          alt={article.imageAlt}
+          className="block h-full w-full object-cover transition duration-300 group-hover:scale-105"
+        />
+        <span
+          className={`absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white ${article.accentClassName}`}
+        >
           {article.icon}
         </span>
       </div>
 
       <div className="flex flex-1 flex-col p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{article.source}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {article.source}
+        </p>
         <h3 className="mt-1.5 text-sm font-bold leading-snug text-slate-900">{article.title}</h3>
         <p className="mt-2 flex-1 text-xs leading-relaxed text-slate-500">{article.description}</p>
         <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-700">
           Read more
-          <ArrowUpRight size={14} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <ArrowUpRight
+            size={14}
+            className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          />
         </span>
       </div>
     </a>

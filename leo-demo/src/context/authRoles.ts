@@ -1,6 +1,6 @@
 export const Role = {
   Student: "student",
   Teacher: "teacher",
-} as const
+} as const;
 
-export type Role = (typeof Role)[keyof typeof Role]
+export type Role = (typeof Role)[keyof typeof Role];

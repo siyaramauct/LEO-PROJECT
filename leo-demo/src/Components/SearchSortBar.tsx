@@ -30,7 +30,10 @@ export default function SearchSortBar<T extends string>({
   return (
     <div className={`flex flex-col gap-2 sm:flex-row sm:items-center ${className}`}>
       <div className="relative min-w-0 flex-1">
-        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search
+          size={16}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
         <input
           type="search"
           value={query}
@@ -52,8 +55,13 @@ export default function SearchSortBar<T extends string>({
       </div>
 
       <div className="relative shrink-0">
-        <label htmlFor={sortId} className="sr-only">Sort by</label>
-        <ArrowUpDown size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <label htmlFor={sortId} className="sr-only">
+          Sort by
+        </label>
+        <ArrowUpDown
+          size={15}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
         <select
           id={sortId}
           value={sort}
@@ -61,7 +69,9 @@ export default function SearchSortBar<T extends string>({
           className={`h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white pl-9 pr-8 ${text} text-slate-700 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:w-auto`}
         >
           {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       </div>

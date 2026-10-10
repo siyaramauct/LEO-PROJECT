@@ -13,9 +13,7 @@ type ClassroomStudentRowProps = {
 
 export type { ClassroomStudent };
 
-export default function ClassroomStudentRow({
-  student,
-}: ClassroomStudentRowProps) {
+export default function ClassroomStudentRow({ student }: ClassroomStudentRowProps) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
       {/* The image falls back to the student's initials if it cannot load. */}

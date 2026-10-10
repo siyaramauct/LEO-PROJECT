@@ -70,7 +70,10 @@ const router = createBrowserRouter([
       { path: "/teacher-dashboard", element: <TeacherDashboard /> },
       { path: "/TeacherClassroom", element: <TeacherClassroom /> },
       { path: "/teacher-classroom/:classroomId", element: <ClassroomDetail /> },
-      { path: "/teacher-classroom/:classroomId/lesson/:lessonId", element: <TeacherLessonReport /> },
+      {
+        path: "/teacher-classroom/:classroomId/lesson/:lessonId",
+        element: <TeacherLessonReport />,
+      },
       { path: "/create-classroom", element: <CreateClassroom /> },
       { path: "/create-lesson", element: <CreateLesson /> },
       { path: "/class-progress", element: <ClassProgress /> },

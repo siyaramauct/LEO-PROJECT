@@ -20,10 +20,7 @@ type ClassroomMobileCardProps = {
   onDelete: (classroom: Classroom) => void;
 };
 
-export default function ClassroomMobileCard({
-  classroom,
-  onDelete,
-}: ClassroomMobileCardProps) {
+export default function ClassroomMobileCard({ classroom, onDelete }: ClassroomMobileCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -75,7 +72,7 @@ export default function ClassroomMobileCard({
         </div>
       </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-slate-50 p-2.5">
           <div className="flex items-center gap-1.5 text-slate-500">
             <Users size={13} />
@@ -91,7 +88,7 @@ export default function ClassroomMobileCard({
           </div>
           <p className="mt-1 text-xs font-bold">{classroom.lessonCount}</p>
         </div>
-        </div>
+      </div>
 
       <div className="mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
         <div>

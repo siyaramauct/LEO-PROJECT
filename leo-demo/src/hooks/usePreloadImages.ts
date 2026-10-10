@@ -28,7 +28,7 @@ export default function usePreloadImages(urls: string[] | null) {
           image.onload = () => resolve();
           image.onerror = () => resolve();
           image.src = src;
-        })
+        }),
     );
 
     const timeout = window.setTimeout(finish, IMAGE_PRELOAD_TIMEOUT_MS);

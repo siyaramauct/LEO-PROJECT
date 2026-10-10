@@ -16,10 +16,13 @@ export default function CreateClassroomHero() {
         </span>
         <h1 className="text-3xl font-bold leading-tight sm:text-4xl">Create your next classroom</h1>
         <p className="text-sm text-white/90 sm:text-base">
-          Set up a name, level and cover in a couple of minutes, then invite your learners.
-          Get inspired below, then bring it to life.
+          Set up a name, level and cover in a couple of minutes, then invite your learners. Get
+          inspired below, then bring it to life.
         </p>
-        <Link to="/create-classroom" className="mt-1 flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-violet-50">
+        <Link
+          to="/create-classroom"
+          className="mt-1 flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-violet-50"
+        >
           <Plus size={19} />
           Create a classroom
         </Link>

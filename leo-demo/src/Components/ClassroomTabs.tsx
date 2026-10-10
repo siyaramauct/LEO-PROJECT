@@ -18,7 +18,15 @@ const tabId = (id: string) => `classroom-tab-${id}`;
 const panelId = (id: string) => `classroom-panel-${id}`;
 
 // Pairs with the tab of the same id so screen readers announce which section is shown.
-export function ClassroomTabPanel({ id, className, children }: { id: string; className?: string; children: ReactNode }) {
+export function ClassroomTabPanel({
+  id,
+  className,
+  children,
+}: {
+  id: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <div role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} className={className}>
       {children}
@@ -27,7 +35,12 @@ export function ClassroomTabPanel({ id, className, children }: { id: string; cla
 }
 
 // Pill-shaped tablist following the WAI-ARIA tabs pattern (roving tabindex, arrow/Home/End keys).
-export default function ClassroomTabs<T extends string>({ tabs, active, onChange, label }: ClassroomTabsProps<T>) {
+export default function ClassroomTabs<T extends string>({
+  tabs,
+  active,
+  onChange,
+  label,
+}: ClassroomTabsProps<T>) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const focusTab = (index: number) => {
@@ -37,7 +50,12 @@ export default function ClassroomTabs<T extends string>({ tabs, active, onChange
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const moves: Record<string, number> = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 };
+    const moves: Record<string, number> = {
+      ArrowRight: index + 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: tabs.length - 1,
+    };
     if (!(event.key in moves)) return;
     event.preventDefault();
     focusTab(moves[event.key]);
@@ -50,7 +68,9 @@ export default function ClassroomTabs<T extends string>({ tabs, active, onChange
         return (
           <button
             key={tab.id}
-            ref={(element) => { buttonRefs.current[index] = element; }}
+            ref={(element) => {
+              buttonRefs.current[index] = element;
+            }}
             type="button"
             role="tab"
             id={tabId(tab.id)}
@@ -64,7 +84,11 @@ export default function ClassroomTabs<T extends string>({ tabs, active, onChange
             {tab.icon}
             {tab.label}
             {tab.count !== undefined && (
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>{tab.count}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}
+              >
+                {tab.count}
+              </span>
             )}
           </button>
         );

@@ -20,12 +20,18 @@ export default function StudentProfile() {
     let isCurrent = true;
 
     const loadProfile = async () => {
-      const { data } = await supabase.from("profiles").select("name, surname, username").eq("id", session.user.id).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("name, surname, username")
+        .eq("id", session.user.id)
+        .maybeSingle();
       if (isCurrent) setStudentProfile(data);
     };
 
     void loadProfile();
-    return () => { isCurrent = false; };
+    return () => {
+      isCurrent = false;
+    };
   }, [session?.user]);
 
   async function handleLogout() {
@@ -53,9 +59,13 @@ export default function StudentProfile() {
     }
   }
 
-  const fallbackName = session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "Student";
-  const fullName = [studentProfile?.name ?? fallbackName, studentProfile?.surname].filter(Boolean).join(" ");
-  const initials = `${(studentProfile?.name ?? fallbackName)[0] ?? "S"}${studentProfile?.surname?.[0] ?? ""}`.toUpperCase();
+  const fallbackName =
+    session?.user.user_metadata?.name ?? session?.user.email?.split("@")[0] ?? "Student";
+  const fullName = [studentProfile?.name ?? fallbackName, studentProfile?.surname]
+    .filter(Boolean)
+    .join(" ");
+  const initials =
+    `${(studentProfile?.name ?? fallbackName)[0] ?? "S"}${studentProfile?.surname?.[0] ?? ""}`.toUpperCase();
 
   return (
     <div className="min-h-screen bg-white text-slate-900">

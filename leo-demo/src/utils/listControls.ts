@@ -13,14 +13,20 @@ export function matchesSearch(query: string, ...fields: (string | null | undefin
 
 const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
 
-export const compareText = (a: string | null | undefined, b: string | null | undefined) => collator.compare(a ?? "", b ?? "");
+export const compareText = (a: string | null | undefined, b: string | null | undefined) =>
+  collator.compare(a ?? "", b ?? "");
 
 // Missing values always sort last, whichever direction is chosen.
-export function compareNullableNumbers(a: number | null | undefined, b: number | null | undefined, direction: "asc" | "desc") {
+export function compareNullableNumbers(
+  a: number | null | undefined,
+  b: number | null | undefined,
+  direction: "asc" | "desc",
+) {
   if (a == null && b == null) return 0;
   if (a == null) return 1;
   if (b == null) return -1;
   return direction === "asc" ? a - b : b - a;
 }
 
-export const toTime = (value: string | Date | null | undefined) => (value ? new Date(value).getTime() : null);
+export const toTime = (value: string | Date | null | undefined) =>
+  value ? new Date(value).getTime() : null;

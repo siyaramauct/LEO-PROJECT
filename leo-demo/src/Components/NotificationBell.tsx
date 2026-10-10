@@ -76,7 +76,9 @@ export default function NotificationBell() {
         setUnreadCount(count ?? 0);
       });
 
-    return () => { isCurrent = false; };
+    return () => {
+      isCurrent = false;
+    };
   }, [userId]);
 
   // Bumps the unread badge instantly when a new notification is inserted for this user.
@@ -91,12 +93,19 @@ export default function NotificationBell() {
       .channel(`notifications:${userId}:${instanceIdRef.current}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_id=eq.${userId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${userId}`,
+        },
         () => setUnreadCount((count) => count + 1),
       )
       .subscribe();
 
-    return () => { void supabase.removeChannel(channel); };
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   // Closes the dropdown when clicking outside of it.
@@ -118,10 +127,17 @@ export default function NotificationBell() {
 
   async function markAsRead(notification: NotificationRow) {
     if (!notification.is_read) {
-      setNotifications((current) => current.map((n) => (n.notification_id === notification.notification_id ? { ...n, is_read: true } : n)));
+      setNotifications((current) =>
+        current.map((n) =>
+          n.notification_id === notification.notification_id ? { ...n, is_read: true } : n,
+        ),
+      );
       setUnreadCount((count) => Math.max(0, count - 1));
 
-      const { error } = await supabase.from("notifications").update({ is_read: true }).eq("notification_id", notification.notification_id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("notification_id", notification.notification_id);
       if (error) console.error("Error marking notification as read:", error);
     }
 
@@ -134,7 +150,11 @@ export default function NotificationBell() {
     setNotifications((current) => current.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
 
-    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("recipient_id", userId).eq("is_read", false);
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("recipient_id", userId)
+      .eq("is_read", false);
     if (error) console.error("Error marking all notifications as read:", error);
   }
 
@@ -160,34 +180,53 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h2 className="text-sm font-bold">Notifications</h2>
             {unreadCount > 0 && (
-              <button type="button" onClick={() => void markAllAsRead()} className="flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-800">
+              <button
+                type="button"
+                onClick={() => void markAllAsRead()}
+                className="flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-800"
+              >
                 <CheckCheck size={14} /> Mark all as read
               </button>
             )}
           </div>
 
           <div className="max-h-96 overflow-y-auto">
-            {isLoading && <p className="px-4 py-6 text-center text-sm text-slate-400">Loading...</p>}
+            {isLoading && (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">Loading...</p>
+            )}
 
-            {!isLoading && notifications.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-400">You have no notifications yet.</p>}
+            {!isLoading && notifications.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">
+                You have no notifications yet.
+              </p>
+            )}
 
-            {!isLoading && notifications.map((notification) => (
-              <button
-                key={notification.notification_id}
-                type="button"
-                onClick={() => void markAsRead(notification)}
-                className={`flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 ${
-                  notification.is_read ? "" : "bg-violet-50/60"
-                }`}
-              >
-                <div className="flex w-full items-center gap-2">
-                  {!notification.is_read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-700" />}
-                  <span className="truncate text-sm font-semibold text-slate-800">{notification.title}</span>
-                </div>
-                {notification.body && <p className="line-clamp-2 text-xs text-slate-500">{notification.body}</p>}
-                <span className="text-[11px] text-slate-400">{formatRelativeTime(notification.created_at)}</span>
-              </button>
-            ))}
+            {!isLoading &&
+              notifications.map((notification) => (
+                <button
+                  key={notification.notification_id}
+                  type="button"
+                  onClick={() => void markAsRead(notification)}
+                  className={`flex w-full flex-col items-start gap-0.5 border-b border-slate-50 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 ${
+                    notification.is_read ? "" : "bg-violet-50/60"
+                  }`}
+                >
+                  <div className="flex w-full items-center gap-2">
+                    {!notification.is_read && (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-700" />
+                    )}
+                    <span className="truncate text-sm font-semibold text-slate-800">
+                      {notification.title}
+                    </span>
+                  </div>
+                  {notification.body && (
+                    <p className="line-clamp-2 text-xs text-slate-500">{notification.body}</p>
+                  )}
+                  <span className="text-[11px] text-slate-400">
+                    {formatRelativeTime(notification.created_at)}
+                  </span>
+                </button>
+              ))}
           </div>
         </div>
       )}

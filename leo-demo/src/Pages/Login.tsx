@@ -11,7 +11,6 @@ export default function Login() {
   if (!loading && session) return <Navigate to="/" replace />;
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col lg:flex-row bg-white">
-
       {/* Mobile-only header image */}
       <div className="lg:hidden w-full h-56 flex-shrink-0 overflow-hidden">
         <img
@@ -22,20 +21,25 @@ export default function Login() {
       </div>
 
       {/* Desktop left panel */}
-      <div className="bg-violet-700 flex-shrink-0
+      <div
+        className="bg-violet-700 flex-shrink-0
                       hidden
                       lg:flex lg:flex-col lg:w-[46%] lg:h-full lg:items-center
-                      lg:justify-between lg:px-12 lg:py-12">
-
+                      lg:justify-between lg:px-12 lg:py-12"
+      >
         {/* Branding */}
         <div className="text-center">
-          <h1 className="text-white font-extrabold tracking-wide whitespace-nowrap
+          <h1
+            className="text-white font-extrabold tracking-wide whitespace-nowrap
                          text-base
-                         lg:text-[2rem] lg:mb-2">
+                         lg:text-[2rem] lg:mb-2"
+          >
             Learn English Online
           </h1>
-          <p className="text-violet-200 text-[11px] leading-relaxed
-                        lg:text-sm lg:mt-1">
+          <p
+            className="text-violet-200 text-[11px] leading-relaxed
+                        lg:text-sm lg:mt-1"
+          >
             Language learning for the real world.
           </p>
         </div>
@@ -57,11 +61,12 @@ export default function Login() {
       </div>
 
       {/* Right / bottom — form panel */}
-      <div className="flex-1 flex flex-col justify-start overflow-y-auto
+      <div
+        className="flex-1 flex flex-col justify-start overflow-y-auto
                       px-6 pt-6 pb-8
-                      lg:justify-center lg:px-0 lg:py-0 lg:overflow-hidden">
+                      lg:justify-center lg:px-0 lg:py-0 lg:overflow-hidden"
+      >
         <div className="w-full max-w-xs mx-auto lg:max-w-sm">
-
           {/* Heading */}
           <div className="mb-4 text-center">
             <h2 className="text-gray-900 text-xl font-bold tracking-tight lg:text-2xl">
@@ -71,7 +76,11 @@ export default function Login() {
           </div>
 
           {/* Google button */}
-          {oauthError && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Google sign-in failed: {oauthError}</p>}
+          {oauthError && (
+            <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              Google sign-in failed: {oauthError}
+            </p>
+          )}
           <GoogleSignInButton />
 
           {/* Divider */}
@@ -85,11 +94,12 @@ export default function Login() {
 
           <p className="mt-4 text-center text-xs text-gray-400">
             Don't have an account?{" "}
-            <a href="/signup" className="text-violet-600 font-semibold hover:underline">Sign up</a>
+            <a href="/signup" className="text-violet-600 font-semibold hover:underline">
+              Sign up
+            </a>
           </p>
         </div>
       </div>
-
     </div>
   );
 }

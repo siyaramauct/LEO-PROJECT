@@ -9,17 +9,13 @@ type StatCardProps = {
   iconClassName?: string;
 };
 
-export default function StatCard({
-  icon,
-  label,
-  value,
-  progress,
-  iconClassName,
-}: StatCardProps) {
+export default function StatCard({ icon, label, value, progress, iconClassName }: StatCardProps) {
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-3">
-      <div className={`flex h-8 w-8 items-center justify-center ${iconClassName ? `rounded-lg ${iconClassName}` : "text-violet-700"}`}>
-          {cloneElement(icon, { size: 19 })}
+      <div
+        className={`flex h-8 w-8 items-center justify-center ${iconClassName ? `rounded-lg ${iconClassName}` : "text-violet-700"}`}
+      >
+        {cloneElement(icon, { size: 19 })}
       </div>
 
       <p className="mt-2 text-xl font-bold">{value}</p>
@@ -27,10 +23,7 @@ export default function StatCard({
 
       {progress !== undefined && (
         <div className="mt-3 h-1.5 w-28 overflow-hidden rounded-full bg-violet-100">
-          <div
-            className="h-full rounded-full bg-violet-700"
-            style={{ width: `${progress}%` }}
-          />
+          <div className="h-full rounded-full bg-violet-700" style={{ width: `${progress}%` }} />
         </div>
       )}
     </div>

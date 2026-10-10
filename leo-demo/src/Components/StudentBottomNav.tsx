@@ -7,9 +7,9 @@ import {
   UserGroupIcon,
   UserIcon,
   BookOpenIcon,
-} from "@heroicons/react/24/outline"
-import { Link, NavLink, useNavigate } from "react-router-dom"
-import { useAuth } from "../../context/AuthContext"
+} from "@heroicons/react/24/outline";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const desktopNavItems = [
   { label: "Home", path: "/student/dashboard", icon: HomeIcon },
@@ -18,22 +18,22 @@ const desktopNavItems = [
   { label: "Report", path: "/student/report", icon: ChartBarIcon },
   { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
-]
+];
 
-const mobileStartItems = desktopNavItems.slice(0, 2)
+const mobileStartItems = desktopNavItems.slice(0, 2);
 const mobileEndItems = [
   { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
   { label: "Profile", path: "/student/profile", icon: UserIcon },
-]
+];
 
 export default function StudentBottomNav() {
-  const { logout } = useAuth()
-  const navigate = useNavigate()
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout()
-    navigate("/login", { replace: true })
-  }
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <>
@@ -63,7 +63,9 @@ export default function StudentBottomNav() {
             to="/student/practice"
             className={({ isActive }) =>
               `mt-4 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
-                isActive ? "bg-white text-violet-800" : "bg-white/10 text-violet-50 hover:bg-white/15"
+                isActive
+                  ? "bg-white text-violet-800"
+                  : "bg-white/10 text-violet-50 hover:bg-white/15"
               }`
             }
           >
@@ -122,5 +124,5 @@ export default function StudentBottomNav() {
         ))}
       </nav>
     </>
-  )
+  );
 }

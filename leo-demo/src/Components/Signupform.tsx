@@ -1,102 +1,119 @@
-import { useRef, useState, type FormEventHandler } from "react"
-import { useForm, type SubmitHandler } from "react-hook-form"
-import { useNavigate } from "react-router-dom"
-import { useAuth } from "../../context/AuthContext.tsx"
+import { useRef, useState, type FormEventHandler } from "react";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.tsx";
 
 type Inputs = {
-  firstName: string
-  lastName: string
-  email: string
-  password: string
-}
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
 
 const field =
-  "w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100"
+  "w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100";
 
-const label = "block text-sm font-bold text-gray-700 mb-1.5"
+const label = "block text-sm font-bold text-gray-700 mb-1.5";
 
 export default function SignupForm() {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<Inputs>()
+  } = useForm<Inputs>();
 
-  const { signup } = useAuth()
-  const navigate = useNavigate()
-  const [saving, setSaving] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [signupMessage, setSignupMessage] = useState<string | null>(null)
-  const submitLock = useRef(false)
+  const { signup } = useAuth();
+  const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [signupMessage, setSignupMessage] = useState<string | null>(null);
+  const submitLock = useRef(false);
 
   const handleSignup: SubmitHandler<Inputs> = async (data) => {
-    if (submitLock.current) return
+    if (submitLock.current) return;
 
-    submitLock.current = true
-    setAuthError(null)
-    setSignupMessage(null)
-    setSaving(true)
+    submitLock.current = true;
+    setAuthError(null);
+    setSignupMessage(null);
+    setSaving(true);
     try {
-      const session = await signup(data.email, data.password, data.firstName, data.lastName)
+      const session = await signup(data.email, data.password, data.firstName, data.lastName);
       if (session) {
-        navigate("/select-role")
+        navigate("/select-role");
       } else {
-        setSignupMessage("If this is a new email account, check your inbox for a confirmation link. Already used Google? Sign in with Google instead.")
+        setSignupMessage(
+          "If this is a new email account, check your inbox for a confirmation link. Already used Google? Sign in with Google instead.",
+        );
       }
     } catch (error: unknown) {
-      console.error("[Signup] ✗ Signup failed:", error)
-      setAuthError(error instanceof Error ? error.message : "Something went wrong. Please try again.")
+      console.error("[Signup] ✗ Signup failed:", error);
+      setAuthError(
+        error instanceof Error ? error.message : "Something went wrong. Please try again.",
+      );
     } finally {
-      setSaving(false)
-      submitLock.current = false
+      setSaving(false);
+      submitLock.current = false;
     }
-  }
+  };
 
-  const onSubmit: SubmitHandler<Inputs> = (data) => handleSignup(data)
+  const onSubmit: SubmitHandler<Inputs> = (data) => handleSignup(data);
   const onFormSubmit: FormEventHandler<HTMLFormElement> = (event) => {
-    void handleSubmit(onSubmit)(event)
-  }
+    void handleSubmit(onSubmit)(event);
+  };
 
   return (
     <form onSubmit={onFormSubmit} className="flex flex-col gap-4.5">
-
       {/* First name */}
       <div>
-        <label htmlFor="firstName" className={label}>First Name</label>
+        <label htmlFor="firstName" className={label}>
+          First Name
+        </label>
         <input
           id="firstName"
           placeholder="Jane"
           className={field}
-          {...register("firstName", { required: "Required",
+          {...register("firstName", {
+            required: "Required",
             pattern: {
               value: /^[a-zA-Z]*$/,
-              message: "Only alphabet letters are allowed"
+              message: "Only alphabet letters are allowed",
             },
-            minLength: { value: 2, message: "Min 2 characters" },  })}
+            minLength: { value: 2, message: "Min 2 characters" },
+          })}
         />
-        {errors.firstName && <p className="mt-1 text-[11px] text-red-500">{errors.firstName.message}</p>}
+        {errors.firstName && (
+          <p className="mt-1 text-[11px] text-red-500">{errors.firstName.message}</p>
+        )}
       </div>
 
       {/* Last name */}
       <div>
-        <label htmlFor="lastName" className={label}>Last Name</label>
+        <label htmlFor="lastName" className={label}>
+          Last Name
+        </label>
         <input
           id="lastName"
           placeholder="Doe"
           className={field}
-          {...register("lastName", { required: "Required",
+          {...register("lastName", {
+            required: "Required",
             pattern: {
               value: /^[a-zA-Z]*$/,
-              message: "Only alphabet letters are allowed"
+              message: "Only alphabet letters are allowed",
             },
-            minLength: { value: 2, message: "Min 2 characters" } })}
+            minLength: { value: 2, message: "Min 2 characters" },
+          })}
         />
-        {errors.lastName && <p className="mt-1 text-[11px] text-red-500">{errors.lastName.message}</p>}
+        {errors.lastName && (
+          <p className="mt-1 text-[11px] text-red-500">{errors.lastName.message}</p>
+        )}
       </div>
 
       {/* Email */}
       <div>
-        <label htmlFor="email" className={label}>Email Address</label>
+        <label htmlFor="email" className={label}>
+          Email Address
+        </label>
         <input
           id="email"
           type="email"
@@ -115,7 +132,9 @@ export default function SignupForm() {
 
       {/* Password */}
       <div>
-        <label htmlFor="password" className={label}>Password</label>
+        <label htmlFor="password" className={label}>
+          Password
+        </label>
         <input
           id="password"
           type="password"
@@ -133,7 +152,9 @@ export default function SignupForm() {
             },
           })}
         />
-        {errors.password && <p className="mt-1 text-[11px] text-red-500">{errors.password.message}</p>}
+        {errors.password && (
+          <p className="mt-1 text-[11px] text-red-500">{errors.password.message}</p>
+        )}
       </div>
 
       {/* Submit */}
@@ -141,7 +162,9 @@ export default function SignupForm() {
         <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-[12px] text-red-600">{authError}</p>
       )}
       {signupMessage && (
-        <p className="rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[12px] text-emerald-700">{signupMessage}</p>
+        <p className="rounded-lg bg-emerald-50 px-3.5 py-2.5 text-[12px] text-emerald-700">
+          {signupMessage}
+        </p>
       )}
       <button
         type="submit"
@@ -150,7 +173,6 @@ export default function SignupForm() {
       >
         {saving ? "Creating account..." : "Create Account"}
       </button>
-
     </form>
-  )
+  );
 }

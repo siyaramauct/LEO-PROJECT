@@ -23,7 +23,11 @@ export default function ClassroomFormField({
       </label>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
       <div className="mt-2">{children}</div>
-      {error && <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

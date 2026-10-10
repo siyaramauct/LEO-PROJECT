@@ -36,7 +36,11 @@ export default function StudentClassroomCard({ classroom, onLeave }: StudentClas
     >
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 shadow-inner">
-          <img src={classroom.image} alt={classroom.imageAlt} className="h-full w-full object-cover" />
+          <img
+            src={classroom.image}
+            alt={classroom.imageAlt}
+            className="h-full w-full object-cover"
+          />
         </div>
 
         <div className="min-w-0 flex-1">

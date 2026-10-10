@@ -33,8 +33,10 @@ export async function notifyClassroomStudents(
     return;
   }
 
-  await notifyUsers((students ?? []).map((student) => ({
-    ...notification,
-    recipient_id: student.student_id,
-  })));
+  await notifyUsers(
+    (students ?? []).map((student) => ({
+      ...notification,
+      recipient_id: student.student_id,
+    })),
+  );
 }

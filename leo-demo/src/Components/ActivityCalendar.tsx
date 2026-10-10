@@ -12,19 +12,34 @@ type ActivityCalendarProps = {
   legend: { level: number; label: string }[];
 };
 
-export default function ActivityCalendar({ weeks, getLevel, getTitle, label, legend }: ActivityCalendarProps) {
+export default function ActivityCalendar({
+  weeks,
+  getLevel,
+  getTitle,
+  label,
+  legend,
+}: ActivityCalendarProps) {
   return (
     <div>
       <div className="overflow-x-auto">
         <div className="inline-flex gap-1.5" role="img" aria-label={label}>
           <div className="grid grid-rows-[auto_repeat(7,1rem)] gap-1 pr-1 text-[10px] leading-4 text-slate-400 sm:grid-rows-[auto_repeat(7,1.25rem)]">
             <span className="h-4" />
-            {WEEKDAY_LABELS.map((weekday, index) => <span key={index} className="flex items-center">{weekday}</span>)}
+            {WEEKDAY_LABELS.map((weekday, index) => (
+              <span key={index} className="flex items-center">
+                {weekday}
+              </span>
+            ))}
           </div>
           {weeks.map((week, weekIndex) => {
-            const startsMonth = weekIndex === 0 || week[0].date.getMonth() !== weeks[weekIndex - 1][0].date.getMonth();
+            const startsMonth =
+              weekIndex === 0 ||
+              week[0].date.getMonth() !== weeks[weekIndex - 1][0].date.getMonth();
             return (
-              <div key={week[0].key} className="grid grid-rows-[auto_repeat(7,1rem)] gap-1 sm:grid-rows-[auto_repeat(7,1.25rem)]">
+              <div
+                key={week[0].key}
+                className="grid grid-rows-[auto_repeat(7,1rem)] gap-1 sm:grid-rows-[auto_repeat(7,1.25rem)]"
+              >
                 <span className="h-4 w-4 overflow-visible whitespace-nowrap text-[10px] leading-4 text-slate-400 sm:w-5">
                   {startsMonth ? week[0].date.toLocaleDateString("en-ZA", { month: "short" }) : ""}
                 </span>

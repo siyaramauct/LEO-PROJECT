@@ -1,0 +1,6 @@
+dist
+node_modules
+public
+supabase
+db
+package-lock.json

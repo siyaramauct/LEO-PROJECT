@@ -5,7 +5,13 @@ import ClassroomMetric from "./ClassroomMetric";
 import SearchSortBar from "./SearchSortBar";
 import type { StudentProfile } from "./ClassroomInvitePanel";
 import { supabase } from "../supabase-client";
-import { compareNullableNumbers, compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
+import {
+  compareNullableNumbers,
+  compareText,
+  matchesSearch,
+  toTime,
+  type SortOption,
+} from "../utils/listControls";
 
 type ClassroomStudentsTabProps = {
   classroomId: string;
@@ -24,7 +30,13 @@ type StudentStats = {
 
 const ACTIVITY_WINDOW_DAYS = 30;
 
-type StudentSort = "name-asc" | "name-desc" | "recently-joined" | "highest-score" | "most-quizzes" | "recently-active";
+type StudentSort =
+  | "name-asc"
+  | "name-desc"
+  | "recently-joined"
+  | "highest-score"
+  | "most-quizzes"
+  | "recently-active";
 
 const studentSortOptions: SortOption<StudentSort>[] = [
   { value: "name-asc", label: "Name (A–Z)" },
@@ -46,17 +58,30 @@ const lastActiveLabel = (activityDate: string | null) => {
   if (!activityDate) return `Not active in ${ACTIVITY_WINDOW_DAYS} days`;
   const [year, month, day] = activityDate.split("-").map(Number);
   const today = new Date();
-  const days = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - new Date(year, month - 1, day).getTime()) / 86_400_000);
+  const days = Math.round(
+    (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() -
+      new Date(year, month - 1, day).getTime()) /
+      86_400_000,
+  );
   if (days <= 0) return "Active today";
   if (days === 1) return "Active yesterday";
   return `Active ${days} days ago`;
 };
 
-const fullName = (student: StudentProfile) => [student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student";
-const initials = (student: StudentProfile) => `${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S";
+const fullName = (student: StudentProfile) =>
+  [student.name, student.surname].filter(Boolean).join(" ") || "Unnamed student";
+const initials = (student: StudentProfile) =>
+  `${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S";
 
 // Rudimentary roster with light statistics. Stats load only when this tab is first shown.
-export default function ClassroomStudentsTab({ classroomId, students, enrolledAt, lessonIds, rosterError, onRemove }: ClassroomStudentsTabProps) {
+export default function ClassroomStudentsTab({
+  classroomId,
+  students,
+  enrolledAt,
+  lessonIds,
+  rosterError,
+  onRemove,
+}: ClassroomStudentsTabProps) {
   const [stats, setStats] = useState<Record<string, StudentStats>>({});
   const [statsError, setStatsError] = useState<string | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -86,16 +111,30 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
           ? supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", classLessonIds)
           : Promise.resolve({ data: [], error: null }),
         classLessonIds.length
-          ? supabase.from("lesson_attempts").select("student_id, lesson_id, score").in("lesson_id", classLessonIds).in("student_id", studentIds).not("completed_at", "is", null)
+          ? supabase
+              .from("lesson_attempts")
+              .select("student_id, lesson_id, score")
+              .in("lesson_id", classLessonIds)
+              .in("student_id", studentIds)
+              .not("completed_at", "is", null)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from("student_activity").select("student_id, activity_date").in("student_id", studentIds).gte("activity_date", localDate(ACTIVITY_WINDOW_DAYS)),
+        supabase
+          .from("student_activity")
+          .select("student_id, activity_date")
+          .in("student_id", studentIds)
+          .gte("activity_date", localDate(ACTIVITY_WINDOW_DAYS)),
       ]);
       if (cancelled) return;
 
       const error = mcqResult.error ?? attemptResult.error ?? activityResult.error;
       if (error) setStatsError(`Some statistics could not be loaded: ${error.message}`);
 
-      const ceilings = new Map((mcqResult.data ?? []).map((mcq) => [mcq.lesson_id as string, mcq.score_ceiling as number | null]));
+      const ceilings = new Map(
+        (mcqResult.data ?? []).map((mcq) => [
+          mcq.lesson_id as string,
+          mcq.score_ceiling as number | null,
+        ]),
+      );
       setQuizLessonCount(mcqResult.error ? null : ceilings.size);
       // Keep each student's best percentage per lesson so retakes don't drag the average down.
       const bestPercent = new Map<string, Map<string, number | null>>();
@@ -103,44 +142,75 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
         // Finishing a flashcards-only lesson records an unscored attempt; completion here counts quiz lessons only.
         if (!mcqResult.error && !ceilings.has(attempt.lesson_id)) continue;
         const ceiling = ceilings.get(attempt.lesson_id);
-        const percent = ceiling && attempt.score !== null ? Math.round((Number(attempt.score) / ceiling) * 100) : null;
+        const percent =
+          ceiling && attempt.score !== null
+            ? Math.round((Number(attempt.score) / ceiling) * 100)
+            : null;
         const lessons = bestPercent.get(attempt.student_id) ?? new Map<string, number | null>();
         const previous = lessons.get(attempt.lesson_id);
-        lessons.set(attempt.lesson_id, previous == null ? percent : percent == null ? previous : Math.max(previous, percent));
+        lessons.set(
+          attempt.lesson_id,
+          previous == null ? percent : percent == null ? previous : Math.max(previous, percent),
+        );
         bestPercent.set(attempt.student_id, lessons);
       }
 
       const lastActive = new Map<string, string>();
       for (const row of activityResult.data ?? []) {
         const current = lastActive.get(row.student_id);
-        if (!current || row.activity_date > current) lastActive.set(row.student_id, row.activity_date);
+        if (!current || row.activity_date > current)
+          lastActive.set(row.student_id, row.activity_date);
       }
 
-      setStats(Object.fromEntries(studentIds.map((id) => {
-        const lessons = bestPercent.get(id) ?? new Map<string, number | null>();
-        const percents = [...lessons.values()].filter((value): value is number => value !== null);
-        return [id, {
-          completedLessons: lessons.size,
-          averagePercent: percents.length ? Math.round(percents.reduce((sum, value) => sum + value, 0) / percents.length) : null,
-          lastActive: lastActive.get(id) ?? null,
-        }];
-      })));
+      setStats(
+        Object.fromEntries(
+          studentIds.map((id) => {
+            const lessons = bestPercent.get(id) ?? new Map<string, number | null>();
+            const percents = [...lessons.values()].filter(
+              (value): value is number => value !== null,
+            );
+            return [
+              id,
+              {
+                completedLessons: lessons.size,
+                averagePercent: percents.length
+                  ? Math.round(percents.reduce((sum, value) => sum + value, 0) / percents.length)
+                  : null,
+                lastActive: lastActive.get(id) ?? null,
+              },
+            ];
+          }),
+        ),
+      );
       setIsLoadingStats(false);
     };
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [studentKey, lessonKey]);
 
   const lessonCount = quizLessonCount ?? lessonIds.length;
   const flashcardOnlyCount = lessonIds.length - lessonCount;
   const studentStats = students.map((student) => stats[student.id]).filter(Boolean);
   const weekStart = localDate(6);
-  const activeThisWeek = studentStats.filter((stat) => stat.lastActive && stat.lastActive >= weekStart).length;
-  const averages = studentStats.map((stat) => stat.averagePercent).filter((value): value is number => value !== null);
-  const classAverage = averages.length ? Math.round(averages.reduce((sum, value) => sum + value, 0) / averages.length) : null;
+  const activeThisWeek = studentStats.filter(
+    (stat) => stat.lastActive && stat.lastActive >= weekStart,
+  ).length;
+  const averages = studentStats
+    .map((stat) => stat.averagePercent)
+    .filter((value): value is number => value !== null);
+  const classAverage = averages.length
+    ? Math.round(averages.reduce((sum, value) => sum + value, 0) / averages.length)
+    : null;
   const possibleCompletions = students.length * lessonCount;
-  const completionRate = possibleCompletions ? Math.round((studentStats.reduce((sum, stat) => sum + stat.completedLessons, 0) / possibleCompletions) * 100) : null;
+  const completionRate = possibleCompletions
+    ? Math.round(
+        (studentStats.reduce((sum, stat) => sum + stat.completedLessons, 0) / possibleCompletions) *
+          100,
+      )
+    : null;
   const pending = isLoadingStats ? "…" : null;
 
   // Stat-based sorts put students without a value (or still loading) last, then fall back to name.
@@ -149,34 +219,79 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
     const statA = stats[a.id];
     const statB = stats[b.id];
     switch (studentSort) {
-      case "name-desc": return -byName;
-      case "recently-joined": return compareNullableNumbers(toTime(enrolledAt[a.id]), toTime(enrolledAt[b.id]), "desc") || byName;
-      case "highest-score": return compareNullableNumbers(statA?.averagePercent, statB?.averagePercent, "desc") || byName;
-      case "most-quizzes": return compareNullableNumbers(statA?.completedLessons, statB?.completedLessons, "desc") || byName;
-      case "recently-active": return compareNullableNumbers(toTime(statA?.lastActive), toTime(statB?.lastActive), "desc") || byName;
-      default: return byName;
+      case "name-desc":
+        return -byName;
+      case "recently-joined":
+        return (
+          compareNullableNumbers(toTime(enrolledAt[a.id]), toTime(enrolledAt[b.id]), "desc") ||
+          byName
+        );
+      case "highest-score":
+        return (
+          compareNullableNumbers(statA?.averagePercent, statB?.averagePercent, "desc") || byName
+        );
+      case "most-quizzes":
+        return (
+          compareNullableNumbers(statA?.completedLessons, statB?.completedLessons, "desc") || byName
+        );
+      case "recently-active":
+        return (
+          compareNullableNumbers(toTime(statA?.lastActive), toTime(statB?.lastActive), "desc") ||
+          byName
+        );
+      default:
+        return byName;
     }
   };
   const visibleStudents = students
-    .filter((student) => matchesSearch(studentQuery, student.name, student.surname, student.username))
+    .filter((student) =>
+      matchesSearch(studentQuery, student.name, student.surname, student.username),
+    )
     .sort(compareStudents);
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <ClassroomMetric icon={<Users size={16} />} label="Students enrolled" value={String(students.length)} detail="Total" />
-        <ClassroomMetric icon={<Activity size={16} />} label="Active this week" value={pending ?? `${activeThisWeek}/${students.length}`} detail="Last 7 days" />
-        <ClassroomMetric icon={<BarChart3 size={16} />} label="Average quiz score" value={pending ?? (classAverage === null ? "—" : `${classAverage}%`)} detail="Best attempt" />
-        <ClassroomMetric icon={<CheckCircle2 size={16} />} label="Lesson completion" value={pending ?? (completionRate === null ? "—" : `${completionRate}%`)} detail={`${lessonCount} quiz lesson${lessonCount !== 1 ? "s" : ""}${flashcardOnlyCount > 0 ? ` · ${flashcardOnlyCount} flashcards only` : ""}`} />
+        <ClassroomMetric
+          icon={<Users size={16} />}
+          label="Students enrolled"
+          value={String(students.length)}
+          detail="Total"
+        />
+        <ClassroomMetric
+          icon={<Activity size={16} />}
+          label="Active this week"
+          value={pending ?? `${activeThisWeek}/${students.length}`}
+          detail="Last 7 days"
+        />
+        <ClassroomMetric
+          icon={<BarChart3 size={16} />}
+          label="Average quiz score"
+          value={pending ?? (classAverage === null ? "—" : `${classAverage}%`)}
+          detail="Best attempt"
+        />
+        <ClassroomMetric
+          icon={<CheckCircle2 size={16} />}
+          label="Lesson completion"
+          value={pending ?? (completionRate === null ? "—" : `${completionRate}%`)}
+          detail={`${lessonCount} quiz lesson${lessonCount !== 1 ? "s" : ""}${flashcardOnlyCount > 0 ? ` · ${flashcardOnlyCount} flashcards only` : ""}`}
+        />
       </div>
 
       <section className="rounded-xl border border-slate-100 bg-white">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div>
             <h2 className="text-base font-bold">Roster</h2>
-            <p className="mt-0.5 text-sm text-slate-500">{students.length} student{students.length !== 1 ? "s" : ""} in this classroom</p>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {students.length} student{students.length !== 1 ? "s" : ""} in this classroom
+            </p>
           </div>
-          <Link to={`/class-progress/${classroomId}`} className="text-xs font-semibold text-violet-700 hover:underline">Full progress report</Link>
+          <Link
+            to={`/class-progress/${classroomId}`}
+            className="text-xs font-semibold text-violet-700 hover:underline"
+          >
+            Full progress report
+          </Link>
         </div>
 
         {students.length > 0 && (
@@ -192,28 +307,55 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
           />
         )}
 
-        {rosterError && <p role="alert" className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{rosterError}</p>}
-        {statsError && <p role="alert" className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{statsError}</p>}
+        {rosterError && (
+          <p role="alert" className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+            {rosterError}
+          </p>
+        )}
+        {statsError && (
+          <p
+            role="alert"
+            className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          >
+            {statsError}
+          </p>
+        )}
 
         {students.length === 0 ? (
           <div className="flex flex-col items-center px-4 py-10 text-center">
             <Users size={24} className="text-slate-300" />
             <p className="mt-2 text-sm font-semibold text-slate-600">No students have joined yet</p>
-            <p className="mt-1 text-xs text-slate-400">Use “Invite students” in the banner to share the classroom code.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Use “Invite students” in the banner to share the classroom code.
+            </p>
           </div>
         ) : visibleStudents.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-slate-500">No students match "{studentQuery.trim()}".</p>
+          <p className="px-4 py-10 text-center text-sm text-slate-500">
+            No students match "{studentQuery.trim()}".
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-xs text-slate-400">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">Student</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Joined</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Quizzes done</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Avg score</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Last active</th>
-                  <th scope="col" className="px-4 py-2"><span className="sr-only">Actions</span></th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Student
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Joined
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Quizzes done
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Avg score
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Last active
+                  </th>
+                  <th scope="col" className="px-4 py-2">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -224,17 +366,41 @@ export default function ClassroomStudentsTab({ classroomId, students, enrolledAt
                     <tr key={student.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-bold text-violet-700">{initials(student)}</span>
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-bold text-violet-700">
+                            {initials(student)}
+                          </span>
                           <span className="min-w-0">
-                            <span className="block truncate font-semibold text-slate-800">{fullName(student)}</span>
-                            {student.username && <span className="text-xs text-slate-500">@{student.username}</span>}
+                            <span className="block truncate font-semibold text-slate-800">
+                              {fullName(student)}
+                            </span>
+                            {student.username && (
+                              <span className="text-xs text-slate-500">@{student.username}</span>
+                            )}
                           </span>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{joined ? new Date(joined).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{stat ? `${stat.completedLessons}/${lessonCount}` : pending ?? "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{stat ? (stat.averagePercent === null ? "—" : `${stat.averagePercent}%`) : pending ?? "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">{stat ? lastActiveLabel(stat.lastActive) : pending ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                        {joined
+                          ? new Date(joined).toLocaleDateString(undefined, {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {stat ? `${stat.completedLessons}/${lessonCount}` : (pending ?? "—")}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {stat
+                          ? stat.averagePercent === null
+                            ? "—"
+                            : `${stat.averagePercent}%`
+                          : (pending ?? "—")}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                        {stat ? lastActiveLabel(stat.lastActive) : (pending ?? "—")}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"

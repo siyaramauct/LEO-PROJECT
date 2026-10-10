@@ -5,26 +5,42 @@ import { Role, type Role as RoleType } from "../../context/roles";
 import { supabase } from "../supabase-client.ts";
 import { bucketImageUrl } from "../utils/images";
 
-const roles: { value: RoleType; title: string; description: string; imageSrc: string; imageAlt: string }[] = [
+const roles: {
+  value: RoleType;
+  title: string;
+  description: string;
+  imageSrc: string;
+  imageAlt: string;
+}[] = [
   {
     value: Role.Student,
     title: "Student",
-    description: "Practice lessons, build vocabulary, and track your progress through guided activities.",
+    description:
+      "Practice lessons, build vocabulary, and track your progress through guided activities.",
     imageSrc: bucketImageUrl("lessonImgs/travel-illustration.avif"),
     imageAlt: "Student learning from digital English lessons",
   },
   {
     value: Role.Teacher,
     title: "Teacher",
-    description: "Organize learning paths, guide learners, and manage classroom-focused English practice.",
+    description:
+      "Organize learning paths, guide learners, and manage classroom-focused English practice.",
     imageSrc: bucketImageUrl("lessonImgs/businessEng.avif"),
     imageAlt: "Teacher leading an online English learning session",
   },
 ];
 
 function usernamePrefix(name: string, surname: string) {
-  const surnamePart = surname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toLowerCase().padEnd(3, "x");
-  const namePart = name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toLowerCase() || "x";
+  const surnamePart = surname
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 3)
+    .toLowerCase()
+    .padEnd(3, "x");
+  const namePart =
+    name
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 1)
+      .toLowerCase() || "x";
   return `${surnamePart}${namePart}`;
 }
 
@@ -34,14 +50,25 @@ export default function RoleSelection() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
   const [saving, setSaving] = useState(false);
-  console.log("[RoleSelection] Mounted — user id:", user?.id, "| email:", user?.email , "user name:", user?.user_metadata?.name  );
+  console.log(
+    "[RoleSelection] Mounted — user id:",
+    user?.id,
+    "| email:",
+    user?.email,
+    "user name:",
+    user?.user_metadata?.name,
+  );
 
   if (!user) {
     return <Navigate to="/login" />;
   }
 
   if (loading || profileLoading) {
-    return <main className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Loading profile...</p></main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-500">Loading profile...</p>
+      </main>
+    );
   }
 
   if (profileError || !profile) {
@@ -67,7 +94,9 @@ export default function RoleSelection() {
       if (!username) {
         const prefix = usernamePrefix(profile.name ?? "", profile.surname ?? "");
         for (let attempt = 0; attempt < 10; attempt += 1) {
-          const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000).toString().padStart(3, "0");
+          const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000)
+            .toString()
+            .padStart(3, "0");
           const candidate = `${prefix}${randomDigits}`;
           const { data: matchingProfile, error: usernameError } = await supabase
             .from("profiles")
@@ -89,11 +118,11 @@ export default function RoleSelection() {
         .eq("id", user.id);
       if (error) throw error;
       await refreshProfile();
-      if (selectedRole == "student"){
-        navigate("/student/dashboard")
+      if (selectedRole == "student") {
+        navigate("/student/dashboard");
       }
-      if (selectedRole == "teacher"){
-        navigate("/teacher-dashboard")
+      if (selectedRole == "teacher") {
+        navigate("/teacher-dashboard");
       }
     } catch (error) {
       console.error("[RoleSelection] ✗ Failed to save role:", error);
@@ -104,7 +133,6 @@ export default function RoleSelection() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 px-5 py-10 sm:px-8 lg:h-screen lg:overflow-hidden lg:px-12 lg:py-10">
-
       <header className="mx-auto w-full max-w-2xl text-center">
         <p className="text-xs font-semibold tracking-[0.24em] text-violet-600">ACCOUNT SETUP</p>
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
@@ -139,8 +167,17 @@ export default function RoleSelection() {
                 />
                 {isSelected && (
                   <span className="absolute left-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </span>
                 )}
@@ -148,17 +185,17 @@ export default function RoleSelection() {
 
               <div className="flex flex-col p-6 lg:flex-[0.6] lg:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">
-                    {title}
-                  </h2>
+                  <h2 className="text-xl font-bold text-slate-900">{title}</h2>
                   <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>
                 </div>
 
-                <span className={`mt-6 inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors duration-500 ${
-                  isSelected
-                    ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-violet-600 text-violet-700 group-hover:bg-violet-600 group-hover:text-white"
-                }`}>
+                <span
+                  className={`mt-6 inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors duration-500 ${
+                    isSelected
+                      ? "border-violet-600 bg-violet-600 text-white"
+                      : "border-violet-600 text-violet-700 group-hover:bg-violet-600 group-hover:text-white"
+                  }`}
+                >
                   {isSelected ? `✓ ${title} selected` : `Continue as ${title}`}
                 </span>
               </div>
@@ -177,8 +214,8 @@ export default function RoleSelection() {
           {saving
             ? "Saving..."
             : selectedRole
-            ? `Continue as ${roles.find((r) => r.value === selectedRole)?.title}`
-            : "Select a role to continue"}
+              ? `Continue as ${roles.find((r) => r.value === selectedRole)?.title}`
+              : "Select a role to continue"}
         </button>
       </div>
 

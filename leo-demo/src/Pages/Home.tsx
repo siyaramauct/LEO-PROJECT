@@ -15,8 +15,12 @@ export default function Home() {
     if (oauthError) {
       return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 p-4 text-center">
-          <p role="alert" className="max-w-md text-sm text-red-700">Google sign-in failed: {oauthError}</p>
-          <Link to="/login" className="text-sm font-semibold text-violet-700 underline">Try signing in again</Link>
+          <p role="alert" className="max-w-md text-sm text-red-700">
+            Google sign-in failed: {oauthError}
+          </p>
+          <Link to="/login" className="text-sm font-semibold text-violet-700 underline">
+            Try signing in again
+          </Link>
         </main>
       );
     }
@@ -32,7 +36,9 @@ export default function Home() {
   if (!profile) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4 text-center">
-        <p className="max-w-sm text-sm text-red-700">Your profile could not be loaded. Please sign out and try again.</p>
+        <p className="max-w-sm text-sm text-red-700">
+          Your profile could not be loaded. Please sign out and try again.
+        </p>
       </main>
     );
   }

@@ -44,9 +44,7 @@ export default function StudentPractice() {
           throw enrolmentError;
         }
 
-        const classroomIds = (enrolments ?? []).map(
-          (enrolment) => enrolment.classroom_id
-        );
+        const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
 
         // Student is not enrolled in any classrooms
         if (classroomIds.length === 0) {
@@ -72,9 +70,7 @@ export default function StudentPractice() {
         // Get lessons belonging to those classrooms
         const { data: lessonData, error: lessonError } = await supabase
           .from("lessons")
-          .select(
-            "lesson_id, classroom_id, title, description, lesson_image_path"
-          )
+          .select("lesson_id, classroom_id, title, description, lesson_image_path")
           .in("classroom_id", classroomIds)
           .lte("release_date", new Date().toISOString())
           .order("title");
@@ -98,9 +94,8 @@ export default function StudentPractice() {
 
   const getClassroomName = (classroomId: string) => {
     return (
-      classrooms.find(
-        (classroom) => classroom.classroom_id === classroomId
-      )?.classroom_name ?? "Your classroom"
+      classrooms.find((classroom) => classroom.classroom_id === classroomId)?.classroom_name ??
+      "Your classroom"
     );
   };
 
@@ -112,13 +107,9 @@ export default function StudentPractice() {
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-violet-700">
-                Student portal
-              </p>
+              <p className="text-xs font-medium text-violet-700">Student portal</p>
 
-              <h1 className="mt-1 text-xl font-bold">
-                Practice
-              </h1>
+              <h1 className="mt-1 text-xl font-bold">Practice</h1>
 
               <p className="mt-1 text-xs text-slate-500">
                 Practise the lessons your teachers have shared with you.
@@ -137,31 +128,21 @@ export default function StudentPractice() {
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
           <section className="rounded-xl bg-violet-700 p-5 text-white sm:p-6">
-            <p className="text-xs font-medium text-violet-100">
-              Your learning
-            </p>
+            <p className="text-xs font-medium text-violet-100">Your learning</p>
 
-            <h2 className="mt-2 text-xl font-bold">
-              Choose a lesson to practise
-            </h2>
+            <h2 className="mt-2 text-xl font-bold">Choose a lesson to practise</h2>
 
             <p className="mt-2 max-w-xl text-sm text-violet-100">
-              These are the lessons that your teachers have made available
-              through your classrooms.
+              These are the lessons that your teachers have made available through your classrooms.
             </p>
           </section>
 
           {isLoading && (
-            <p className="py-12 text-center text-sm text-slate-500">
-              Loading your lessons...
-            </p>
+            <p className="py-12 text-center text-sm text-slate-500">Loading your lessons...</p>
           )}
 
           {errorMessage && (
-            <p
-              role="alert"
-              className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
+            <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
               {errorMessage}
             </p>
           )}
@@ -170,9 +151,7 @@ export default function StudentPractice() {
             <section className="mt-5">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-bold">
-                    Available lessons
-                  </h2>
+                  <h2 className="text-base font-bold">Available lessons</h2>
 
                   <p className="mt-1 text-sm text-slate-500">
                     {lessons.length} lesson
@@ -183,28 +162,20 @@ export default function StudentPractice() {
 
               {lessons.length === 0 ? (
                 <div className="rounded-xl border border-slate-100 bg-white px-4 py-12 text-center">
-                  <BookOpen
-                    size={24}
-                    className="mx-auto text-slate-300"
-                  />
+                  <BookOpen size={24} className="mx-auto text-slate-300" />
 
-                  <p className="mt-3 text-sm font-semibold">
-                    No lessons are available yet
-                  </p>
+                  <p className="mt-3 text-sm font-semibold">No lessons are available yet</p>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Your teacher's lessons will appear here when they are
-                    added to your classroom.
+                    Your teacher's lessons will appear here when they are added to your classroom.
                   </p>
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {lessons.map((lesson) => {
                     const image = lesson.lesson_image_path
-                      ? supabase.storage
-                          .from("images")
-                          .getPublicUrl(lesson.lesson_image_path)
-                          .data.publicUrl
+                      ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path).data
+                          .publicUrl
                       : BROKEN_IMAGE_URL;
 
                     return (
@@ -212,31 +183,22 @@ export default function StudentPractice() {
                         key={lesson.lesson_id}
                         className="overflow-hidden rounded-xl border border-slate-100 bg-white"
                       >
-                        <img
-                          src={image}
-                          alt=""
-                          className="h-36 w-full object-cover"
-                        />
+                        <img src={image} alt="" className="h-36 w-full object-cover" />
 
                         <div className="p-4">
                           <p className="text-xs font-medium text-violet-700">
                             {getClassroomName(lesson.classroom_id)}
                           </p>
 
-                          <h3 className="mt-1 truncate text-base font-bold">
-                            {lesson.title}
-                          </h3>
+                          <h3 className="mt-1 truncate text-base font-bold">{lesson.title}</h3>
 
                           <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">
-                            {lesson.description ??
-                              "Practise the vocabulary from this lesson."}
+                            {lesson.description ?? "Practise the vocabulary from this lesson."}
                           </p>
 
                           <button
                             type="button"
-                            onClick={() =>
-                              navigate(`/lesson/${lesson.lesson_id}`)
-                            }
+                            onClick={() => navigate(`/lesson/${lesson.lesson_id}`)}
                             className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800"
                           >
                             Start Practice

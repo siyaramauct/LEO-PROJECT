@@ -31,6 +31,6 @@ export function installBrokenImageFallback() {
       image.dataset.brokenFallback = "true";
       image.src = BROKEN_IMAGE_URL;
     },
-    true
+    true,
   );
 }

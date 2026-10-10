@@ -16,7 +16,10 @@ import { useEffect, useMemo, useState } from "react";
 import LoadingScreen from "../Components/LoadingScreen";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
-import ScheduledLessonCard, { type ScheduledLesson, type ScheduledLessonEdits } from "../Components/ScheduledLessonCard";
+import ScheduledLessonCard, {
+  type ScheduledLesson,
+  type ScheduledLessonEdits,
+} from "../Components/ScheduledLessonCard";
 import SidebarItem from "../Components/SidebarItem";
 import DeleteAccountDialog from "../Components/DeleteAccountDialog";
 import { useAuth } from "../../context/AuthContext.tsx";
@@ -67,7 +70,9 @@ export default function TeacherDashboard() {
   // Lessons whose release date is still ahead; null while loading.
   const [scheduledLessons, setScheduledLessons] = useState<ScheduledLesson[] | null>(null);
   const [scheduledLessonsError, setScheduledLessonsError] = useState<string | null>(null);
-  const [scheduledLessonToDelete, setScheduledLessonToDelete] = useState<ScheduledLesson | null>(null);
+  const [scheduledLessonToDelete, setScheduledLessonToDelete] = useState<ScheduledLesson | null>(
+    null,
+  );
   const [isDeletingScheduledLesson, setIsDeletingScheduledLesson] = useState(false);
 
   async function handleLogout() {
@@ -152,14 +157,13 @@ export default function TeacherDashboard() {
           // Same issue as lessons — an unguarded call crashes on a
           // missing/null cover_image_path and kills the whole list.
           image: classroom.cover_image_path
-            ? supabase.storage
-                .from("images")
-                .getPublicUrl(classroom.cover_image_path).data.publicUrl
+            ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data
+                .publicUrl
             : BROKEN_IMAGE_URL,
           imageAlt: `${classroom.classroom_name} classroom cover`,
           studentCount: studentCountByClassroom[classroom.classroom_id] ?? 0,
           lessonCount: lessonCountByClassroom[classroom.classroom_id] ?? 0,
-        }))
+        })),
       );
     };
     void loadClassrooms();
@@ -231,8 +235,7 @@ export default function TeacherDashboard() {
       // turn a flat list of rows into { lessonId: count }
       const wordCountByLesson: Record<string, number> = {};
       (flashcards ?? []).forEach((row) => {
-        wordCountByLesson[row.lesson_id] =
-          (wordCountByLesson[row.lesson_id] ?? 0) + 1;
+        wordCountByLesson[row.lesson_id] = (wordCountByLesson[row.lesson_id] ?? 0) + 1;
       });
 
       setLessons(
@@ -251,7 +254,7 @@ export default function TeacherDashboard() {
           wordCount: wordCountByLesson[lesson.lesson_id] ?? 0,
           imageAlt: `${lesson.title} lesson cover`,
           created_at: lesson.created_at,
-        }))
+        })),
       );
     };
 
@@ -267,7 +270,9 @@ export default function TeacherDashboard() {
       // The inner join keeps only lessons in this teacher's classrooms.
       const { data, error } = await supabase
         .from("lessons")
-        .select("lesson_id, classroom_id, title, description, release_date, classrooms!inner(classroom_name, teacher_id)")
+        .select(
+          "lesson_id, classroom_id, title, description, release_date, classrooms!inner(classroom_name, teacher_id)",
+        )
         .eq("classrooms.teacher_id", session.user.id)
         .gt("release_date", new Date().toISOString())
         .order("release_date", { ascending: true });
@@ -281,7 +286,9 @@ export default function TeacherDashboard() {
 
       setScheduledLessons(
         data.map((lesson) => {
-          const classroom = Array.isArray(lesson.classrooms) ? lesson.classrooms[0] : lesson.classrooms;
+          const classroom = Array.isArray(lesson.classrooms)
+            ? lesson.classrooms[0]
+            : lesson.classrooms;
           return {
             lessonId: lesson.lesson_id,
             classroomId: lesson.classroom_id,
@@ -291,17 +298,24 @@ export default function TeacherDashboard() {
             // Grouped by the teacher's local calendar day, matching how it was picked.
             releaseDateKey: toDateKey(new Date(lesson.release_date)),
           };
-        })
+        }),
       );
     };
 
     void loadScheduledLessons();
   }, [session?.user]);
 
-  async function saveScheduledLesson(lesson: ScheduledLesson, edits: ScheduledLessonEdits): Promise<string | null> {
+  async function saveScheduledLesson(
+    lesson: ScheduledLesson,
+    edits: ScheduledLessonEdits,
+  ): Promise<string | null> {
     const { error } = await supabase
       .from("lessons")
-      .update({ title: edits.title, description: edits.description, release_date: releaseDateToIso(edits.releaseDateKey) })
+      .update({
+        title: edits.title,
+        description: edits.description,
+        release_date: releaseDateToIso(edits.releaseDateKey),
+      })
       .eq("lesson_id", lesson.lessonId);
 
     if (error) {
@@ -312,10 +326,15 @@ export default function TeacherDashboard() {
     setScheduledLessons((current) =>
       (current ?? [])
         .map((item) => (item.lessonId === lesson.lessonId ? { ...item, ...edits } : item))
-        .sort((a, b) => a.releaseDateKey.localeCompare(b.releaseDateKey))
+        .sort((a, b) => a.releaseDateKey.localeCompare(b.releaseDateKey)),
     );
-    setLessons((current) =>
-      current?.map((item) => (item.lesson_id === lesson.lessonId ? { ...item, title: edits.title, description: edits.description } : item)) ?? null
+    setLessons(
+      (current) =>
+        current?.map((item) =>
+          item.lesson_id === lesson.lessonId
+            ? { ...item, title: edits.title, description: edits.description }
+            : item,
+        ) ?? null,
     );
     // Follow a rescheduled lesson to its new day so the change is visible.
     setSelectedDateKey(edits.releaseDateKey);
@@ -340,8 +359,13 @@ export default function TeacherDashboard() {
 
     setScheduledLessons((current) => (current ?? []).filter((item) => item.lessonId !== lessonId));
     setLessons((current) => current?.filter((item) => item.lesson_id !== lessonId) ?? null);
-    setClassrooms((current) =>
-      current?.map((item) => (item.id === classroomId ? { ...item, lessonCount: Math.max(0, item.lessonCount - 1) } : item)) ?? null
+    setClassrooms(
+      (current) =>
+        current?.map((item) =>
+          item.id === classroomId
+            ? { ...item, lessonCount: Math.max(0, item.lessonCount - 1) }
+            : item,
+        ) ?? null,
     );
     setScheduledLessonToDelete(null);
   }
@@ -351,7 +375,7 @@ export default function TeacherDashboard() {
       classrooms === null || isLessonsLoading
         ? null
         : [...classrooms.map((c) => c.image), ...(lessons ?? []).map((l) => l.lesson_image_path)],
-    [classrooms, lessons, isLessonsLoading]
+    [classrooms, lessons, isLessonsLoading],
   );
   const imagesReady = usePreloadImages(imageUrls);
 
@@ -366,22 +390,31 @@ export default function TeacherDashboard() {
       const date = new Date(today);
       date.setDate(today.getDate() - mondayOffset + weekIndex * 7 + dayIndex);
       const dateKey = toDateKey(date);
-      return { dateKey, day: date.getDate(), isToday: dateKey === todayKey, isPast: dateKey < todayKey };
+      return {
+        dateKey,
+        day: date.getDate(),
+        isToday: dateKey === todayKey,
+        isPast: dateKey < todayKey,
+      };
     }),
   }));
   // Two weeks can cross into the next month, e.g. "October – November 2026".
   const plannerLastDay = new Date(`${plannerWeeks[1].days[6].dateKey}T00:00:00`);
-  const monthLabel = plannerLastDay.getMonth() === today.getMonth()
-    ? today.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : `${today.toLocaleDateString("en-US", { month: "long" })} – ${plannerLastDay.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+  const monthLabel =
+    plannerLastDay.getMonth() === today.getMonth()
+      ? today.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      : `${today.toLocaleDateString("en-US", { month: "long" })} – ${plannerLastDay.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
   // The selection is stored as a key, so it can go stale if the dashboard stays open past midnight.
   const isScheduling = selectedDateKey > todayKey;
   const activeDateKey = selectedDateKey < todayKey ? todayKey : selectedDateKey;
   const scheduledCountByDay: Record<string, number> = {};
   (scheduledLessons ?? []).forEach((lesson) => {
-    scheduledCountByDay[lesson.releaseDateKey] = (scheduledCountByDay[lesson.releaseDateKey] ?? 0) + 1;
+    scheduledCountByDay[lesson.releaseDateKey] =
+      (scheduledCountByDay[lesson.releaseDateKey] ?? 0) + 1;
   });
-  const selectedDayLessons = (scheduledLessons ?? []).filter((lesson) => lesson.releaseDateKey === activeDateKey);
+  const selectedDayLessons = (scheduledLessons ?? []).filter(
+    (lesson) => lesson.releaseDateKey === activeDateKey,
+  );
 
   if (classrooms === null || isLessonsLoading || scheduledLessons === null || !imagesReady) {
     return <LoadingScreen label="Loading your dashboard" />;
@@ -398,9 +431,7 @@ export default function TeacherDashboard() {
           <div>
             <p className="text-sm text-slate-500">Welcome back</p>
 
-            <h1 className="mt-0.5 text-xl font-bold tracking-tight">
-              Hi, {teacher?.name} 👋
-            </h1>
+            <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hi, {teacher?.name} 👋</h1>
 
             <p className="mt-0.5 text-[11px] text-slate-400">
               Here's what's happening in your classrooms.
@@ -437,20 +468,29 @@ export default function TeacherDashboard() {
                   </p>
                 </div>
 
-                {classrooms?.[0] ? <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
-                  <img src={classrooms[0].image} alt={classrooms[0].imageAlt} className="h-full w-full object-contain" />
-                </div> : <div aria-hidden="true" className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-violet-600/50">
-                  <div className="absolute -right-4 -top-5 h-16 w-16 rounded-full border-[10px] border-violet-200/50" />
-                  <div className="absolute -bottom-5 left-3 h-16 w-16 rotate-45 rounded-2xl bg-fuchsia-300/30" />
-                  <div className="absolute bottom-4 right-4 h-3 w-10 -rotate-12 rounded-full bg-white/25" />
-                </div>}
+                {classrooms?.[0] ? (
+                  <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
+                    <img
+                      src={classrooms[0].image}
+                      alt={classrooms[0].imageAlt}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-violet-600/50"
+                  >
+                    <div className="absolute -right-4 -top-5 h-16 w-16 rounded-full border-[10px] border-violet-200/50" />
+                    <div className="absolute -bottom-5 left-3 h-16 w-16 rotate-45 rounded-2xl bg-fuchsia-300/30" />
+                    <div className="absolute bottom-4 right-4 h-3 w-10 -rotate-12 rounded-full bg-white/25" />
+                  </div>
+                )}
               </div>
 
               <Link
                 to={
-                  classrooms?.[0]
-                    ? `/teacher-classroom/${classrooms[0].id}`
-                    : "/create-classroom"
+                  classrooms?.[0] ? `/teacher-classroom/${classrooms[0].id}` : "/create-classroom"
                 }
                 className="mt-3 flex w-fit items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50"
               >
@@ -477,9 +517,7 @@ export default function TeacherDashboard() {
               </div>
               <div>
                 <p className="text-xs font-bold">Create Lesson</p>
-                <p className="mt-0.5 text-[10px] text-slate-500">
-                  Add vocabulary
-                </p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Add vocabulary</p>
               </div>
             </Link>
 
@@ -492,9 +530,7 @@ export default function TeacherDashboard() {
               </div>
               <div>
                 <p className="text-xs font-bold">Students</p>
-                <p className="mt-0.5 text-[10px] text-slate-500">
-                  View your students
-                </p>
+                <p className="mt-0.5 text-[10px] text-slate-500">View your students</p>
               </div>
             </Link>
           </div>
@@ -507,11 +543,11 @@ export default function TeacherDashboard() {
           <h2 className="mb-3 text-sm font-bold">My Classes</h2>
 
           {classroomsError ? (
-            <p role="alert" className="text-xs text-red-700">{classroomsError}</p>
-          ) : classrooms.length === 0 ? (
-            <p className="text-xs text-slate-400">
-              You haven't created any classrooms yet.
+            <p role="alert" className="text-xs text-red-700">
+              {classroomsError}
             </p>
+          ) : classrooms.length === 0 ? (
+            <p className="text-xs text-slate-400">You haven't created any classrooms yet.</p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {classrooms.slice(0, DASHBOARD_ROW_LIMIT).map((item) => (
@@ -529,9 +565,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="mt-2 min-w-0 shrink-0 px-2 pb-2">
-                    <p className="truncate text-[10px] font-bold">
-                      {item.name}
-                    </p>
+                    <p className="truncate text-[10px] font-bold">{item.name}</p>
                     <p className="mt-0.5 truncate text-[9px] text-slate-500">
                       {item.studentCount} students · {item.lessonCount} lessons
                     </p>
@@ -549,11 +583,11 @@ export default function TeacherDashboard() {
           <h2 className="mb-3 text-sm font-bold">Recent Lessons</h2>
 
           {lessonsError ? (
-            <p role="alert" className="text-xs text-red-700">{lessonsError}</p>
-          ) : lessons === null || lessons.length === 0 ? (
-            <p className="text-xs text-slate-400">
-              You haven't created any lessons yet.
+            <p role="alert" className="text-xs text-red-700">
+              {lessonsError}
             </p>
+          ) : lessons === null || lessons.length === 0 ? (
+            <p className="text-xs text-slate-400">You haven't created any lessons yet.</p>
           ) : (
             <div className="space-y-2">
               {lessons.map((lesson) => (
@@ -571,9 +605,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="ml-2 min-w-0 flex-1">
-                    <p className="truncate text-[10px] font-bold">
-                      {lesson.title}
-                    </p>
+                    <p className="truncate text-[10px] font-bold">{lesson.title}</p>
                     <p className="mt-0.5 truncate text-[9px] text-slate-500">
                       {lesson.classroomName} · {lesson.wordCount} words
                     </p>
@@ -614,7 +646,12 @@ export default function TeacherDashboard() {
           </div>
 
           <nav className="space-y-2">
-            <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" active />
+            <SidebarItem
+              icon={<Home size={18} />}
+              label="Dashboard"
+              to="/teacher-dashboard"
+              active
+            />
             <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
             <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
             <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
@@ -672,9 +709,7 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-bold">My Classes</h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Manage your active classrooms.
-                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Manage your active classrooms.</p>
                   </div>
 
                   <Link
@@ -688,13 +723,24 @@ export default function TeacherDashboard() {
 
                 <div className="mt-2 space-y-1.5">
                   {classroomsError ? (
-                    <p role="alert" className="text-sm text-red-700">{classroomsError}</p>
+                    <p role="alert" className="text-sm text-red-700">
+                      {classroomsError}
+                    </p>
                   ) : classrooms.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/60 px-4 py-6 text-center">
                       <Users className="mx-auto text-violet-700" size={22} />
-                      <p className="mt-2 text-sm font-semibold text-slate-800">Your first classroom starts here</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">Create a classroom to organise lessons and invite learners.</p>
-                      <Link to="/create-classroom" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"><Plus size={15} /> Create Classroom</Link>
+                      <p className="mt-2 text-sm font-semibold text-slate-800">
+                        Your first classroom starts here
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Create a classroom to organise lessons and invite learners.
+                      </p>
+                      <Link
+                        to="/create-classroom"
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
+                      >
+                        <Plus size={15} /> Create Classroom
+                      </Link>
                     </div>
                   ) : (
                     classrooms.slice(0, DASHBOARD_ROW_LIMIT).map((item) => (
@@ -747,14 +793,20 @@ export default function TeacherDashboard() {
                         {week.days.map((day, dayIndex) => {
                           const isSelected = day.dateKey === activeDateKey;
                           const scheduledCount = scheduledCountByDay[day.dateKey] ?? 0;
-                          const dayLabel = day.isToday ? `Create a lesson today, ${formatDateKey(day.dateKey)}` : formatDateKey(day.dateKey);
+                          const dayLabel = day.isToday
+                            ? `Create a lesson today, ${formatDateKey(day.dateKey)}`
+                            : formatDateKey(day.dateKey);
                           return (
                             <button
                               key={day.dateKey}
                               type="button"
                               disabled={day.isPast}
                               aria-pressed={day.isPast ? undefined : isSelected}
-                              aria-label={scheduledCount > 0 ? `${dayLabel}, ${scheduledCount} lesson${scheduledCount === 1 ? "" : "s"} scheduled` : dayLabel}
+                              aria-label={
+                                scheduledCount > 0
+                                  ? `${dayLabel}, ${scheduledCount} lesson${scheduledCount === 1 ? "" : "s"} scheduled`
+                                  : dayLabel
+                              }
                               onClick={() => setSelectedDateKey(day.dateKey)}
                               className={`relative flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 pb-2.5 transition ${
                                 isSelected
@@ -766,7 +818,9 @@ export default function TeacherDashboard() {
                                       : "border border-slate-100 bg-white text-slate-700 hover:border-slate-200"
                               }`}
                             >
-                              <span className={`text-[10px] font-semibold uppercase tracking-wide ${isSelected ? "text-violet-100" : day.isPast ? "text-slate-300" : "text-slate-400"}`}>
+                              <span
+                                className={`text-[10px] font-semibold uppercase tracking-wide ${isSelected ? "text-violet-100" : day.isPast ? "text-slate-300" : "text-slate-400"}`}
+                              >
                                 {weekdayLabels[dayIndex]}
                               </span>
                               <span className="text-sm font-bold">{day.day}</span>
@@ -785,7 +839,9 @@ export default function TeacherDashboard() {
                 </div>
 
                 {scheduledLessonsError && (
-                  <p role="alert" className="mt-3 text-xs text-red-700">{scheduledLessonsError}</p>
+                  <p role="alert" className="mt-3 text-xs text-red-700">
+                    {scheduledLessonsError}
+                  </p>
                 )}
 
                 {selectedDayLessons.length > 0 && (
@@ -815,7 +871,11 @@ export default function TeacherDashboard() {
 
                 <div className="mt-auto pt-5">
                   <Link
-                    to={isScheduling ? `/create-lesson?releaseDate=${activeDateKey}` : "/create-lesson"}
+                    to={
+                      isScheduling
+                        ? `/create-lesson?releaseDate=${activeDateKey}`
+                        : "/create-lesson"
+                    }
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
                   >
                     {isScheduling ? "Schedule lesson" : "Create lesson"}
@@ -836,11 +896,11 @@ export default function TeacherDashboard() {
 
               <div className="mt-2 space-y-1.5">
                 {lessonsError ? (
-                  <p role="alert" className="text-xs text-red-700">{lessonsError}</p>
-                ) : lessons === null || lessons.length === 0 ? (
-                  <p className="text-xs text-slate-400">
-                    You haven't created any lessons yet.
+                  <p role="alert" className="text-xs text-red-700">
+                    {lessonsError}
                   </p>
+                ) : lessons === null || lessons.length === 0 ? (
+                  <p className="text-xs text-slate-400">You haven't created any lessons yet.</p>
                 ) : (
                   lessons.map((lesson) => (
                     <Link

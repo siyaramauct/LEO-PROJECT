@@ -7,10 +7,7 @@ type ClassroomDesktopCardProps = {
   onDelete: (classroom: Classroom) => void;
 };
 
-export default function ClassroomDesktopCard({
-  classroom,
-  onDelete,
-}: ClassroomDesktopCardProps) {
+export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomDesktopCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -38,9 +35,7 @@ export default function ClassroomDesktopCard({
 
           <div>
             <h3 className="text-sm font-bold">{classroom.name}</h3>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Created {classroom.createdDate}
-            </p>
+            <p className="mt-1 text-[11px] text-slate-400">Created {classroom.createdDate}</p>
           </div>
         </div>
         <button
@@ -57,9 +52,7 @@ export default function ClassroomDesktopCard({
         </button>
       </div>
 
-      <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
-        {classroom.description}
-      </p>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{classroom.description}</p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-slate-50 p-2.5">
@@ -89,7 +82,10 @@ export default function ClassroomDesktopCard({
           </p>
         </div>
 
-        <Link to={`/teacher-classroom/${classroom.id}`} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 transition-all duration-1000 ease-out hover:bg-violet-700 hover:text-white">
+        <Link
+          to={`/teacher-classroom/${classroom.id}`}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-violet-700 transition-all duration-1000 ease-out hover:bg-violet-700 hover:text-white"
+        >
           View Classroom
           <ChevronRight size={14} />
         </Link>

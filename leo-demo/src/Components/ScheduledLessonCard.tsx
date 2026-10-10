@@ -24,9 +24,14 @@ type ScheduledLessonCardProps = {
 
 export type { ScheduledLesson, ScheduledLessonEdits };
 
-const inputClassName = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-700 focus:ring-2 focus:ring-slate-100";
+const inputClassName =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-700 focus:ring-2 focus:ring-slate-100";
 
-export default function ScheduledLessonCard({ lesson, onSave, onDelete }: ScheduledLessonCardProps) {
+export default function ScheduledLessonCard({
+  lesson,
+  onSave,
+  onDelete,
+}: ScheduledLessonCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +59,11 @@ export default function ScheduledLessonCard({ lesson, onSave, onDelete }: Schedu
 
     setIsSaving(true);
     setError(null);
-    const saveError = await onSave(lesson, { title: title.trim(), description: description.trim(), releaseDateKey });
+    const saveError = await onSave(lesson, {
+      title: title.trim(),
+      description: description.trim(),
+      releaseDateKey,
+    });
     setIsSaving(false);
 
     if (saveError) {
@@ -70,11 +79,22 @@ export default function ScheduledLessonCard({ lesson, onSave, onDelete }: Schedu
         <div className="space-y-3">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Lesson title</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={80} className={inputClassName} />
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={80}
+              className={inputClassName}
+            />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Description</span>
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} maxLength={280} className={`${inputClassName} resize-none`} />
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={2}
+              maxLength={280}
+              className={`${inputClassName} resize-none`}
+            />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Release date</span>
@@ -88,7 +108,14 @@ export default function ScheduledLessonCard({ lesson, onSave, onDelete }: Schedu
           </label>
         </div>
 
-        {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
+        {error && (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+          >
+            {error}
+          </p>
+        )}
 
         <div className="mt-3 flex justify-end gap-2">
           <button
@@ -149,7 +176,9 @@ export default function ScheduledLessonCard({ lesson, onSave, onDelete }: Schedu
         </div>
       </div>
 
-      {lesson.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{lesson.description}</p>}
+      {lesson.description && (
+        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{lesson.description}</p>
+      )}
     </div>
   );
 }

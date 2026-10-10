@@ -1,7 +1,11 @@
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { MaterialSpine, MaterialTypeTag } from "./MaterialTypeMarks";
-import { MATERIAL_FILE_ACCEPT, MATERIAL_FILE_LABEL, materialTypeLabel } from "../utils/materialFileTypes";
+import {
+  MATERIAL_FILE_ACCEPT,
+  MATERIAL_FILE_LABEL,
+  materialTypeLabel,
+} from "../utils/materialFileTypes";
 
 export type ClassroomMaterial = {
   id: string;
@@ -121,7 +125,14 @@ export default function ClassroomMaterialsPanel({
         </div>
       )}
 
-      {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
+      {error && (
+        <p
+          role="alert"
+          className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+        >
+          {error}
+        </p>
+      )}
 
       {/* Existing classroom resources */}
       <div className="mt-3 divide-y divide-slate-100">
@@ -135,7 +146,9 @@ export default function ClassroomMaterialsPanel({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="truncate text-xs font-semibold text-slate-700">{material.title}</p>
-                  <MaterialTypeTag label={materialTypeLabel(material.resourceType, material.resourcePath)} />
+                  <MaterialTypeTag
+                    label={materialTypeLabel(material.resourceType, material.resourcePath)}
+                  />
                 </div>
                 <p className="mt-0.5 truncate text-[10px] text-slate-400">{material.detail}</p>
               </div>
@@ -145,7 +158,12 @@ export default function ClassroomMaterialsPanel({
           return (
             <div key={material.id} className="flex items-center gap-2 py-2.5">
               {material.url ? (
-                <a href={material.url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2 transition hover:bg-slate-50">
+                <a
+                  href={material.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-w-0 flex-1 items-center gap-2 transition hover:bg-slate-50"
+                >
                   {content}
                 </a>
               ) : (
