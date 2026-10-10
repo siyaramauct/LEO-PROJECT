@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { FunctionsHttpError } from "@supabase/supabase-js";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, ChevronLeft, ChevronRight, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON, MAX_LESSONS_PER_CLASSROOM } from "../config/limits";
@@ -157,6 +156,7 @@ export default function CreateLesson() {
   const [includeMcq, setIncludeMcq] = useState(true);
   const [selectedMcqFormat, setSelectedMcqFormat] = useState<McqFormat | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationFailed, setGenerationFailed] = useState(false);
 
   // ---- Step 4: review & edit AI-generated MCQ state ----
   const [generatedTitle, setGeneratedTitle] = useState("");
@@ -292,6 +292,7 @@ export default function CreateLesson() {
   async function generateActivity() {
     if (!selectedMcqFormat) return;
     setIsGenerating(true);
+    setGenerationFailed(false);
     setError("");
     try {
       const prompt = buildMcqPrompt(selectedMcqFormat, flashcards);
@@ -299,26 +300,24 @@ export default function CreateLesson() {
         body: { prompt },
       });
 
-      if (functionError) {
-        // A non-2xx reply only says "non-2xx status code"; the function's own JSON body has the real reason.
-        let detail = functionError.message;
-        if (functionError instanceof FunctionsHttpError) {
-          const body = await functionError.context.json().catch(() => null);
-          const reason = body?.error ?? body?.message;
-          if (reason) detail = `${functionError.context.status} – ${typeof reason === "string" ? reason : JSON.stringify(reason)}`;
-        }
-        throw new Error(`Could not generate the activity: ${detail}`);
-      }
+      if (functionError) throw functionError;
       const generatedMcq = parseGeneratedMcq(data?.result, flashcards.length);
 
       setGeneratedTitle(generatedMcq.title.trim());
       setGeneratedQuestions(generatedMcq.questions.map((question, index) => ({ ...question, id: index + 1 })));
       setStep("review");
-    } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : "The activity could not be generated.");
+    } catch {
+      setGenerationFailed(true);
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  // Fallback offered when generation fails: drop the MCQ and save flashcards only.
+  function switchToFlashcardsOnly() {
+    setGenerationFailed(false);
+    setIncludeMcq(false);
+    setStep("activity");
   }
 
   /* ---------------------------------------------------------------------- */
@@ -465,9 +464,10 @@ export default function CreateLesson() {
 
         {/* Step 3: choose the MCQ format, then generate it with AI */}
         {step === "activity" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="max-w-xl"><h3 className="text-xl font-bold">Choose the MCQ activity</h3><p className="mt-2 text-sm leading-6 text-slate-500">Your lesson has {flashcards.length} flashcard{flashcards.length === 1 ? "" : "s"}. {includeMcq ? "Select the question format to generate from them." : "Students will study the flashcards without a quiz."}</p></div>
-          <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4"><div><p id="include-mcq-label" className="text-sm font-bold">Include an MCQ activity</p><p className="mt-1 text-sm leading-5 text-slate-500">Turn this off to create a flashcards-only lesson. Flashcards-only lessons have no quiz, so no scores are recorded for them.</p></div><button type="button" role="switch" aria-checked={includeMcq} aria-labelledby="include-mcq-label" onClick={() => { setError(""); setIncludeMcq((current) => !current); }} className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${includeMcq ? "bg-slate-800" : "bg-slate-300"}`}><span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${includeMcq ? "translate-x-5" : "translate-x-0.5"}`} /></button></div>
+          <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4"><div><p id="include-mcq-label" className="text-sm font-bold">Include an MCQ activity</p><p className="mt-1 text-sm leading-5 text-slate-500">Turn this off to create a flashcards-only lesson. Flashcards-only lessons have no quiz, so no scores are recorded for them.</p></div><button type="button" role="switch" aria-checked={includeMcq} aria-labelledby="include-mcq-label" onClick={() => { setError(""); setGenerationFailed(false); setIncludeMcq((current) => !current); }} className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${includeMcq ? "bg-slate-800" : "bg-slate-300"}`}><span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${includeMcq ? "translate-x-5" : "translate-x-0.5"}`} /></button></div>
           {includeMcq && <div className="mt-4 grid gap-3 md:grid-cols-2">{mcqFormatOptions.map((format) => { const selected = selectedMcqFormat === format.id; return <button key={format.id} type="button" onClick={() => setSelectedMcqFormat(format.id)} className={`min-h-36 rounded-lg border p-5 text-left transition ${selected ? "border-slate-800 bg-slate-50 ring-2 ring-slate-100" : "border-slate-200 hover:border-slate-400"}`} aria-pressed={selected}><h4 className="font-bold">{format.name}</h4><p className="mt-2 text-sm leading-5 text-slate-500">{format.description}</p>{selected && <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-700"><Check size={15} /> Selected</span>}</button>; })}</div>}
-          {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center"><button type="button" onClick={() => setStep("flashcards")} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Edit flashcards</button>{includeMcq ? <button type="button" disabled={!selectedMcqFormat || isGenerating} onClick={generateActivity} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{isGenerating ? "Generating..." : "Generate activity"} {!isGenerating && <ChevronRight size={17} />}</button> : <button type="button" disabled={isSaving} onClick={createLesson} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{saveLabel}</button>}</div></section>}
+          {generationFailed && <div role="alert" className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertCircle size={18} className="mt-0.5 shrink-0" /><p className="leading-5"><span className="font-semibold">Something went wrong generating the activity.</span> Please try again, or <button type="button" onClick={switchToFlashcardsOnly} className="font-semibold underline underline-offset-2 transition hover:text-red-800">create the lesson with flashcards only</button>.</p></div>}
+          {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}<div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center"><button type="button" onClick={() => { setGenerationFailed(false); setStep("flashcards"); }} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Edit flashcards</button>{includeMcq ? <button type="button" disabled={!selectedMcqFormat || isGenerating} onClick={generateActivity} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{isGenerating ? "Generating..." : "Generate activity"} {!isGenerating && <ChevronRight size={17} />}</button> : <button type="button" disabled={isSaving} onClick={createLesson} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{saveLabel}</button>}</div></section>}
 
         {/* Step 4 (new): review and edit the AI-generated MCQ before saving */}
         {step === "review" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-start"><div className="max-w-xl"><h3 className="text-lg font-bold">Review the generated activity</h3><p className="mt-1 text-sm text-slate-500">Check the questions Gemini created from your flashcards and edit anything before it's saved.</p></div><button type="button" onClick={generateActivity} disabled={isGenerating} className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"><Sparkles size={15} /> {isGenerating ? "Regenerating..." : "Regenerate"}</button></div>
@@ -476,8 +476,9 @@ export default function CreateLesson() {
 
           <div className="mt-5 space-y-3">{generatedQuestions.map((question, index) => <div key={question.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="mb-3 flex items-center justify-between"><span className="text-sm font-bold text-slate-700">Question {index + 1}</span></div><label className="mb-3 block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Question text</span><textarea value={question.question_text} onChange={(event) => updateGeneratedQuestion(question.id, "question_text", event.target.value)} rows={2} className={`${inputClassName} resize-none`} /></label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Options — mark the correct answer</span><div className="grid gap-2 sm:grid-cols-2">{optionKeys.map((optionKey, optionIndex) => { const letter = correctOptions[optionIndex]; const isCorrect = question.correct_option === letter; return <label key={optionKey} className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition ${isCorrect ? "border-slate-800" : "border-slate-200"}`}><input type="radio" name={`correct-option-${question.id}`} checked={isCorrect} onChange={() => updateGeneratedQuestion(question.id, "correct_option", letter)} className="h-4 w-4 accent-slate-800" aria-label={`Mark option ${letter} as correct for question ${index + 1}`} /><span className="w-4 shrink-0 text-xs font-bold text-slate-500">{letter}</span><input value={question[optionKey]} onChange={(event) => updateGeneratedQuestion(question.id, optionKey, event.target.value)} placeholder={`Option ${letter}`} className="w-full flex-1 border-none bg-transparent p-0 text-sm text-slate-800 outline-none placeholder:text-slate-400" /></label>; })}</div></div>)}</div>
 
+          {generationFailed && <div role="alert" className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertCircle size={18} className="mt-0.5 shrink-0" /><p className="leading-5"><span className="font-semibold">Something went wrong generating the activity.</span> Please try again, or <button type="button" onClick={switchToFlashcardsOnly} className="font-semibold underline underline-offset-2 transition hover:text-red-800">create the lesson with flashcards only</button>.</p></div>}
           {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{error}</p>}
-          <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center"><button type="button" onClick={() => { setError(""); setStep("activity"); }} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Back</button><button type="button" disabled={isSaving || isGenerating} onClick={createLesson} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{saveLabel}</button></div>
+          <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center"><button type="button" onClick={() => { setError(""); setGenerationFailed(false); setStep("activity"); }} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"><ChevronLeft size={17} /> Back</button><button type="button" disabled={isSaving || isGenerating} onClick={createLesson} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">{saveLabel}</button></div>
         </section>}
       </main>
     </div>
