@@ -49,11 +49,12 @@ export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: Classro
             </span>
           </div>
           <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
-            {lesson.words} words ·{" "}
+            {lesson.words} words
             {lesson.hasQuiz ? (
-              `${lesson.completion}% completed`
+              ` · ${lesson.completion}% completed`
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
+              // Hidden on phones, where the tag squeezes the row.
+              <span className="hidden items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 sm:inline-flex">
                 <Layers size={10} /> Flashcards only · no scores
               </span>
             )}

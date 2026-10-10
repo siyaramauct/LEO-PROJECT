@@ -454,10 +454,10 @@ export default function TeacherDashboard() {
         <div className="grid grid-cols-2 gap-2">
           <Link
             to="/create-lesson"
-            className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 p-2.5 text-left transition hover:bg-violet-100"
+            className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
-              <Plus size={20} />
+              <Plus size={19} />
             </div>
             <div>
               <p className="text-xs font-bold">Create Lesson</p>

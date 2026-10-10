@@ -96,7 +96,7 @@ const materialTitle = (material: Material) => {
 // -- Lesson list --------------------------------------------------------------
 
 // One card listing lessons. The right-hand marker depends on the lesson:
-//   flashcards-only lesson     a "Flashcards only" tag
+//   flashcards-only lesson     a "Flashcards only" tag (an arrow on phones)
 //   completed with a score     "score / total" (and the percentage from sm up)
 //   completed without a score  a tick
 //   not yet done               an arrow
@@ -146,9 +146,13 @@ const LessonList = ({
               </span>
             </span>
             {!lesson.hasQuiz ? (
-              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                <Layers size={9} /> Flashcards only
-              </span>
+              <>
+                {/* Phones show a plain arrow; the tag squeezes the row there. */}
+                <ChevronRight size={18} className="shrink-0 text-slate-400 sm:hidden" />
+                <span className="hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 sm:flex">
+                  <Layers size={9} /> Flashcards only
+                </span>
+              </>
             ) : completed ? (
               lesson.score !== null && lesson.totalQuestions ? (
                 <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs font-bold text-violet-700 sm:gap-3">

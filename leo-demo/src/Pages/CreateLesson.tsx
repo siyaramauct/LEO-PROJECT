@@ -50,7 +50,7 @@ import {
   formatDateKey,
   parseFutureDateKey,
   releaseDateToIso,
-  tomorrowDateKey,
+  toDateKey,
 } from "../utils/releaseDate";
 
 // -- Types --------------------------------------------------------------------
@@ -255,7 +255,7 @@ export default function CreateLesson() {
   const [classrooms, setClassrooms] = useState<ClassroomOption[]>([]);
   const [coverId, setCoverId] = useState(lessonCoverOptions[0].id);
   const [lessonDocuments, setLessonDocuments] = useState<File[]>([]);
-  // "" releases the lesson immediately; a day picked on the dashboard arrives in the URL.
+  // "" means today (release immediately); a day picked on the dashboard arrives in the URL.
   const [releaseDate, setReleaseDate] = useState(() =>
     parseFutureDateKey(searchParams.get("releaseDate")),
   );
@@ -289,6 +289,8 @@ export default function CreateLesson() {
     lessonCoverOptions.find((cover) => cover.id === coverId) ?? lessonCoverOptions[0];
   const selectedClassroom = classrooms.find((classroom) => classroom.classroom_id === classroomId);
   const isClassroomLocked = Boolean(requestedClassroomId && selectedClassroom);
+  // The date picker shows today while releaseDate is "" (release now).
+  const todayKey = toDateKey(new Date());
   const saveLabel = releaseDate
     ? isSaving
       ? "Scheduling..."
@@ -750,14 +752,17 @@ export default function CreateLesson() {
                     Release date
                   </label>
                   <div className="flex gap-2">
+                    {/* Defaults to today. Picking (or clearing back to) today
+                        parses to "" so the lesson releases immediately. */}
                     <input
                       id="release-date"
                       type="date"
-                      value={releaseDate}
-                      min={tomorrowDateKey()}
+                      value={releaseDate || todayKey}
+                      min={todayKey}
                       onChange={(event) => setReleaseDate(parseFutureDateKey(event.target.value))}
                       className={inputClassName}
                     />
+                    {/* Only needed once a later day is picked, to jump back to today. */}
                     {releaseDate && (
                       <button
                         type="button"
@@ -771,7 +776,7 @@ export default function CreateLesson() {
                   <span className="mt-1.5 block text-xs text-slate-500">
                     {releaseDate
                       ? `Students can open this lesson from ${formatDateKey(releaseDate)}.`
-                      : "Leave empty to release the lesson as soon as it is created."}
+                      : "Today: the lesson is released as soon as it is created."}
                   </span>
                 </div>
                 <div>

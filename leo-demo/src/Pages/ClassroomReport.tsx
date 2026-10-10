@@ -326,7 +326,7 @@ export default function ClassroomReport() {
               <ul className="mt-3 divide-y divide-slate-100">
                 {attentionStudents.map((student) => (
                   <li key={student.id} className="flex items-start gap-3 py-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-violet-700">
                       {student.initials}
                     </span>
                     <div className="min-w-0 flex-1">
