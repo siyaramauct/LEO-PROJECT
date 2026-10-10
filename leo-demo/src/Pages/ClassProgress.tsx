@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, Home, Settings, Sparkles, Users, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { supabase } from "../supabase-client";
 import { useAuth } from "../context/AuthContext";
-import NavItem from "../Components/NavItem";
-import SidebarItem from "../Components/SidebarItem";
+import TeacherBottomNav from "../Components/TeacherBottomNav";
+import TeacherSidebar from "../Components/TeacherSidebar";
 import { BROKEN_IMAGE_URL } from "../utils/images";
 
 type Classroom = {
@@ -126,55 +126,16 @@ export default function ClassProgress() {
           )}
         </main>
 
-        {/* Mobile Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem icon={<Home size={19} />} label="Home" to="/teacher-dashboard" />
-
-          <NavItem icon={<Users size={19} />} label="Classes" to="/TeacherClassroom" />
-
-          <NavItem icon={<Sparkles size={19} />} label="Explore" to="/learning-hub" />
-
-          <NavItem icon={<BarChart3 size={19} />} label="Reports" to="/class-progress" active />
-
-          <NavItem icon={<Settings size={19} />} label="Profile" to="/teacher-profile" />
-        </nav>
+        <TeacherBottomNav active="reports" />
       </div>
 
       {/* =========================
           DESKTOP VERSION
       ========================== */}
       <div className="hidden min-h-dvh lg:flex">
-        {/* Sidebar */}
-        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
-          <div className="mb-10 px-2">
-            <h1 className="text-2xl font-bold tracking-tight">LEO</h1>
+        <TeacherSidebar active="reports" />
 
-            <p className="text-xs text-violet-200">Teacher Portal</p>
-          </div>
-
-          <nav className="space-y-2">
-            <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
-
-            <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
-
-            <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-
-            <SidebarItem
-              icon={<BarChart3 size={18} />}
-              label="Reports"
-              to="/class-progress"
-              active
-            />
-          </nav>
-
-          <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-          </div>
-        </aside>
-
-        {/* Main */}
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          {/* Header */}
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
             <div>
               <p className="text-xs font-medium text-violet-700">Teacher Portal</p>
@@ -185,7 +146,9 @@ export default function ClassProgress() {
             </div>
           </header>
 
-          {/* Content */}
+          {
+            // Content
+          }
           <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
             {isLoading ? (
               <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">

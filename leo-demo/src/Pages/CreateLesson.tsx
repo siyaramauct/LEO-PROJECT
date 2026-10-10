@@ -591,7 +591,9 @@ export default function CreateLesson() {
           </p>
         </div>
 
-        {/* Stepper — 4 steps with the review stage, 3 when the lesson has no MCQ */}
+        {
+          // Stepper — 4 steps with the review stage, 3 when the lesson has no MCQ
+        }
         <ol
           className={`relative mb-6 grid gap-2 before:absolute before:top-3.5 before:h-px before:bg-slate-200 sm:gap-4 sm:before:hidden ${includeMcq ? "grid-cols-4 before:left-[12.5%] before:right-[12.5%]" : "grid-cols-3 before:left-[16.67%] before:right-[16.67%]"}`}
           aria-label="Lesson creation progress"
@@ -622,7 +624,9 @@ export default function CreateLesson() {
           })}
         </ol>
 
-        {/* Step 1: lesson details */}
+        {
+          // Step 1: lesson details
+        }
         {step === "details" && (
           <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -811,7 +815,9 @@ export default function CreateLesson() {
           </section>
         )}
 
-        {/* Step 2: flashcards */}
+        {
+          // Step 2: flashcards
+        }
         {step === "flashcards" && (
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col justify-between gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end">
@@ -945,7 +951,9 @@ export default function CreateLesson() {
           </section>
         )}
 
-        {/* Step 3: choose the MCQ format, then generate it with AI */}
+        {
+          // Step 3: choose the MCQ format, then generate it with AI
+        }
         {step === "activity" && (
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="max-w-xl">
@@ -1073,7 +1081,9 @@ export default function CreateLesson() {
           </section>
         )}
 
-        {/* Step 4 (new): review and edit the AI-generated MCQ before saving */}
+        {
+          // Step 4 (new): review and edit the AI-generated MCQ before saving
+        }
         {step === "review" && (
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-start">

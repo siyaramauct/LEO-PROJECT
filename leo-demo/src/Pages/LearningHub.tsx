@@ -1,25 +1,19 @@
 import {
   ArrowLeft,
-  BarChart3,
   BookOpen,
   GraduationCap,
   Headphones,
-  Home,
   Mic,
-  Plus,
-  Settings,
   Sparkles,
   Globe2,
-  User,
-  Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ArticleLinkCard, { type ArticleLink } from "../Components/ArticleLinkCard";
 import CreateClassroomHero from "../Components/CreateClassroomHero";
-import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
-import SidebarItem from "../Components/SidebarItem";
 import UserIdentity from "../Components/UserIdentity";
+import TeacherBottomNav from "../Components/TeacherBottomNav";
+import TeacherSidebar from "../Components/TeacherSidebar";
 
 // Free-to-use Unsplash photography — no project image assets used here.
 const articles: ArticleLink[] = [
@@ -94,7 +88,9 @@ const articles: ArticleLink[] = [
 export default function LearningHub() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* Mobile hub layout */}
+      {
+        // Mobile hub layout
+      }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
           <Link
@@ -123,38 +119,14 @@ export default function LearningHub() {
           </section>
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem icon={<Home size={19} />} label="Home" to="/teacher-dashboard" />
-          <NavItem icon={<Users size={19} />} label="Classes" to="/TeacherClassroom" />
-          <Link
-            to="/learning-hub"
-            aria-label="Open the learning hub"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white shadow-lg shadow-violet-200"
-          >
-            <Plus size={23} />
-          </Link>
-          <NavItem icon={<BarChart3 size={19} />} label="Reports" to="/class-progress" />
-          <NavItem icon={<User size={19} />} label="Profile" />
-        </nav>
+        <TeacherBottomNav active="explore" />
       </div>
 
-      {/* Desktop hub layout */}
+      {
+        // Desktop hub layout
+      }
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
-          <div className="mb-10 px-2">
-            <h1 className="text-2xl font-bold tracking-tight">LEO</h1>
-            <p className="text-xs text-white">Teacher Portal</p>
-          </div>
-          <nav className="space-y-2">
-            <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
-            <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" />
-            <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" active />
-            <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
-          </nav>
-          <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-          </div>
-        </aside>
+        <TeacherSidebar active="explore" />
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3">

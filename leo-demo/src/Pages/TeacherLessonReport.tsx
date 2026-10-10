@@ -507,7 +507,9 @@ export default function TeacherLessonReport() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
-        {/* Lesson summary */}
+        {
+          // Lesson summary
+        }
         <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center">
           <img
             src={coverUrl}
@@ -526,7 +528,9 @@ export default function TeacherLessonReport() {
           </div>
         </section>
 
-        {/* General statistics — flashcards-only lessons have no quiz, so there is nothing to score */}
+        {
+          // General statistics — flashcards-only lessons have no quiz, so there is nothing to score
+        }
         {isFlashcardsOnly ? (
           <section className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
             <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
@@ -622,7 +626,9 @@ export default function TeacherLessonReport() {
           )}
         </section>
 
-        {/* Flashcards */}
+        {
+          // Flashcards
+        }
         <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-bold">Flashcards</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -785,7 +791,9 @@ export default function TeacherLessonReport() {
           )}
         </section>
 
-        {/* Per-student scores */}
+        {
+          // Per-student scores
+        }
         {!isFlashcardsOnly && (
           <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="text-base font-bold">Student results</h2>

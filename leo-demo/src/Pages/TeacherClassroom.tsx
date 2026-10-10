@@ -1,4 +1,4 @@
-import { Plus, Sparkles, Users, Home, BarChart3, User, Settings } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -6,11 +6,11 @@ import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, { type Classroom } from "../Components/ClassroomMobileCard";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
-import NavItem from "../Components/NavItem";
 import SearchSortBar from "../Components/SearchSortBar";
 import NotificationBell from "../Components/NotificationBell";
-import SidebarItem from "../Components/SidebarItem";
 import UserIdentity from "../Components/UserIdentity";
+import TeacherBottomNav from "../Components/TeacherBottomNav";
+import TeacherSidebar from "../Components/TeacherSidebar";
 import { supabase } from "../supabase-client";
 import { compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
@@ -180,7 +180,6 @@ export default function TeacherClassrooms() {
       =================================================== */}
 
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col overflow-y-auto bg-white pb-16 lg:hidden">
-        {/* Header */}
         <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 sm:px-6">
           <div>
             <p className="text-sm text-slate-500">Teacher Portal</p>
@@ -193,7 +192,9 @@ export default function TeacherClassrooms() {
           <NotificationBell />
         </header>
 
-        {/* Search + sort */}
+        {
+          // Search + sort
+        }
         <section className="mt-4 shrink-0 px-4 sm:px-6">
           <SearchSortBar
             size="sm"
@@ -206,7 +207,9 @@ export default function TeacherClassrooms() {
           />
         </section>
 
-        {/* Create Classroom */}
+        {
+          // Create Classroom
+        }
         <section className="mt-2 shrink-0 px-4 sm:px-6">
           <Link
             to="/create-classroom"
@@ -217,7 +220,9 @@ export default function TeacherClassrooms() {
           </Link>
         </section>
 
-        {/* Classroom List */}
+        {
+          // Classroom List
+        }
         <section className="mt-4 min-h-0 flex-1 px-4 sm:px-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold">Your Classrooms</h2>
@@ -255,24 +260,10 @@ export default function TeacherClassrooms() {
           )}
         </section>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem icon={<Home size={19} />} label="Home" to="/teacher-dashboard" />
-
-          <NavItem icon={<Users size={19} />} label="Classes" to="/TeacherClassroom" active />
-
-          <Link
-            to="/learning-hub"
-            aria-label="Open the learning hub"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white shadow-lg shadow-violet-200"
-          >
-            <Plus size={23} />
-          </Link>
-
-          <NavItem icon={<BarChart3 size={19} />} label="Reports" to="/class-progress" />
-
-          <NavItem icon={<User size={19} />} label="Profile" to="/teacher-profile" />
-        </nav>
+        {
+          // Mobile Bottom Navigation
+        }
+        <TeacherBottomNav active="classes" />
       </div>
 
       {/* ===================================================
@@ -280,52 +271,12 @@ export default function TeacherClassrooms() {
       =================================================== */}
 
       <div className="hidden min-h-dvh lg:flex">
-        {/* Sidebar */}
-        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
-          <div className="mb-10 px-2">
-            <h1 className="text-2xl font-bold tracking-tight">LEO</h1>
+        <TeacherSidebar active="classes" />
 
-            <p className="text-xs text-violet-200">Teacher Portal</p>
-          </div>
-
-          <nav className="space-y-2">
-            <SidebarItem
-              icon={<Home size={18} />}
-              label="Dashboard"
-              to="/teacher-dashboard"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
-
-            <SidebarItem
-              icon={<Sparkles size={18} />}
-              label="Explore"
-              to="/learning-hub"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-
-            <SidebarItem
-              icon={<BarChart3 size={18} />}
-              label="Reports"
-              to="/class-progress"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-          </nav>
-
-          <div className="mt-auto space-y-2">
-            <SidebarItem
-              icon={<Settings size={18} />}
-              label="Settings"
-              to="/teacher-profile"
-              inactiveClassName="text-white hover:bg-white/10"
-            />
-          </div>
-        </aside>
-
-        {/* Desktop Main */}
+        {
+          // Desktop Main
+        }
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          {/* Header */}
           <header className="flex shrink-0 flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <p className="text-xs font-medium text-violet-700">Teacher Portal</p>
@@ -345,7 +296,9 @@ export default function TeacherClassrooms() {
           </header>
 
           <div className="mx-auto w-full max-w-7xl p-4">
-            {/* Page top actions */}
+            {
+              // Page top actions
+            }
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">Your Classrooms</h2>
@@ -364,7 +317,9 @@ export default function TeacherClassrooms() {
               </Link>
             </div>
 
-            {/* Search + Filters */}
+            {
+              // Search + Filters
+            }
             <div className="mt-3 flex items-center justify-between gap-4">
               <SearchSortBar
                 className="w-full max-w-xl"
@@ -383,7 +338,9 @@ export default function TeacherClassrooms() {
               </p>
             </div>
 
-            {/* Classroom Grid */}
+            {
+              // Classroom Grid
+            }
             <section className="mt-3">
               {isLoading ? (
                 <p className="py-12 text-center text-sm text-slate-400">Loading classrooms...</p>

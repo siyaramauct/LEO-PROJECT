@@ -1,17 +1,4 @@
-import {
-  ArrowLeft,
-  BarChart3,
-  BookOpen,
-  FolderOpen,
-  Home,
-  Plus,
-  Settings,
-  Sparkles,
-  User,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { ArrowLeft, BookOpen, FolderOpen, Plus, UserPlus, Users, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -24,12 +11,12 @@ import ClassroomStudentsTab from "../Components/ClassroomStudentsTab";
 import ClassroomTabs, { ClassroomTabPanel } from "../Components/ClassroomTabs";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
-import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
-import SidebarItem from "../Components/SidebarItem";
 import ClassroomInvitePanel, { type StudentProfile } from "../Components/ClassroomInvitePanel";
 import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
 import UserIdentity from "../Components/UserIdentity";
+import TeacherBottomNav from "../Components/TeacherBottomNav";
+import TeacherSidebar from "../Components/TeacherSidebar";
 import { validateMaterialFile } from "../utils/materialFileTypes";
 import { supabase } from "../supabase-client";
 import { BROKEN_IMAGE_URL } from "../utils/images";
@@ -484,7 +471,9 @@ export default function ClassroomDetail() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* Mobile */}
+      {
+        // Mobile
+      }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
           <Link
@@ -574,38 +563,14 @@ export default function ClassroomDetail() {
           </section>
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-20 mx-auto flex max-w-4xl items-center justify-around border-t border-slate-100 bg-white px-4 py-1">
-          <NavItem icon={<Home size={19} />} label="Home" to="/teacher-dashboard" />
-          <NavItem icon={<Users size={19} />} label="Classes" to="/TeacherClassroom" active />
-          <Link
-            to="/learning-hub"
-            aria-label="Open the learning hub"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white"
-          >
-            <Plus size={23} />
-          </Link>
-          <NavItem icon={<BarChart3 size={19} />} label="Reports" to="/class-progress" />
-          <NavItem icon={<User size={19} />} label="Profile" />
-        </nav>
+        <TeacherBottomNav active="classes" />
       </div>
 
-      {/* Desktop */}
+      {
+        // Desktop
+      }
       <div className="hidden min-h-dvh lg:flex">
-        <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
-          <div className="mb-10 px-2">
-            <h1 className="text-2xl font-bold tracking-tight">LEO</h1>
-            <p className="text-xs text-white">Teacher Portal</p>
-          </div>
-          <nav className="space-y-2">
-            <SidebarItem icon={<Home size={18} />} label="Dashboard" to="/teacher-dashboard" />
-            <SidebarItem icon={<Users size={18} />} label="Classes" to="/TeacherClassroom" active />
-            <SidebarItem icon={<Sparkles size={18} />} label="Explore" to="/learning-hub" />
-            <SidebarItem icon={<BarChart3 size={18} />} label="Reports" to="/class-progress" />
-          </nav>
-          <div className="mt-auto space-y-2">
-            <SidebarItem icon={<Settings size={18} />} label="Settings" to="/teacher-profile" />
-          </div>
-        </aside>
+        <TeacherSidebar active="classes" />
 
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-3">
