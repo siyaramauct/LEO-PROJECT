@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Reset Password
+//
+// Where the emailed reset link lands. Supabase signs the user in from the link,
+// so a session here means the link was valid. After the new password is saved
+// the user is signed out and asked to sign in again with it.
+//
+// Route: /reset-password || Access: anyone holding a valid reset link
+// -----------------------------------------------------------------------------
+
 import { LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";

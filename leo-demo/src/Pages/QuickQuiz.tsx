@@ -1,3 +1,18 @@
+// -----------------------------------------------------------------------------
+// Quick Quiz
+//
+// The lesson's multiple-choice quiz, one question at a time. Students can move
+// back and forth and change answers until they press "Complete attempt".
+//
+// On completion the page:
+//   1. works out the score and saves it as a lesson attempt
+//   2. notifies the classroom's teacher
+//   3. logs today as an active day for the streak
+//   4. stores the detailed results in sessionStorage and opens the summary page
+//
+// Route: /quiz/:lessonId || Access: students
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -5,6 +20,8 @@ import { useAuth } from "../context/AuthContext";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { notifyUser } from "../utils/notifications";
 import { supabase } from "../supabase-client";
+
+// -- Types --------------------------------------------------------------------
 
 type Mcq = { mcq_id: string; title: string | null; score_ceiling: number | null };
 type Question = {
@@ -17,23 +34,25 @@ type Question = {
   correct_option: "A" | "B" | "C" | "D";
 };
 
+// -- Page ---------------------------------------------------------------------
+
 export default function QuickQuiz() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const { session } = useAuth();
   const navigate = useNavigate();
   const [mcq, setMcq] = useState<Mcq | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({});
+  const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({}); // By question id.
   const [index, setIndex] = useState(0);
   const [startedAt] = useState(() => new Date().toISOString());
   const [isLoading, setIsLoading] = useState(() => Boolean(lessonId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Load the lesson's quiz, then its questions.
   useEffect(() => {
-    if (!lessonId) {
-      return;
-    }
+    if (!lessonId) return;
+
     const loadQuiz = async () => {
       const { data: mcqData, error: mcqError } = await supabase
         .from("mcqs")
@@ -64,9 +83,13 @@ export default function QuickQuiz() {
   const question = questions[index];
   const progress = questions.length ? ((index + 1) / questions.length) * 100 : 0;
 
+  // -- Submit the attempt --
+
   async function completeAttempt() {
     if (!session?.user || !lessonId || !mcq) return;
     setIsSubmitting(true);
+
+    // 1. Score: the share of correct answers, scaled to the quiz's maximum.
     const correctCount = questions.filter(
       (item) => answers[item.question_id] === item.correct_option,
     ).length;
@@ -74,6 +97,7 @@ export default function QuickQuiz() {
     const score = questions.length
       ? Math.round((correctCount / questions.length) * scoreCeiling)
       : 0;
+
     const { error: attemptError } = await supabase.from("lesson_attempts").insert({
       student_id: session.user.id,
       lesson_id: lessonId,
@@ -86,6 +110,9 @@ export default function QuickQuiz() {
       setError(attemptError.message);
       return;
     }
+
+    // 2. Tell the teacher. The classroom comes back as an object or a
+    //    one-item array depending on how Supabase reads the relationship.
     const { data: lesson } = await supabase
       .from("lessons")
       .select("title, classrooms(classroom_id, teacher_id, classroom_name)")
@@ -104,8 +131,9 @@ export default function QuickQuiz() {
         link_url: `/teacher-classroom/${classroom.classroom_id}`,
       });
     }
-    // Record today's learning activity for the streak. Best-effort: a failure here
-    // must never block the student from seeing their quiz result.
+
+    // 3. Count today towards the streak. Best effort: a failure here must never
+    //    stop the student from seeing their result.
     const { error: activityError } = await supabase
       .from("student_activity")
       .upsert(
@@ -113,6 +141,8 @@ export default function QuickQuiz() {
         { onConflict: "student_id,activity_date", ignoreDuplicates: true },
       );
     if (activityError) console.error("Could not record learning activity:", activityError);
+
+    // 4. Hand the detailed results to the summary page.
     sessionStorage.setItem(
       "quiz-result",
       JSON.stringify({
@@ -138,6 +168,8 @@ export default function QuickQuiz() {
     );
     navigate("/summary");
   }
+
+  // -- Loading and error screens --
 
   if (isLoading)
     return (
@@ -169,6 +201,8 @@ export default function QuickQuiz() {
         </main>
       </div>
     );
+
+  // -- Question screen --
 
   const options: Array<["A" | "B" | "C" | "D", string]> = [
     ["A", question.option_a],

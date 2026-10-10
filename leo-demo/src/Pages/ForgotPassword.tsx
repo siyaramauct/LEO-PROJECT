@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Forgot Password
+//
+// Asks for an email address and has Supabase send a password-reset link. The
+// link opens /reset-password. The confirmation message is the same whether or
+// not the account exists, so the page can't be used to check who is registered.
+//
+// Route: /forgot-password || Access: anyone
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, Mail } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";

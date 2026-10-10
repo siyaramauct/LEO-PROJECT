@@ -1,3 +1,18 @@
+// -----------------------------------------------------------------------------
+// Lesson Summary
+//
+// The result screen after a quiz: percentage, correct and incorrect counts,
+// and a question-by-question review showing the right answer for any the
+// student got wrong.
+//
+// The quiz page passes the full results through sessionStorage ("quiz-result").
+// If the page is opened without them (for example after a refresh in a new
+// tab), it falls back to the student's latest scored attempt, which only has
+// the score, so the answer review is empty.
+//
+// Route: /summary || Access: students
+// -----------------------------------------------------------------------------
+
 import { Check, ClipboardCheck, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -5,6 +20,7 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
+// The shape QuickQuiz writes to sessionStorage.
 type QuizResult = {
   score: number;
   totalQuestions: number;
@@ -28,6 +44,7 @@ export default function LessonSummary() {
   });
   const [isLoading, setIsLoading] = useState(!result && Boolean(session?.user));
 
+  // Fallback: no saved result, so show the latest scored attempt instead.
   useEffect(() => {
     if (result || !session?.user) return;
 
@@ -42,6 +59,7 @@ export default function LessonSummary() {
         .limit(1)
         .maybeSingle();
 
+      // Only the score is stored, so the counts below are an estimate out of 10.
       if (data) {
         setResult({
           score: data.score,
@@ -91,6 +109,8 @@ export default function LessonSummary() {
       </div>
     );
   }
+
+  // -- Result screen --
 
   const percentage = result.totalQuestions
     ? Math.round((result.score / result.totalQuestions) * 100)

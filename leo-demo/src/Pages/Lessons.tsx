@@ -1,10 +1,20 @@
+// -----------------------------------------------------------------------------
+// Lessons
+//
+// Every released lesson the student can see, as a grid of cards. Row-level
+// security limits the list to the student's own classrooms; the release date
+// filter hides lessons a teacher has scheduled for later.
+//
+// Route: /lessons || Access: students
+// -----------------------------------------------------------------------------
+
 import { BookOpen, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { supabase } from "../supabase-client";
-import { BROKEN_IMAGE_URL, bucketImageUrl } from "../utils/images";
+import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
 
 interface Lesson {
   lesson_id: string;
@@ -101,12 +111,7 @@ export default function Lessons() {
                       className="overflow-hidden rounded-xl border border-slate-100 bg-white text-left transition hover:border-violet-200 hover:shadow-sm"
                     >
                       <img
-                        src={
-                          lesson.lesson_image_path
-                            ? supabase.storage.from("images").getPublicUrl(lesson.lesson_image_path)
-                                .data.publicUrl
-                            : BROKEN_IMAGE_URL
-                        }
+                        src={bucketImageUrlOrBroken(lesson.lesson_image_path)}
                         alt={lesson.title}
                         className="h-36 w-full object-cover"
                       />

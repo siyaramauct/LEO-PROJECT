@@ -1,8 +1,22 @@
+// -----------------------------------------------------------------------------
+// Image Match Activity
+//
+// A matching game built from the lesson's flashcards that have images. The
+// student picks a word, then the image that goes with it. Correct pairs turn
+// green and stay locked; a wrong guess clears the selection so they can try
+// again. "Play again" reshuffles both columns.
+//
+// Opened from the flashcard page when a lesson has at least two image cards.
+//
+// Route: /lesson/:lessonId/match || Access: students
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, CheckCircle2, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { supabase } from "../supabase-client";
+import { bucketImageUrl } from "../utils/images";
 
 type MatchCard = {
   flashcard_id: string;
@@ -10,6 +24,9 @@ type MatchCard = {
   image_path: string;
 };
 
+// Returns a shuffled copy using the Fisher-Yates method: walk backwards
+// through the list, swapping each item with a random one at or before it.
+// Every order is equally likely.
 function shuffled<T>(items: T[]): T[] {
   const copy = [...items];
   for (let index = copy.length - 1; index > 0; index -= 1) {
@@ -23,13 +40,14 @@ export default function ImageMatchActivity() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
   const [cards, setCards] = useState<MatchCard[]>([]);
-  const [round, setRound] = useState(0);
+  const [round, setRound] = useState(0); // Bumped by "Play again" to reshuffle.
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
   const [matchedIds, setMatchedIds] = useState<string[]>([]);
   const [feedback, setFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Only cards with an image can be part of the game.
   useEffect(() => {
     if (!lessonId) return;
     const loadCards = async () => {
@@ -48,6 +66,9 @@ export default function ImageMatchActivity() {
     void loadCards();
   }, [lessonId]);
 
+  // Words and images are shuffled separately so the columns don't line up.
+  // "round" is listed as a dependency, and read with void, so each new round
+  // reshuffles while normal re-renders keep the same order.
   const words = useMemo(() => {
     void round;
     return shuffled(cards);
@@ -58,6 +79,7 @@ export default function ImageMatchActivity() {
   }, [cards, round]);
   const isComplete = cards.length >= 2 && matchedIds.length === cards.length;
 
+  // A pair matches when the image belongs to the same flashcard as the word.
   function chooseImage(cardId: string) {
     if (!selectedWordId || matchedIds.includes(cardId)) return;
     if (cardId === selectedWordId) {
@@ -191,9 +213,7 @@ export default function ImageMatchActivity() {
                     <div className="mt-3 grid grid-cols-2 gap-3">
                       {images.map((card) => {
                         const matched = matchedIds.includes(card.flashcard_id);
-                        const imageUrl = supabase.storage
-                          .from("images")
-                          .getPublicUrl(card.image_path).data.publicUrl;
+                        const imageUrl = bucketImageUrl(card.image_path);
                         return (
                           <button
                             key={card.flashcard_id}

@@ -1,3 +1,26 @@
+// -----------------------------------------------------------------------------
+// Flash Activity
+//
+// The first step of every lesson for a student: study the lesson's flashcards
+// one at a time. A progress bar tracks the position, any documents the teacher
+// attached are listed, and lessons with at least two image cards offer the
+// image-matching game.
+//
+// How the cards move:
+//   Only one card is shown. Next and Previous change the index in state, and
+//   the Flashcard is keyed by its id, so React swaps in a fresh card that
+//   always starts face up. Tapping a card flips it (see Flashcard.tsx).
+//
+// What the last card does:
+//   Lessons with a quiz show "Start quiz". Flashcards-only lessons show
+//   "Finish lesson", which records an unscored attempt so the lesson still
+//   counts towards the student's weekly progress.
+//
+// Opening the page also logs today as an active day for the streak.
+//
+// Route: /lesson/:lessonId || Access: students
+// -----------------------------------------------------------------------------
+
 import {
   ArrowLeft,
   Check,
@@ -9,12 +32,15 @@ import {
   Images,
   Layers,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Flashcard from "../Components/Flashcard";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
+import { bucketImageUrl } from "../utils/images";
+
+// -- Types --------------------------------------------------------------------
 
 type FlashcardData = {
   flashcard_id: string;
@@ -23,23 +49,42 @@ type FlashcardData = {
   definition: string;
   image_path: string | null;
 };
+
 type LessonDocument = { resource_id: string; resource_url: string; signedUrl: string };
+
+// Uploaded files are stored as "<uuid>-<name>"; show just the name.
+const documentName = (path: string) =>
+  decodeURIComponent(path.split("/").pop() ?? path).replace(/^[0-9a-f-]{36}-/i, "");
+
+// Shared look for the Previous, Next, Start quiz and Finish buttons.
+const NAV_BUTTON =
+  "flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg px-2 py-2.5 text-sm font-semibold transition sm:w-auto sm:px-4";
+const PRIMARY_BUTTON = `${NAV_BUTTON} gap-2 bg-violet-700 text-white hover:bg-violet-800`;
+
+// -- Page ---------------------------------------------------------------------
 
 export default function FlashActivity() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const { session } = useAuth();
   const navigate = useNavigate();
+
   const [flashcards, setFlashcards] = useState<FlashcardData[]>([]);
   const [documents, setDocuments] = useState<LessonDocument[]>([]);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(0); // Position of the card on screen.
   const [isLoading, setIsLoading] = useState(true);
   const [hasQuiz, setHasQuiz] = useState(true);
   const [error, setError] = useState("");
   const [startedAt] = useState(() => new Date().toISOString());
   const [isFinishing, setIsFinishing] = useState(false);
 
+  // -- Load the lesson --
+  //
+  // Three queries run together: the flashcards, any attached documents, and
+  // whether the lesson has a quiz. Documents live in a private bucket, so each
+  // one gets a signed link that works for an hour.
   useEffect(() => {
     if (!lessonId) return;
+
     const loadFlashcards = async () => {
       const [flashcardsResult, documentsResult, quizResult] = await Promise.all([
         supabase
@@ -53,12 +98,14 @@ export default function FlashActivity() {
           .eq("lesson_id", lessonId)
           .eq("resource_type", "document")
           .order("uploaded_date", { ascending: false }),
-        // Flashcards-only lessons have no mcqs row, so the last card finishes the lesson instead of starting a quiz.
+        // Flashcards-only lessons have no mcqs row.
         supabase.from("mcqs").select("mcq_id").eq("lesson_id", lessonId).maybeSingle(),
       ]);
+
       if (flashcardsResult.error) setError(flashcardsResult.error.message);
       else setFlashcards((flashcardsResult.data ?? []) as FlashcardData[]);
       setHasQuiz(Boolean(quizResult.data));
+
       if (documentsResult.error) {
         console.error("Could not load lesson documents:", documentsResult.error);
       } else {
@@ -75,6 +122,8 @@ export default function FlashActivity() {
       }
       setIsLoading(false);
 
+      // Count today towards the streak. ignoreDuplicates makes repeat visits
+      // on the same day harmless.
       if (session?.user) {
         void supabase
           .from("student_activity")
@@ -84,14 +133,17 @@ export default function FlashActivity() {
           );
       }
     };
+
     void loadFlashcards();
   }, [lessonId, session?.user]);
 
-  // Flashcards-only lessons have no quiz to submit, so reaching the end is the completion:
-  // record an unscored attempt so it counts towards the student's weekly progress.
+  // -- Finish a flashcards-only lesson --
+
   async function finishLesson() {
     if (!session?.user || !lessonId) return;
     setIsFinishing(true);
+
+    // An attempt with no score marks the lesson as completed.
     const { error: attemptError } = await supabase.from("lesson_attempts").insert({
       student_id: session.user.id,
       lesson_id: lessonId,
@@ -104,7 +156,8 @@ export default function FlashActivity() {
       setError(attemptError.message);
       return;
     }
-    // Best-effort, like the quiz: today's streak entry may already exist from opening the lesson.
+
+    // Best effort: today's streak entry may already exist from opening the lesson.
     const { error: activityError } = await supabase
       .from("student_activity")
       .upsert(
@@ -112,18 +165,194 @@ export default function FlashActivity() {
         { onConflict: "student_id,activity_date", ignoreDuplicates: true },
       );
     if (activityError) console.error("Could not record learning activity:", activityError);
+
     navigate("/student/classrooms");
   }
+
+  // -- Derived values --
 
   const currentCard = flashcards[index];
   const isLastCard = index === flashcards.length - 1;
   const progress = flashcards.length ? ((index + 1) / flashcards.length) * 100 : 0;
   const imageCardCount = flashcards.filter((card) => card.image_path).length;
-  const currentImageUrl = currentCard?.image_path
-    ? supabase.storage.from("images").getPublicUrl(currentCard.image_path).data.publicUrl
-    : null;
-  const documentName = (path: string) =>
-    decodeURIComponent(path.split("/").pop() ?? path).replace(/^[0-9a-f-]{36}-/i, "");
+  const currentImageUrl = currentCard?.image_path ? bucketImageUrl(currentCard.image_path) : null;
+
+  // -- Progress panel --
+  // Stacks on phones so the match button never squeezes the instructions.
+
+  const progressPanel = (
+    <section className="rounded-xl border border-slate-100 bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div>
+          <h2 className="text-sm font-bold">Read every flashcard</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Use Next and Previous to move through the lesson.
+          </p>
+          {!hasQuiz && (
+            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+              <Layers size={12} /> Flashcards only · no quiz or score
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 sm:justify-start">
+          {imageCardCount >= 2 && (
+            <button
+              type="button"
+              onClick={() => navigate(`/lesson/${lessonId}/match`)}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+            >
+              <Images size={15} /> Match images
+            </button>
+          )}
+          <span className="text-sm font-semibold text-slate-600">
+            {index + 1} of {flashcards.length}
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-violet-700 transition-all"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </section>
+  );
+
+  // -- Lesson documents --
+
+  const documentsPanel = documents.length > 0 && (
+    <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
+      <h2 className="text-sm font-bold">Lesson documents</h2>
+      <p className="mt-1 text-xs text-slate-500">Resources your teacher attached to this lesson.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {documents.map((document) => (
+          <a
+            key={document.resource_id}
+            href={document.signedUrl || undefined}
+            target="_blank"
+            rel="noreferrer"
+            className={`flex items-center gap-3 rounded-lg border border-slate-200 p-3 transition ${document.signedUrl ? "hover:border-violet-300 hover:bg-violet-50" : "pointer-events-none opacity-60"}`}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+              <FileText size={17} />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
+              {documentName(document.resource_url)}
+            </span>
+            <ExternalLink size={15} className="shrink-0 text-slate-400" />
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+
+  // -- Card stage --
+  // The key makes React mount a new Flashcard for each card, so every card
+  // starts face up and with no translation selected.
+
+  const cardStage = currentCard && (
+    <section className="mt-5 flex min-h-96 items-center justify-center rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
+      <Flashcard
+        key={currentCard.flashcard_id}
+        word={currentCard.word}
+        definition={currentCard.definition}
+        flashcardId={currentCard.flashcard_id}
+        imageUrl={currentImageUrl}
+      />
+    </section>
+  );
+
+  // -- Previous and Next --
+  // Two equal columns on phones; pushed to either side from sm up.
+
+  let forwardButton;
+  if (!isLastCard) {
+    forwardButton = (
+      <button
+        type="button"
+        onClick={() => setIndex((current) => current + 1)}
+        className={`${NAV_BUTTON} gap-1 bg-violet-700 text-white hover:bg-violet-800`}
+      >
+        <span>Next</span> <ChevronRight size={17} />
+      </button>
+    );
+  } else if (hasQuiz) {
+    forwardButton = (
+      <button
+        type="button"
+        onClick={() => navigate(`/quiz/${lessonId}`)}
+        className={PRIMARY_BUTTON}
+      >
+        <ClipboardCheck size={17} />
+        <span className="truncate">Start quiz</span>
+      </button>
+    );
+  } else {
+    forwardButton = (
+      <button
+        type="button"
+        disabled={isFinishing}
+        onClick={() => void finishLesson()}
+        className={`${PRIMARY_BUTTON} disabled:cursor-not-allowed disabled:bg-slate-300`}
+      >
+        <Check size={17} />
+        <span className="truncate">{isFinishing ? "Finishing..." : "Finish lesson"}</span>
+      </button>
+    );
+  }
+
+  const cardNavigation = (
+    <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between">
+      <button
+        type="button"
+        disabled={index === 0}
+        onClick={() => setIndex((current) => current - 1)}
+        className={`${NAV_BUTTON} gap-1 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40`}
+      >
+        <ChevronLeft size={17} />
+        <span className="truncate">Previous</span>
+      </button>
+      {forwardButton}
+    </div>
+  );
+
+  // -- Status messages --
+
+  const statusCard = (children: ReactNode) => (
+    <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">{children}</div>
+  );
+
+  let content;
+  if (isLoading) {
+    content = statusCard(<p className="text-sm text-slate-500">Loading flashcards...</p>);
+  } else if (error || !currentCard) {
+    content = statusCard(
+      <>
+        <h2 className="text-lg font-bold">Flashcards unavailable</h2>
+        <p className="mt-2 text-sm text-slate-500">
+          {error || "This lesson does not have flashcards yet."}
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/student/classrooms")}
+          className="mt-5 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          Back to classrooms
+        </button>
+      </>,
+    );
+  } else {
+    content = (
+      <>
+        {progressPanel}
+        {documentsPanel}
+        {cardStage}
+        {cardNavigation}
+      </>
+    );
+  }
+
+  // -- Layout --
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -145,144 +374,7 @@ export default function FlashActivity() {
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
-          {isLoading ? (
-            <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">
-              <p className="text-sm text-slate-500">Loading flashcards...</p>
-            </div>
-          ) : error || !currentCard ? (
-            <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">
-              <h2 className="text-lg font-bold">Flashcards unavailable</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                {error || "This lesson does not have flashcards yet."}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate("/student/classrooms")}
-                className="mt-5 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white"
-              >
-                Back to classrooms
-              </button>
-            </div>
-          ) : (
-            <>
-              <section className="rounded-xl border border-slate-100 bg-white p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-sm font-bold">Read every flashcard</h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Use Next and Previous to move through the lesson.
-                    </p>
-                    {!hasQuiz && (
-                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                        <Layers size={12} /> Flashcards only · no quiz or score
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {imageCardCount >= 2 && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/lesson/${lessonId}/match`)}
-                        className="flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
-                      >
-                        <Images size={15} /> Match images
-                      </button>
-                    )}
-                    <span className="text-sm font-semibold text-slate-600">
-                      {index + 1} of {flashcards.length}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-violet-700 transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </section>
-              {documents.length > 0 && (
-                <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
-                  <h2 className="text-sm font-bold">Lesson documents</h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Resources your teacher attached to this lesson.
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {documents.map((document) => (
-                      <a
-                        key={document.resource_id}
-                        href={document.signedUrl || undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex items-center gap-3 rounded-lg border border-slate-200 p-3 transition ${document.signedUrl ? "hover:border-violet-300 hover:bg-violet-50" : "pointer-events-none opacity-60"}`}
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-                          <FileText size={17} />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
-                          {documentName(document.resource_url)}
-                        </span>
-                        <ExternalLink size={15} className="shrink-0 text-slate-400" />
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              )}
-              <section className="mt-5 flex min-h-96 items-center justify-center rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
-                <Flashcard
-                  key={currentCard.flashcard_id}
-                  word={currentCard.word}
-                  definition={currentCard.definition}
-                  flashcardId={currentCard.flashcard_id}
-                  imageUrl={currentImageUrl}
-                />
-              </section>
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  disabled={index === 0}
-                  onClick={() => setIndex((current) => current - 1)}
-                  className="flex min-h-11 w-full min-w-0 items-center justify-center gap-1 rounded-lg px-2 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-4"
-                >
-                  <ChevronLeft size={17} />
-                  <span className="truncate">Previous</span>
-                </button>
-                {isLastCard ? (
-                  hasQuiz ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/quiz/${lessonId}`)}
-                      className="flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-violet-700 px-2 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 sm:w-auto sm:px-4"
-                    >
-                      <ClipboardCheck size={17} />
-                      <span className="truncate">Start quiz</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isFinishing}
-                      onClick={() => void finishLesson()}
-                      className="flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-violet-700 px-2 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto sm:px-4"
-                    >
-                      <Check size={17} />
-                      <span className="truncate">
-                        {isFinishing ? "Finishing..." : "Finish lesson"}
-                      </span>
-                    </button>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIndex((current) => current + 1)}
-                    className="flex min-h-11 w-full min-w-0 items-center justify-center gap-1 rounded-lg bg-violet-700 px-2 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 sm:w-auto sm:px-4"
-                  >
-                    <span>Next</span> <ChevronRight size={17} />
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        <div className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">{content}</div>
       </main>
     </div>
   );

@@ -1,9 +1,23 @@
+// -----------------------------------------------------------------------------
+// Role Selection
+//
+// Shown once, after a new account is created: the user chooses Student or
+// Teacher. Saving the role also gives the user a username, made from their
+// name plus three random digits (for example "smij042").
+//
+// Users who already have a role are sent straight to their dashboard.
+//
+// Route: /select-role || Access: signed-in users without a role
+// -----------------------------------------------------------------------------
+
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Role, type Role as RoleType } from "../context/roles";
-import { supabase } from "../supabase-client.ts";
+import { supabase } from "../supabase-client";
 import { bucketImageUrl } from "../utils/images";
+
+// -- Role cards ---------------------------------------------------------------
 
 const roles: {
   value: RoleType;
@@ -30,6 +44,10 @@ const roles: {
   },
 ];
 
+// -- Usernames ----------------------------------------------------------------
+
+// First three letters of the surname plus the first letter of the name,
+// padded with "x" when a name is too short: Jane Smith becomes "smij".
 function usernamePrefix(name: string, surname: string) {
   const surnamePart = surname
     .replace(/[^a-zA-Z0-9]/g, "")
@@ -50,14 +68,9 @@ export default function RoleSelection() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
   const [saving, setSaving] = useState(false);
-  console.log(
-    "[RoleSelection] Mounted — user id:",
-    user?.id,
-    "| email:",
-    user?.email,
-    "user name:",
-    user?.user_metadata?.name,
-  );
+  const [saveError, setSaveError] = useState("");
+
+  // -- Who may see this page --
 
   if (!user) {
     return <Navigate to="/login" />;
@@ -75,14 +88,17 @@ export default function RoleSelection() {
     return <Navigate to="/" replace />;
   }
 
-  if (profile?.user_role === "teacher") return <Navigate to="/teacher-dashboard" replace />;
-  if (profile?.user_role === "student") return <Navigate to="/student/dashboard" replace />;
+  if (profile.user_role === Role.Teacher) return <Navigate to="/teacher-dashboard" replace />;
+  if (profile.user_role === Role.Student) return <Navigate to="/student/dashboard" replace />;
+
+  // -- Save the role --
 
   const handleContinue = async () => {
     if (!selectedRole) return;
     setSaving(true);
-    console.log("[RoleSelection] Saving role:", selectedRole, "for user:", user.id);
+    setSaveError("");
     try {
+      // Keep an existing username; otherwise generate one.
       const { data: existingProfile, error: profileError } = await supabase
         .from("profiles")
         .select("username")
@@ -92,6 +108,7 @@ export default function RoleSelection() {
 
       let username = existingProfile.username;
       if (!username) {
+        // Try up to 10 random three-digit suffixes until one is free.
         const prefix = usernamePrefix(profile.name ?? "", profile.surname ?? "");
         for (let attempt = 0; attempt < 10; attempt += 1) {
           const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000)
@@ -117,19 +134,19 @@ export default function RoleSelection() {
         .update({ user_role: selectedRole, username })
         .eq("id", user.id);
       if (error) throw error;
+
+      // Reload the profile so GuardRoute sees the new role, then go to the dashboard.
       await refreshProfile();
-      if (selectedRole == "student") {
-        navigate("/student/dashboard");
-      }
-      if (selectedRole == "teacher") {
-        navigate("/teacher-dashboard");
-      }
+      navigate(selectedRole === Role.Student ? "/student/dashboard" : "/teacher-dashboard");
     } catch (error) {
-      console.error("[RoleSelection] ✗ Failed to save role:", error);
+      console.error("Failed to save role:", error);
+      setSaveError("Your role could not be saved. Please try again.");
     } finally {
       setSaving(false);
     }
   };
+
+  // -- Layout --
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 px-5 py-10 sm:px-8 lg:h-screen lg:overflow-hidden lg:px-12 lg:py-10">
@@ -217,6 +234,11 @@ export default function RoleSelection() {
               ? `Continue as ${roles.find((r) => r.value === selectedRole)?.title}`
               : "Select a role to continue"}
         </button>
+        {saveError && (
+          <p role="alert" className="mt-3 text-center text-sm text-red-700">
+            {saveError}
+          </p>
+        )}
       </div>
 
       <p className="mt-6 text-center text-xs text-slate-400 lg:mt-4">

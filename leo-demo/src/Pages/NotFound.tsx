@@ -1,3 +1,11 @@
+// -----------------------------------------------------------------------------
+// Not Found
+//
+// The 404 page for any address that doesn't match a route.
+//
+// Route: * || Access: anyone
+// -----------------------------------------------------------------------------
+
 import { Link } from "react-router-dom";
 import { projectImageUrl } from "../utils/images";
 
@@ -11,7 +19,7 @@ export default function NotFound() {
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-col rounded-[2rem] border border-violet-100 bg-white p-6 sm:p-10 lg:min-h-[min(760px,calc(100vh-5rem))] lg:p-12">
         <header className="flex justify-end">
-          <span className="text-xs font-bold uppercase tracking-[0.05em]  text-violet-500">
+          <span className="text-xs font-bold uppercase tracking-[0.05em] text-violet-500">
             Error 404
           </span>
         </header>

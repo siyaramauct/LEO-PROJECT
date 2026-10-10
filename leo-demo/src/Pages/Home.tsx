@@ -1,3 +1,17 @@
+// -----------------------------------------------------------------------------
+// Home
+//
+// The app's front door at "/". It shows nothing of its own: it waits for the
+// auth context, then forwards the user to the right place:
+//
+//   signed out                to /login (or shows a failed Google sign-in)
+//   no role chosen yet        to /select-role
+//   teacher                   to /teacher-dashboard
+//   student                   to /student/dashboard
+//
+// Route: / || Access: anyone
+// -----------------------------------------------------------------------------
+
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingScreen from "../Components/LoadingScreen";
