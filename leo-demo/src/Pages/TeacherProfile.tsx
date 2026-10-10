@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Teacher Profile
+//
+// The teacher's account page: logging out and deleting the account are
+// handled here; the page body is ProfileContent. Phones and tablets get a
+// simple header with the bottom navigation, desktop gets the sidebar.
+//
+// Route: /teacher-profile || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
@@ -23,6 +33,7 @@ export default function TeacherProfile() {
     }
   }
 
+  // Deletes the profile row, then signs out.
   async function handleDeleteAccount() {
     if (!session?.user) return;
     setDeletingAccount(true);
@@ -43,6 +54,9 @@ export default function TeacherProfile() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
+      {
+        // -- Phone and tablet layout (under 1024px) --
+      }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
           <div>
@@ -53,20 +67,25 @@ export default function TeacherProfile() {
         </header>
 
         <main className="flex-1 bg-slate-50 px-4 py-6 sm:px-6">
-          <ProfileContent
-            role="teacher"
-            fullName={fullName}
-            initials={initials}
-            loggingOut={loggingOut}
-            onLogout={handleLogout}
-            deletingAccount={deletingAccount}
-            onDeleteAccount={handleDeleteAccount}
-          />
+          <div className="mx-auto max-w-2xl">
+            <ProfileContent
+              role="teacher"
+              fullName={fullName}
+              initials={initials}
+              loggingOut={loggingOut}
+              onLogout={handleLogout}
+              deletingAccount={deletingAccount}
+              onDeleteAccount={handleDeleteAccount}
+            />
+          </div>
         </main>
 
         <TeacherBottomNav active="profile" />
       </div>
 
+      {
+        // -- Desktop layout (1024px and up) --
+      }
       <div className="hidden min-h-dvh lg:flex">
         <TeacherSidebar active="profile" />
 

@@ -1,12 +1,22 @@
+// -----------------------------------------------------------------------------
+// Class Progress
+//
+// The teacher's Reports page: a list of their classrooms, each opening that
+// classroom's full progress report (ClassroomReport).
+//
+// One layout for every screen, inside TeacherShell: a single column on
+// phones, two columns on tablets, three on wide desktops.
+//
+// Route: /class-progress || Access: teachers
+// -----------------------------------------------------------------------------
+
+import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
-
-import { supabase } from "../supabase-client";
+import TeacherShell from "../Components/TeacherShell";
 import { useAuth } from "../context/AuthContext";
-import TeacherBottomNav from "../Components/TeacherBottomNav";
-import TeacherSidebar from "../Components/TeacherSidebar";
-import { BROKEN_IMAGE_URL } from "../utils/images";
+import { supabase } from "../supabase-client";
+import { bucketImageUrlOrBroken } from "../utils/images";
 
 type Classroom = {
   classroom_id: string;
@@ -22,6 +32,7 @@ export default function ClassProgress() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Load the teacher's classrooms, alphabetically.
   useEffect(() => {
     const loadClassrooms = async () => {
       if (!session?.user?.id) {
@@ -45,177 +56,85 @@ export default function ClassProgress() {
       } else {
         setClassrooms(data ?? []);
       }
-
       setIsLoading(false);
     };
 
     void loadClassrooms();
-  }, [session]);
+  }, [session?.user]);
+
+  // -- Header --
+
+  const header = (
+    <div>
+      <p className="text-xs font-medium text-violet-700">Teacher Portal</p>
+      <h1 className="mt-1 text-xl font-bold">Class Reports</h1>
+      <p className="mt-1 text-xs text-slate-500">View progress for your classrooms.</p>
+    </div>
+  );
+
+  // -- Content --
+
+  const STATUS_BOX = "rounded-xl border bg-white p-8 text-center lg:p-10";
+
+  let content;
+  if (isLoading) {
+    content = (
+      <div className={`${STATUS_BOX} border-slate-100`}>
+        <p className="text-sm text-slate-500">Loading classrooms...</p>
+      </div>
+    );
+  } else if (error) {
+    content = (
+      <div className={`${STATUS_BOX} border-red-100`}>
+        <p className="text-sm text-red-600">{error}</p>
+      </div>
+    );
+  } else if (classrooms.length === 0) {
+    content = (
+      <div className={`${STATUS_BOX} border-slate-100`}>
+        <p className="text-sm font-semibold text-slate-700">No classrooms yet</p>
+        <p className="mt-1 text-xs text-slate-400">Create a classroom to start viewing reports.</p>
+      </div>
+    );
+  } else {
+    content = (
+      <section>
+        <div className="mb-3 hidden lg:block">
+          <h2 className="font-bold">Your Classrooms</h2>
+          <p className="mt-1 text-xs text-slate-500">Select a classroom to view its report.</p>
+        </div>
+
+        <div className="grid gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {classrooms.map((classroom) => (
+            <button
+              key={classroom.classroom_id}
+              type="button"
+              onClick={() => navigate(`/class-progress/${classroom.classroom_id}`)}
+              className="flex w-full items-center rounded-xl border border-slate-100 bg-white p-3 text-left transition hover:border-violet-200"
+            >
+              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-50">
+                <img
+                  src={bucketImageUrlOrBroken(classroom.cover_image_path)}
+                  alt={`${classroom.classroom_name} classroom`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="ml-3 min-w-0 flex-1">
+                <h3 className="truncate text-sm font-bold">{classroom.classroom_name}</h3>
+                <p className="mt-1 text-xs text-slate-500">View classroom report</p>
+                <p className="mt-2 text-xs font-semibold text-violet-700">View Report</p>
+              </div>
+              <ChevronRight size={18} className="ml-2 shrink-0 text-slate-400" />
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <div className="min-h-dvh bg-white text-slate-900">
-      {/* =========================
-          MOBILE VERSION
-      ========================== */}
-      <div className="min-h-dvh bg-slate-50 pb-16 lg:hidden">
-        <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-violet-700">Teacher Portal</p>
-
-              <h1 className="mt-1 text-xl font-bold">Class Reports</h1>
-
-              <p className="mt-1 text-xs text-slate-500">View progress for your classrooms.</p>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-4xl p-4 sm:p-6">
-          {isLoading ? (
-            <div className="rounded-xl border border-slate-100 bg-white p-8 text-center">
-              <p className="text-sm text-slate-500">Loading classrooms...</p>
-            </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-100 bg-white p-8 text-center">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          ) : classrooms.length === 0 ? (
-            <div className="rounded-xl border border-slate-100 bg-white p-8 text-center">
-              <p className="text-sm font-semibold text-slate-700">No classrooms yet</p>
-
-              <p className="mt-1 text-xs text-slate-400">
-                Create a classroom to start viewing reports.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {classrooms.map((classroom) => {
-                const imageUrl = classroom.cover_image_path
-                  ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path).data
-                      .publicUrl
-                  : BROKEN_IMAGE_URL;
-
-                return (
-                  <button
-                    key={classroom.classroom_id}
-                    type="button"
-                    onClick={() => navigate(`/class-progress/${classroom.classroom_id}`)}
-                    className="flex w-full items-center rounded-xl border border-slate-100 bg-white p-3 text-left transition hover:border-violet-200"
-                  >
-                    <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-50">
-                      <img
-                        src={imageUrl}
-                        alt={`${classroom.classroom_name} classroom`}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-
-                    <div className="ml-3 min-w-0 flex-1">
-                      <h2 className="truncate text-sm font-bold">{classroom.classroom_name}</h2>
-
-                      <p className="mt-1 text-xs text-slate-500">View classroom report</p>
-
-                      <p className="mt-2 text-xs font-semibold text-violet-700">View Report</p>
-                    </div>
-
-                    <ChevronRight size={18} className="ml-2 shrink-0 text-slate-400" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </main>
-
-        <TeacherBottomNav active="reports" />
-      </div>
-
-      {/* =========================
-          DESKTOP VERSION
-      ========================== */}
-      <div className="hidden min-h-dvh lg:flex">
-        <TeacherSidebar active="reports" />
-
-        <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
-          <header className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
-            <div>
-              <p className="text-xs font-medium text-violet-700">Teacher Portal</p>
-
-              <h1 className="mt-1 text-xl font-bold">Class Reports</h1>
-
-              <p className="mt-1 text-xs text-slate-500">View progress for your classrooms.</p>
-            </div>
-          </header>
-
-          {
-            // Content
-          }
-          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
-            {isLoading ? (
-              <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">
-                <p className="text-sm text-slate-500">Loading classrooms...</p>
-              </div>
-            ) : error ? (
-              <div className="rounded-xl border border-red-100 bg-white p-10 text-center">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            ) : classrooms.length === 0 ? (
-              <div className="rounded-xl border border-slate-100 bg-white p-10 text-center">
-                <p className="text-sm font-semibold text-slate-700">No classrooms yet</p>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  Create a classroom to start viewing reports.
-                </p>
-              </div>
-            ) : (
-              <section>
-                <div className="mb-3">
-                  <h2 className="font-bold">Your Classrooms</h2>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Select a classroom to view its report.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {classrooms.map((classroom) => {
-                    const imageUrl = classroom.cover_image_path
-                      ? supabase.storage.from("images").getPublicUrl(classroom.cover_image_path)
-                          .data.publicUrl
-                      : BROKEN_IMAGE_URL;
-
-                    return (
-                      <button
-                        key={classroom.classroom_id}
-                        type="button"
-                        onClick={() => navigate(`/class-progress/${classroom.classroom_id}`)}
-                        className="flex items-center rounded-xl border border-slate-100 bg-white p-3 text-left transition hover:border-violet-200"
-                      >
-                        <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-50">
-                          <img
-                            src={imageUrl}
-                            alt={`${classroom.classroom_name} classroom`}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-
-                        <div className="ml-3 min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-bold">{classroom.classroom_name}</h3>
-
-                          <p className="mt-1 text-xs text-slate-500">View classroom report</p>
-
-                          <p className="mt-2 text-xs font-semibold text-violet-700">View Report</p>
-                        </div>
-
-                        <ChevronRight size={18} className="ml-2 shrink-0 text-slate-400" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-          </div>
-        </main>
-      </div>
-    </div>
+    <TeacherShell active="reports" header={header}>
+      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:max-w-7xl">{content}</div>
+    </TeacherShell>
   );
 }

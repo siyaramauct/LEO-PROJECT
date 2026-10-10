@@ -1,3 +1,21 @@
+// -----------------------------------------------------------------------------
+// Classroom Report
+//
+// The full progress report for one classroom, built by utils/classReport.ts:
+//   Summary      class size, class average, completion, weekly activity and
+//                how many students need attention
+//   Check-ins    students flagged for low scores, inactivity or falling behind
+//   Activity     a 12-week calendar shaded by the share of the class that
+//                studied each day
+//   Lessons      each lesson's mastery bar, average and first-try score
+//   Gradebook    every student's best score per lesson
+//
+// Uses TeacherShell, so phones and tablets get the bottom navigation and
+// desktop the sidebar. Wide sections scroll sideways on small screens.
+//
+// Route: /class-progress/:classroomId || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -21,11 +39,15 @@ import {
   type LessonReport,
   type StudentReport,
 } from "../utils/classReport";
+import { compareNullableNumbers } from "../utils/listControls";
+
+// -- Sorting and display helpers ----------------------------------------------
 
 type LessonSort = "order" | "hardest" | "easiest" | "completion";
 type StudentSort = "attention" | "lowest" | "highest" | "inactive" | "name";
 
-// Mastery bands share one scale everywhere on the page: dark violet is secure, dark slate needs reteaching.
+// One colour scale for score bands everywhere on the page: dark violet is
+// secure, dark slate needs reteaching.
 const BAND_STYLES = {
   mastered: {
     bar: "bg-violet-700",
@@ -56,44 +78,48 @@ const lastActiveText = (student: StudentReport) =>
         ? "Yesterday"
         : `${student.daysSinceActive} days ago`;
 
-// Nulls (nothing to compare yet) always sort last, whichever direction is chosen.
-const compareNullable = (a: number | null, b: number | null, direction: 1 | -1) =>
-  a === null ? (b === null ? 0 : 1) : b === null ? -1 : direction * (a - b);
-
+// Lessons: course order, hardest or easiest by average, or least completed.
 function sortLessons(lessons: LessonReport[], sort: LessonSort) {
   const sorted = [...lessons];
-  if (sort === "hardest")
-    sorted.sort((a, b) => compareNullable(a.averagePercent, b.averagePercent, 1));
-  if (sort === "easiest")
-    sorted.sort((a, b) => compareNullable(a.averagePercent, b.averagePercent, -1));
+  if (sort === "hardest") {
+    sorted.sort((a, b) => compareNullableNumbers(a.averagePercent, b.averagePercent, "asc"));
+  }
+  if (sort === "easiest") {
+    sorted.sort((a, b) => compareNullableNumbers(a.averagePercent, b.averagePercent, "desc"));
+  }
   if (sort === "completion") sorted.sort((a, b) => a.completedCount - b.completedCount);
   return sorted;
 }
 
+// Students: "attention" puts the most flags first, then the lowest averages.
+// Students without a score always sort last.
 function sortStudents(students: StudentReport[], sort: StudentSort) {
   const byName = (a: StudentReport, b: StudentReport) => a.name.localeCompare(b.name);
   return [...students].sort((a, b) => {
     if (sort === "attention")
       return (
         b.flags.length - a.flags.length ||
-        compareNullable(a.averagePercent, b.averagePercent, 1) ||
+        compareNullableNumbers(a.averagePercent, b.averagePercent, "asc") ||
         byName(a, b)
       );
     if (sort === "lowest")
-      return compareNullable(a.averagePercent, b.averagePercent, 1) || byName(a, b);
+      return compareNullableNumbers(a.averagePercent, b.averagePercent, "asc") || byName(a, b);
     if (sort === "highest")
-      return compareNullable(a.averagePercent, b.averagePercent, -1) || byName(a, b);
+      return compareNullableNumbers(a.averagePercent, b.averagePercent, "desc") || byName(a, b);
     if (sort === "inactive")
       return (b.daysSinceActive ?? Infinity) - (a.daysSinceActive ?? Infinity) || byName(a, b);
     return byName(a, b);
   });
 }
 
+// The badge text for each of a student's flags.
 function flagText(student: StudentReport) {
   return student.flags.map((flag) =>
     flag === "inactive" ? inactiveLabel(student.daysSinceActive) : FLAG_LABELS[flag],
   );
 }
+
+// -- Small building blocks ----------------------------------------------------
 
 function KpiCard({
   label,
@@ -116,6 +142,7 @@ function KpiCard({
   );
 }
 
+// A stacked bar showing how many students are in each score band for a lesson.
 function MasteryBar({ lesson, total }: { lesson: LessonReport; total: number }) {
   const segments = (["mastered", "developing", "support", "notAttempted"] as const).filter(
     (band) => lesson.bands[band] > 0,
@@ -139,12 +166,15 @@ function MasteryBar({ lesson, total }: { lesson: LessonReport; total: number }) 
   );
 }
 
+// -- Page ---------------------------------------------------------------------
+
 export default function ClassroomReport() {
   const { classroomId } = useParams();
   const { session } = useAuth();
   const teacherId = session?.user.id;
 
   const [activityWeeks] = useState(() => buildActivityWeeks(new Date()));
+  // undefined while loading, null when not found or failed.
   const [report, setReport] = useState<ClassReport | null | undefined>(undefined);
   const [error, setError] = useState("");
   const [lessonSort, setLessonSort] = useState<LessonSort>("order");
@@ -218,6 +248,8 @@ export default function ClassroomReport() {
     0,
   );
 
+  // Calendar shading: the share of enrolled students who studied that day,
+  // in thirds (1 = up to a third, 2 = up to two thirds, 3 = more).
   const activityLevel = (dayKey: string) => {
     const active = report.activeStudentsByDay.get(dayKey) ?? 0;
     if (!active || !enrolled) return 0;

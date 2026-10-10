@@ -1,18 +1,33 @@
+// -----------------------------------------------------------------------------
+// Teacher Classrooms
+//
+// Every classroom the teacher owns, with search, sorting, a create button and
+// a delete button on each card (confirmed in a popup first).
+//
+// Phones and tablets show compact cards, in one column on phones and two on
+// tablets. Desktop shows larger cards beside the sidebar.
+//
+// Route: /TeacherClassroom || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, { type Classroom } from "../Components/ClassroomMobileCard";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
-import SearchSortBar from "../Components/SearchSortBar";
 import NotificationBell from "../Components/NotificationBell";
-import UserIdentity from "../Components/UserIdentity";
+import SearchSortBar from "../Components/SearchSortBar";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
+import UserIdentity from "../Components/UserIdentity";
+import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
+import { bucketImageUrlOrBroken } from "../utils/images";
 import { compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
+
+// -- Data ---------------------------------------------------------------------
 
 type ClassroomRow = {
   classroom_id: string;
@@ -20,7 +35,7 @@ type ClassroomRow = {
   description: string | null;
   cover_image_path: string | null;
   created_date: Date | null;
-  // Embedded PostgREST counts, e.g. [{ count: 3 }]
+  // Counts embedded by the query below, returned as [{ count: 3 }].
   lessons?: { count: number }[] | null;
   classroom_students?: { count: number }[] | null;
 };
@@ -34,10 +49,8 @@ const formatCreatedDate = (createdAt: Date | null) => {
   }).format(new Date(createdAt));
 };
 
+// Turns a database row into what the classroom cards display.
 const toClassroom = (classroom: ClassroomRow): Classroom => {
-  const { data } = supabase.storage.from("images").getPublicUrl(classroom.cover_image_path ?? "");
-  const coverUrl = data.publicUrl;
-
   return {
     id: classroom.classroom_id,
     name: classroom.classroom_name,
@@ -46,11 +59,13 @@ const toClassroom = (classroom: ClassroomRow): Classroom => {
     lessonCount: classroom.lessons?.[0]?.count ?? 0,
     createdDate: formatCreatedDate(classroom.created_date),
     createdTime: toTime(classroom.created_date),
-    image: classroom.cover_image_path ? coverUrl : "",
+    image: bucketImageUrlOrBroken(classroom.cover_image_path),
     imageAlt: `${classroom.classroom_name} classroom cover`,
     imageClassName: "object-cover",
   };
 };
+
+// -- Sorting ------------------------------------------------------------------
 
 type ClassroomSort =
   | "name-asc"
@@ -69,6 +84,7 @@ const classroomSortOptions: SortOption<ClassroomSort>[] = [
   { value: "most-lessons", label: "Most lessons" },
 ];
 
+// Returns the compare function for a sort choice. Ties fall back to name order.
 const compareClassrooms = (sort: ClassroomSort) => (a: Classroom, b: Classroom) => {
   switch (sort) {
     case "name-desc":
@@ -86,9 +102,7 @@ const compareClassrooms = (sort: ClassroomSort) => (a: Classroom, b: Classroom) 
   }
 };
 
-/* =========================================================
-   MAIN PAGE
-========================================================= */
+// -- Page ---------------------------------------------------------------------
 
 export default function TeacherClassrooms() {
   const { session } = useAuth();
@@ -100,6 +114,7 @@ export default function TeacherClassrooms() {
   const [classroomQuery, setClassroomQuery] = useState("");
   const [classroomSort, setClassroomSort] = useState<ClassroomSort>("name-asc");
 
+  // Search first, then sort what is left.
   const visibleClassrooms = useMemo(
     () =>
       classrooms
@@ -113,6 +128,7 @@ export default function TeacherClassrooms() {
     </p>
   );
 
+  // One query loads the classrooms with their lesson and student counts.
   useEffect(() => {
     if (!session?.user) return;
 
@@ -149,6 +165,7 @@ export default function TeacherClassrooms() {
 
   const totalStudents = classrooms.reduce((total, classroom) => total + classroom.studentCount, 0);
 
+  // Runs after the teacher confirms in the dialog.
   async function deleteClassroom() {
     if (!classroomToDelete || !session?.user || isDeletingClassroom) return;
 
@@ -175,10 +192,9 @@ export default function TeacherClassrooms() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      {/* ===================================================
-          MOBILE
-      =================================================== */}
-
+      {
+        // -- Phone and tablet layout (under 1024px) --
+      }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col overflow-y-auto bg-white pb-16 lg:hidden">
         <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 sm:px-6">
           <div>
@@ -248,7 +264,7 @@ export default function TeacherClassrooms() {
           ) : visibleClassrooms.length === 0 ? (
             noMatches
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {visibleClassrooms.map((classroom) => (
                 <ClassroomMobileCard
                   key={classroom.id}
@@ -260,22 +276,15 @@ export default function TeacherClassrooms() {
           )}
         </section>
 
-        {
-          // Mobile Bottom Navigation
-        }
         <TeacherBottomNav active="classes" />
       </div>
 
-      {/* ===================================================
-          DESKTOP
-      =================================================== */}
-
+      {
+        // -- Desktop layout (1024px and up) --
+      }
       <div className="hidden min-h-dvh lg:flex">
         <TeacherSidebar active="classes" />
 
-        {
-          // Desktop Main
-        }
         <main className="flex min-w-0 flex-1 flex-col bg-slate-50">
           <header className="flex shrink-0 flex-col gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>

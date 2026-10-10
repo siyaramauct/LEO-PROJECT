@@ -1,15 +1,29 @@
+// -----------------------------------------------------------------------------
+// Create Classroom
+//
+// The page around ClassroomForm. The phone and tablet layout puts a violet
+// banner above the form; the desktop layout puts the form beside the sidebar.
+// Both render their own copy of the form, so each gets an id prefix to keep
+// input ids unique.
+//
+// Route: /create-classroom || Access: teachers
+// -----------------------------------------------------------------------------
+
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import ClassroomForm from "../Components/ClassroomForm";
 import NotificationBell from "../Components/NotificationBell";
-import UserIdentity from "../Components/UserIdentity";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
+import UserIdentity from "../Components/UserIdentity";
 import { bucketImageUrl } from "../utils/images";
 
 export default function CreateClassroom() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
+      {
+        // -- Phone and tablet layout (under 1024px) --
+      }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
           <Link
@@ -48,6 +62,9 @@ export default function CreateClassroom() {
         <TeacherBottomNav active="classes" />
       </div>
 
+      {
+        // -- Desktop layout (1024px and up) --
+      }
       <div className="hidden min-h-dvh lg:flex">
         <TeacherSidebar active="classes" />
 

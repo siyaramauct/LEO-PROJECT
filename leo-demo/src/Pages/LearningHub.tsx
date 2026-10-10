@@ -1,21 +1,36 @@
+// -----------------------------------------------------------------------------
+// Learning Hub (teachers)
+//
+// The teacher's "Explore" page: a banner for creating a classroom, then a
+// grid of articles and blogs about language teaching. The articles are fixed
+// in this file; nothing is loaded from the database.
+//
+// The route also admits students, but it uses the teacher layout; students
+// have their own hub at /student/hub.
+//
+// Route: /learning-hub || Access: teachers and students
+// -----------------------------------------------------------------------------
+
 import {
   ArrowLeft,
   BookOpen,
+  Globe2,
   GraduationCap,
   Headphones,
   Mic,
   Sparkles,
-  Globe2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ArticleLinkCard, { type ArticleLink } from "../Components/ArticleLinkCard";
 import CreateClassroomHero from "../Components/CreateClassroomHero";
 import NotificationBell from "../Components/NotificationBell";
-import UserIdentity from "../Components/UserIdentity";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
+import UserIdentity from "../Components/UserIdentity";
 
-// Free-to-use Unsplash photography — no project image assets used here.
+// -- Articles -----------------------------------------------------------------
+// Cover photos are free-to-use Unsplash images, linked directly.
+
 const articles: ArticleLink[] = [
   {
     title: "Practice with real audio, video and pronunciation drills",
@@ -85,11 +100,13 @@ const articles: ArticleLink[] = [
   },
 ];
 
+// -- Page ---------------------------------------------------------------------
+
 export default function LearningHub() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       {
-        // Mobile hub layout
+        // -- Phone and tablet layout (under 1024px) --
       }
       <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
@@ -111,7 +128,7 @@ export default function LearningHub() {
             <p className="mt-1 text-xs text-slate-500">
               Hand-picked reading and listening for language teachers.
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
               {articles.map((article) => (
                 <ArticleLinkCard key={article.url} article={article} />
               ))}
@@ -123,7 +140,7 @@ export default function LearningHub() {
       </div>
 
       {
-        // Desktop hub layout
+        // -- Desktop layout (1024px and up) --
       }
       <div className="hidden min-h-dvh lg:flex">
         <TeacherSidebar active="explore" />
