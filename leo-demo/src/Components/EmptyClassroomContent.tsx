@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Empty Classroom Content
+//
+// Placeholders shown when a list has nothing in it yet: no lessons, no
+// materials, or no classrooms.
+//
+// Used by: ClassroomDetail || TeacherClassroom
+// -----------------------------------------------------------------------------
+
 import { BookOpen, Plus, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 

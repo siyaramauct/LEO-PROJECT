@@ -22,7 +22,7 @@ import ClassroomMaterialsPanel, {
 import ClassroomMaterialsTimeline from "../Components/ClassroomMaterialsTimeline";
 import ClassroomStudentsTab from "../Components/ClassroomStudentsTab";
 import ClassroomTabs, { ClassroomTabPanel } from "../Components/ClassroomTabs";
-import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyLessons, EmptyMaterials } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
@@ -780,7 +780,7 @@ export default function ClassroomDetail() {
         </main>
       </div>
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(lessonToDelete)}
         isDeleting={isDeletingLesson}
         onCancel={() => setLessonToDelete(null)}
@@ -791,7 +791,7 @@ export default function ClassroomDetail() {
         deletingLabel="Deleting lesson..."
       />
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(studentToRemove)}
         isDeleting={isRemovingStudent}
         onCancel={() => setStudentToRemove(null)}
@@ -802,7 +802,7 @@ export default function ClassroomDetail() {
         deletingLabel="Removing..."
       />
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(materialToDelete)}
         isDeleting={isDeletingMaterial}
         onCancel={() => setMaterialToDelete(null)}

@@ -1,3 +1,14 @@
+// -----------------------------------------------------------------------------
+// Classroom Tabs
+//
+// The pill-shaped tab bar on the classroom page (Lessons, Materials, Students).
+// Follows the accessible tabs pattern: arrow keys move between tabs, Home and End
+// jump to the first and last, and each tab is linked to its panel for screen
+// readers.
+//
+// Used by: ClassroomDetail
+// -----------------------------------------------------------------------------
+
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 export type ClassroomTab<T extends string> = {
@@ -17,7 +28,7 @@ type ClassroomTabsProps<T extends string> = {
 const tabId = (id: string) => `classroom-tab-${id}`;
 const panelId = (id: string) => `classroom-panel-${id}`;
 
-// Pairs with the tab of the same id so screen readers announce which section is shown.
+// The content area for one tab. Its ids pair it with the matching tab button.
 export function ClassroomTabPanel({
   id,
   className,
@@ -34,7 +45,6 @@ export function ClassroomTabPanel({
   );
 }
 
-// Pill-shaped tablist following the WAI-ARIA tabs pattern (roving tabindex, arrow/Home/End keys).
 export default function ClassroomTabs<T extends string>({
   tabs,
   active,
@@ -43,12 +53,15 @@ export default function ClassroomTabs<T extends string>({
 }: ClassroomTabsProps<T>) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // Selects and focuses a tab by position, wrapping around at either end.
   const focusTab = (index: number) => {
     const next = tabs[(index + tabs.length) % tabs.length];
     onChange(next.id);
     buttonRefs.current[(index + tabs.length) % tabs.length]?.focus();
   };
 
+  // Keyboard support. Only the active tab is focusable (tabIndex 0), so Tab
+  // moves past the bar and the arrow keys move within it.
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const moves: Record<string, number> = {
       ArrowRight: index + 1,

@@ -21,7 +21,7 @@ import ScheduledLessonCard, {
   type ScheduledLessonEdits,
 } from "../Components/ScheduledLessonCard";
 import SidebarItem from "../Components/SidebarItem";
-import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import ConfirmDialog from "../Components/ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 import usePreloadImages from "../hooks/usePreloadImages";
@@ -935,7 +935,7 @@ export default function TeacherDashboard() {
         </main>
       </div>
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(scheduledLessonToDelete)}
         isDeleting={isDeletingScheduledLesson}
         onCancel={() => setScheduledLessonToDelete(null)}

@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Segmented Control
+//
+// A row of small toggle buttons for choosing one option, such as a sort order.
+// On narrow screens the row scrolls sideways instead of wrapping.
+//
+// Used by: ClassroomReport || StudentLearningReport
+// -----------------------------------------------------------------------------
+
 type SegmentedControlProps<T extends string> = {
   label: string;
   options: { value: T; label: string; disabled?: boolean }[];
@@ -5,7 +14,6 @@ type SegmentedControlProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
-// Compact toggle for switching a list's sort order; scrolls sideways rather than wrapping on narrow screens.
 export default function SegmentedControl<T extends string>({
   label,
   options,

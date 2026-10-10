@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Loading Screen
+//
+// The full-page "please wait" screen shown while the session, profile or a
+// page's data is loading. The label prop says what is being loaded.
+//
+// Used by: GuardRoute and the data-heavy dashboard and report pages
+// -----------------------------------------------------------------------------
+
 import { projectImageUrl } from "../utils/images";
 
 type LoadingScreenProps = {

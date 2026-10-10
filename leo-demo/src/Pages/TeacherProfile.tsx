@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import NavItem from "../Components/NavItem";
 import NotificationBell from "../Components/NotificationBell";
 import SidebarItem from "../Components/SidebarItem";
-import TeacherProfileContent from "../Components/TeacherProfileContent";
+import ProfileContent from "../Components/ProfileContent";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
@@ -54,7 +54,8 @@ export default function TeacherProfile() {
         </header>
 
         <main className="flex-1 bg-slate-50 px-4 py-6 sm:px-6">
-          <TeacherProfileContent
+          <ProfileContent
+            role="teacher"
             fullName={fullName}
             initials={initials}
             loggingOut={loggingOut}
@@ -118,7 +119,8 @@ export default function TeacherProfile() {
           </header>
 
           <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
-            <TeacherProfileContent
+            <ProfileContent
+              role="teacher"
               fullName={fullName}
               initials={initials}
               loggingOut={loggingOut}

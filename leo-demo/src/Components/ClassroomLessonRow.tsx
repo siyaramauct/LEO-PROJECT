@@ -1,6 +1,15 @@
+// -----------------------------------------------------------------------------
+// Classroom Lesson Row
+//
+// One lesson in a classroom's lesson list: cover, title, word count and
+// completion, with an optional delete button. Flashcards-only lessons show a
+// "no scores" tag instead of completion.
+//
+// Used by: ClassroomDetail
+// -----------------------------------------------------------------------------
+
 import { ChevronRight, Layers, Trash2 } from "lucide-react";
 
-// Lesson summary data used by the classroom lesson catalogue.
 type ClassroomLesson = {
   id: string;
   title: string;
@@ -9,8 +18,7 @@ type ClassroomLesson = {
   status: string;
   words: number;
   completion: number;
-  // False for flashcards-only lessons (no MCQ), which have no scores or completion.
-  hasQuiz: boolean;
+  hasQuiz: boolean; // False for flashcards-only lessons, which have no scores.
 };
 
 type ClassroomLessonRowProps = {
@@ -33,7 +41,6 @@ export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: Classro
           <img src={lesson.image} alt={lesson.imageAlt} className="h-full w-full object-cover" />
         </div>
 
-        {/* Lesson metadata keeps the status badge off compact mobile rows. */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-semibold text-slate-800">{lesson.title}</p>

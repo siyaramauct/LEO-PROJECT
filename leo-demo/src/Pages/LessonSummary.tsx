@@ -61,7 +61,7 @@ export default function LessonSummary() {
     return (
       <div className="min-h-screen bg-white text-slate-900">
         <StudentBottomNav />
-        <main className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 pb-20 md:ml-56 md:pb-0">
+        <main className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 pb-20 lg:ml-56 lg:pb-0">
           <p className="text-sm text-slate-500">Loading quiz summary...</p>
         </main>
       </div>
@@ -72,7 +72,7 @@ export default function LessonSummary() {
     return (
       <div className="min-h-screen bg-white text-slate-900">
         <StudentBottomNav />
-        <main className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 pb-20 md:ml-56 md:pb-0">
+        <main className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 pb-20 lg:ml-56 lg:pb-0">
           <section className="w-full max-w-md rounded-xl border border-slate-100 bg-white p-6 text-center">
             <ClipboardCheck size={25} className="mx-auto text-slate-300" />
             <h1 className="mt-4 text-xl font-bold">No quiz result found</h1>
@@ -105,7 +105,7 @@ export default function LessonSummary() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
-      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+      <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl">
             <p className="text-xs font-medium text-violet-700">Lesson complete</p>

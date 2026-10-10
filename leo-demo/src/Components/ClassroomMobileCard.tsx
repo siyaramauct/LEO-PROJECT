@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Classroom Mobile Card
+//
+// A teacher's classroom as a compact card for phones and tablets: cover,
+// name, student and lesson counts, and a delete button. The whole card opens
+// the classroom. Also defines the Classroom type shared with the desktop card.
+//
+// Used by: TeacherClassroom (below lg) || ClassroomDesktopCard (for the type)
+// -----------------------------------------------------------------------------
+
 import { BookOpen, ChevronRight, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -8,8 +18,7 @@ export interface Classroom {
   studentCount: number;
   lessonCount: number;
   createdDate: string;
-  // Raw creation time for sorting; null when the row has no date.
-  createdTime: number | null;
+  createdTime: number | null; // For sorting; null when the row has no date.
   image: string;
   imageAlt: string;
   imageClassName: string;

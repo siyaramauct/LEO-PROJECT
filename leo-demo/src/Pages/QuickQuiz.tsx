@@ -143,7 +143,7 @@ export default function QuickQuiz() {
     return (
       <div className="min-h-screen bg-slate-50">
         <StudentBottomNav />
-        <main className="flex min-h-dvh items-center justify-center pb-20 md:ml-56 md:pb-0">
+        <main className="flex min-h-dvh items-center justify-center pb-20 lg:ml-56 lg:pb-0">
           <p className="text-sm text-slate-500">Loading quiz...</p>
         </main>
       </div>
@@ -152,7 +152,7 @@ export default function QuickQuiz() {
     return (
       <div className="min-h-screen bg-slate-50">
         <StudentBottomNav />
-        <main className="flex min-h-dvh items-center justify-center p-4 pb-20 md:ml-56 md:pb-0">
+        <main className="flex min-h-dvh items-center justify-center p-4 pb-20 lg:ml-56 lg:pb-0">
           <section className="w-full max-w-md rounded-xl border border-slate-100 bg-white p-6 text-center">
             <h1 className="text-lg font-bold">Quiz unavailable</h1>
             <p className="mt-2 text-sm text-slate-500">
@@ -180,7 +180,7 @@ export default function QuickQuiz() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
-      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+      <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <button

@@ -1,3 +1,21 @@
+// -----------------------------------------------------------------------------
+// Notification Bell
+//
+// The bell icon in page headers, with an unread count and a dropdown list.
+//
+// How the dropdown works:
+//   The open or closed state is kept here. Opening it loads the latest 20
+//   notifications. Clicking anywhere outside the bell closes it (a document
+//   listener checks whether the click landed inside). Clicking a notification
+//   marks it read and follows its link.
+//
+// How the count stays live:
+//   A Supabase Realtime channel listens for new rows addressed to this user and
+//   adds one to the badge as each arrives, without reloading.
+//
+// Used by: the header of most student and teacher pages
+// -----------------------------------------------------------------------------
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck } from "lucide-react";

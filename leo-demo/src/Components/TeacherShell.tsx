@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Teacher Shell
+//
+// Page layout for teacher screens: a violet sidebar on desktop (lg and up) and a
+// fixed bottom navigation bar on phones and tablets. Pages pass in their header
+// and content, and which navigation item to highlight.
+//
+// Used by: ClassroomReport
+// -----------------------------------------------------------------------------
+
 import { BarChart3, Home, Settings, Sparkles, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import NavItem from "./NavItem";
@@ -11,7 +21,6 @@ type TeacherShellProps = {
   children: ReactNode;
 };
 
-// One responsive layout for teacher pages: sidebar from lg up, bottom navigation below it.
 export default function TeacherShell({ active, header, children }: TeacherShellProps) {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 lg:flex">

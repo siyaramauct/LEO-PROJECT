@@ -1,43 +1,66 @@
+// -----------------------------------------------------------------------------
+// App Entry Point
+//
+// Starts the React app and defines every route. Routes are grouped by who may
+// open them: public pages, student pages, teacher pages and shared pages.
+// GuardRoute wraps each protected group and sends anyone without the right
+// role to the login page, the role picker or their own dashboard.
+//
+// The whole app sits inside AuthContextProvider, so any page can call useAuth().
+// -----------------------------------------------------------------------------
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
+
 import "./index.css";
 import { AuthContextProvider } from "./context/AuthContext";
 import { GuardRoute } from "./Components/GuardRoute";
-import ClassroomDetail from "./Pages/ClassroomDetail.tsx";
-import ClassProgress from "./Pages/ClassProgress";
-import ClassroomReport from "./Pages/ClassroomReport";
-import CreateClassroom from "./Pages/CreateClassroom.tsx";
-import CreateLesson from "./Pages/CreateLesson";
-import FlashActivity from "./Pages/FlashActivity.tsx";
-import ForgotPassword from "./Pages/ForgotPassword.tsx";
-import Home from "./Pages/Home.tsx";
-import LearningHub from "./Pages/LearningHub.tsx";
-import Lessons from "./Pages/Lessons.tsx";
-import LessonSummary from "./Pages/LessonSummary.tsx";
-import Login from "./Pages/Login.tsx";
-import QuickQuiz from "./Pages/QuickQuiz.tsx";
-import ResetPassword from "./Pages/ResetPassword.tsx";
-import RoleSelection from "./Pages/RoleSelection.tsx";
-import SignUp from "./Pages/Signup.tsx";
-import StudentClassrooms from "./Pages/StudentClassrooms.tsx";
-import StudentClassroomDetail from "./Pages/StudentClassroomDetail.tsx";
-import StudentDashboard from "./Pages/StudentDashboard.tsx";
-import StudentFlashcards from "./Pages/StudentFlashcards.tsx";
-import StudentLearningHub from "./Pages/StudentLearningHub.tsx";
-import StudentLearningReport from "./Pages/StudentLearningReport.tsx";
-import ImageMatchActivity from "./Pages/ImageMatchActivity.tsx";
-import StudentProfile from "./Pages/StudentProfile.tsx";
-import TeacherClassroom from "./Pages/TeacherClassroom.tsx";
-import TeacherDashboard from "./Pages/TeacherDashboard.tsx";
-import TeacherLessonReport from "./Pages/TeacherLessonReport.tsx";
-import TeacherProfile from "./Pages/TeacherProfile.tsx";
-import StudentPractice from "./Pages/StudentPractice.tsx";
-import LoadingScreen from "./Components/LoadingScreen.tsx";
-import NotFound from "./Pages/NotFound.tsx";
+import LoadingScreen from "./Components/LoadingScreen";
 import { installBrokenImageFallback } from "./utils/images";
 
+// Public pages
+import ForgotPassword from "./Pages/ForgotPassword";
+import Home from "./Pages/Home";
+import Login from "./Pages/Login";
+import NotFound from "./Pages/NotFound";
+import ResetPassword from "./Pages/ResetPassword";
+import RoleSelection from "./Pages/RoleSelection";
+import SignUp from "./Pages/Signup";
+
+// Student pages
+import FlashActivity from "./Pages/FlashActivity";
+import ImageMatchActivity from "./Pages/ImageMatchActivity";
+import Lessons from "./Pages/Lessons";
+import LessonSummary from "./Pages/LessonSummary";
+import QuickQuiz from "./Pages/QuickQuiz";
+import StudentClassroomDetail from "./Pages/StudentClassroomDetail";
+import StudentClassrooms from "./Pages/StudentClassrooms";
+import StudentDashboard from "./Pages/StudentDashboard";
+import StudentFlashcards from "./Pages/StudentFlashcards";
+import StudentLearningHub from "./Pages/StudentLearningHub";
+import StudentLearningReport from "./Pages/StudentLearningReport";
+import StudentPractice from "./Pages/StudentPractice";
+import StudentProfile from "./Pages/StudentProfile";
+
+// Teacher pages
+import ClassProgress from "./Pages/ClassProgress";
+import ClassroomDetail from "./Pages/ClassroomDetail";
+import ClassroomReport from "./Pages/ClassroomReport";
+import CreateClassroom from "./Pages/CreateClassroom";
+import CreateLesson from "./Pages/CreateLesson";
+import TeacherClassroom from "./Pages/TeacherClassroom";
+import TeacherDashboard from "./Pages/TeacherDashboard";
+import TeacherLessonReport from "./Pages/TeacherLessonReport";
+import TeacherProfile from "./Pages/TeacherProfile";
+
+// Shared pages
+import LearningHub from "./Pages/LearningHub";
+
+// -- Routes -------------------------------------------------------------------
+
 const router = createBrowserRouter([
+  // Anyone, signed in or not.
   { path: "/", element: <Home /> },
   { path: "/signup", element: <SignUp /> },
   { path: "/login", element: <Login /> },
@@ -45,6 +68,8 @@ const router = createBrowserRouter([
   { path: "/reset-password", element: <ResetPassword /> },
   { path: "/loading", element: <LoadingScreen /> },
   { path: "/select-role", element: <RoleSelection /> },
+
+  // Students only.
   {
     element: <GuardRoute allowedRoles={["student"]} />,
     children: [
@@ -64,6 +89,8 @@ const router = createBrowserRouter([
       { path: "/student/profile", element: <StudentProfile /> },
     ],
   },
+
+  // Teachers only.
   {
     element: <GuardRoute allowedRoles={["teacher"]} />,
     children: [
@@ -81,12 +108,17 @@ const router = createBrowserRouter([
       { path: "/teacher-profile", element: <TeacherProfile /> },
     ],
   },
+
+  // Both roles.
   {
     element: <GuardRoute allowedRoles={["student", "teacher"]} />,
     children: [{ path: "/learning-hub", element: <LearningHub /> }],
   },
+
   { path: "*", element: <NotFound /> },
 ]);
+
+// -- Start-up -----------------------------------------------------------------
 
 installBrokenImageFallback();
 

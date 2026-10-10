@@ -1,3 +1,14 @@
+// -----------------------------------------------------------------------------
+// Student Classroom Card
+//
+// A classroom the student has joined: cover, name, lesson and completion
+// counts, and a leave button. The whole card opens the classroom. It mirrors
+// the teacher's classroom card, but students can leave a classroom, never
+// delete it.
+//
+// Used by: StudentClassrooms
+// -----------------------------------------------------------------------------
+
 import { BookOpen, Check, ChevronRight, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -16,8 +27,6 @@ type StudentClassroomCardProps = {
   onLeave: (classroom: StudentClassroomCardData) => void;
 };
 
-// Mirrors the teacher classroom card layout (thumbnail, stats grid, footer action)
-// but swaps the delete action for a leave action, since students cannot manage a classroom.
 export default function StudentClassroomCard({ classroom, onLeave }: StudentClassroomCardProps) {
   const navigate = useNavigate();
 
@@ -25,6 +34,7 @@ export default function StudentClassroomCard({ classroom, onLeave }: StudentClas
     <article
       role="link"
       tabIndex={0}
+      // The whole card opens the classroom; Enter and Space work for keyboard users.
       onClick={() => navigate(`/student/classrooms/${classroom.id}`)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -50,7 +60,6 @@ export default function StudentClassroomCard({ classroom, onLeave }: StudentClas
               <p className="mt-1 line-clamp-2 text-xs text-slate-500">{classroom.description}</p>
             </div>
 
-            {/* Students can leave a classroom, but never delete it. */}
             <button
               type="button"
               aria-label={`Leave ${classroom.name}`}

@@ -1,5 +1,12 @@
-// Visual markers for classroom materials: a left spine (solid for documents,
-// dashed for links) and an outlined type tag such as "PDF" or "LINK".
+// -----------------------------------------------------------------------------
+// Material Type Marks
+//
+// Small visual markers for classroom materials: a left spine (solid for
+// documents, dashed for links) and an outlined type tag such as "PDF" or "LINK".
+//
+// Used by: ClassroomMaterialsPanel || ClassroomMaterialsTimeline || StudentClassroomDetail
+// -----------------------------------------------------------------------------
+
 export function MaterialSpine({ isLink }: { isLink: boolean }) {
   return (
     <span

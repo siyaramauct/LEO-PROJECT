@@ -1,4 +1,4 @@
-import SignupForm from "../Components/Signupform";
+import SignupForm from "../Components/SignupForm";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";

@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Article Link Card
+//
+// A card linking to an external language-learning article, with a cover image,
+// source, title and short description. Opens in a new tab.
+//
+// Used by: LearningHub
+// -----------------------------------------------------------------------------
+
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -16,7 +25,6 @@ type ArticleLinkCardProps = {
   article: ArticleLink;
 };
 
-// Editorial-style card for an external language-learning resource.
 export default function ArticleLinkCard({ article }: ArticleLinkCardProps) {
   return (
     <a

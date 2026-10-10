@@ -1,4 +1,4 @@
-import LoginForm from "../Components/Loginform";
+import LoginForm from "../Components/LoginForm";
 import GoogleSignInButton from "../Components/GoogleSignInButton";
 import { oauthErrorFromUrl } from "../utils/oauthError";
 import { Navigate } from "react-router-dom";

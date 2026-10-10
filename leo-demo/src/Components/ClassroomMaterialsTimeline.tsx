@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Classroom Materials Timeline
+//
+// The desktop materials view: a "share with the class" box on top, then
+// everything shared so far, newest first, grouped under date headings such as
+// "Today", "This week" or "March 2026".
+//
+// Used by: ClassroomDetail (lg and up)
+// -----------------------------------------------------------------------------
+
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import type { ClassroomMaterial } from "./ClassroomMaterialsPanel";
@@ -17,20 +27,26 @@ type ClassroomMaterialsTimelineProps = {
   error?: string | null;
 };
 
+// -- Date grouping ------------------------------------------------------------
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Buckets are relative to local midnight so "Today" matches the teacher's calendar day.
+// Picks the heading a material is listed under. Measured from local midnight,
+// so "Today" matches the teacher's own calendar day.
 const groupLabel = (uploaded: Date, now: Date) => {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const time = uploaded.getTime();
   if (time >= startOfToday) return "Today";
   if (time >= startOfToday - DAY_MS) return "Yesterday";
   if (time >= startOfToday - 6 * DAY_MS) return "This week";
-  if (uploaded.getFullYear() === now.getFullYear() && uploaded.getMonth() === now.getMonth())
+  if (uploaded.getFullYear() === now.getFullYear() && uploaded.getMonth() === now.getMonth()) {
     return "Earlier this month";
+  }
   return uploaded.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 };
 
+// Materials arrive newest first, so items with the same heading are already
+// next to each other: start a new group whenever the heading changes.
 const groupMaterials = (materials: ClassroomMaterial[]) => {
   const now = new Date();
   const groups: { label: string; items: ClassroomMaterial[] }[] = [];
@@ -56,7 +72,8 @@ const formatTimestamp = (value?: string) =>
       })
     : "";
 
-// Desktop materials feed: composer on top, newest uploads first, grouped by date.
+// -- Component ----------------------------------------------------------------
+
 export default function ClassroomMaterialsTimeline({
   materials,
   onFileUpload,

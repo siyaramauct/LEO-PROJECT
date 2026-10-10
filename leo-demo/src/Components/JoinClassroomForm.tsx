@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Join Classroom Form
+//
+// Lets a student join a classroom with the code their teacher shared. The code
+// is checked by the join_classroom_with_code database function, which also
+// enforces the 30-student limit. On success the student is taken to the classroom.
+//
+// Used by: StudentClassrooms
+// -----------------------------------------------------------------------------
+
 import { KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";

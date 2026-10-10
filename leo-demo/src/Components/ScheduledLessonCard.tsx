@@ -1,9 +1,19 @@
+// -----------------------------------------------------------------------------
+// Scheduled Lesson Card
+//
+// One upcoming lesson in the teacher dashboard's schedule. It shows the title,
+// classroom and release day, and switches in place to an edit form for the
+// title, description and release date. Saving and deleting are handled by the
+// parent page.
+//
+// Used by: TeacherDashboard
+// -----------------------------------------------------------------------------
+
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatDateKey, parseFutureDateKey, tomorrowDateKey } from "../utils/releaseDate";
 
-// A lesson whose release date is still ahead, as shown in the dashboard planner.
 type ScheduledLesson = {
   lessonId: string;
   classroomId: string;
@@ -17,7 +27,7 @@ type ScheduledLessonEdits = Pick<ScheduledLesson, "title" | "description" | "rel
 
 type ScheduledLessonCardProps = {
   lesson: ScheduledLesson;
-  // Resolves to an error message, or null once the changes are saved.
+  // The parent saves the edits and resolves to an error message, or null on success.
   onSave: (lesson: ScheduledLesson, edits: ScheduledLessonEdits) => Promise<string | null>;
   onDelete: (lesson: ScheduledLesson) => void;
 };
@@ -39,6 +49,7 @@ export default function ScheduledLessonCard({
   const [description, setDescription] = useState(lesson.description);
   const [releaseDateKey, setReleaseDateKey] = useState(lesson.releaseDateKey);
 
+  // Edit mode starts from the lesson's current values each time.
   function startEditing() {
     setTitle(lesson.title);
     setDescription(lesson.description);
@@ -72,6 +83,8 @@ export default function ScheduledLessonCard({
     }
     setIsEditing(false);
   }
+
+  // -- Edit mode --
 
   if (isEditing) {
     return (
@@ -138,6 +151,8 @@ export default function ScheduledLessonCard({
       </div>
     );
   }
+
+  // -- View mode --
 
   return (
     <div className="rounded-lg border border-slate-100 p-3">

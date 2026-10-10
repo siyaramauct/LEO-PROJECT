@@ -1,3 +1,11 @@
+// -----------------------------------------------------------------------------
+// User Identity
+//
+// The signed-in user's initial, name and role, shown in teacher page headers.
+//
+// Used by: ClassroomDetail || CreateClassroom || LearningHub || TeacherClassroom
+// -----------------------------------------------------------------------------
+
 import { useAuth } from "../context/AuthContext";
 
 export default function UserIdentity() {

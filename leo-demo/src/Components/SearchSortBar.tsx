@@ -1,3 +1,15 @@
+// -----------------------------------------------------------------------------
+// Search and Sort Bar
+//
+// A search box with a clear button, next to a sort menu. It only renders the
+// controls: the parent page holds the query and sort state and does the actual
+// filtering with the helpers in utils/listControls.ts.
+//
+// Stacks vertically on phones and sits on one row from sm up.
+//
+// Used by: TeacherClassroom || ClassroomStudentsTab || ClassroomInvitePanel
+// -----------------------------------------------------------------------------
+
 import { ArrowUpDown, Search, X } from "lucide-react";
 import { useId } from "react";
 import type { SortOption } from "../utils/listControls";
@@ -9,8 +21,7 @@ type SearchSortBarProps<T extends string> = {
   sort: T;
   onSortChange: (sort: T) => void;
   sortOptions: SortOption<T>[];
-  // "sm" for compact mobile cards, "md" for desktop pages.
-  size?: "sm" | "md";
+  size?: "sm" | "md"; // "sm" for compact mobile cards, "md" for desktop pages.
   className?: string;
 };
 

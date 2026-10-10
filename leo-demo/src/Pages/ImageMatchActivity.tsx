@@ -79,7 +79,7 @@ export default function ImageMatchActivity() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
-      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+      <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center gap-3">
             <button

@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Classroom Desktop Card
+//
+// The desktop version of the classroom card, with larger stats, the creation
+// date and a "View Classroom" button. Same data as ClassroomMobileCard.
+//
+// Used by: TeacherClassroom (lg and up)
+// -----------------------------------------------------------------------------
+
 import { BookOpen, ChevronRight, Trash2, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Classroom } from "./ClassroomMobileCard";

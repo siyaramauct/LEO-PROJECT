@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Create Classroom Hero
+//
+// The violet banner at the top of the teacher Learning Hub, with a button that
+// starts a new classroom.
+//
+// Used by: LearningHub
+// -----------------------------------------------------------------------------
+
 import { Plus, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 

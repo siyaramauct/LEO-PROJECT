@@ -1,17 +1,39 @@
+// -----------------------------------------------------------------------------
+// Class Reports
+//
+// Builds the teacher's progress reports (ClassProgress and ClassroomReport
+// pages). For each classroom it works out, per student and per lesson:
+// completion, first and best quiz scores, retakes, time spent and recent
+// activity. It then raises flags for students who may need help.
+//
+// Everything is loaded in a fixed number of queries, whatever the class size,
+// and combined in memory.
+// -----------------------------------------------------------------------------
+
 import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "../supabase-client";
 import { buildActivityWeeks, daysBetween } from "./activityCalendar";
 import { bucketImageUrlOrBroken } from "./images";
 import { toDateKey } from "./releaseDate";
 
-// Mastery-learning practice (Bloom; Guskey) treats roughly 80% on a formative check as mastery.
+// -- Thresholds ---------------------------------------------------------------
+
+// Mastery-learning practice (Bloom; Guskey) treats roughly 80% on a formative
+// check as mastery.
 export const MASTERY_PERCENT = 80;
-// Below this a lesson's content most likely needs reteaching rather than extra practice.
+
+// Below this, a lesson most likely needs reteaching rather than extra practice.
 export const SUPPORT_PERCENT = 50;
-// LMS activity is an early-warning signal (Macfadyen & Dawson, 2010); a week without study is worth a check-in.
+
+// LMS activity is an early-warning signal (Macfadyen & Dawson, 2010); a week
+// without study is worth a check-in.
 export const INACTIVE_DAYS = 7;
-// "Behind" once a student has finished less than this share of the lessons released so far.
+
+// A student is "behind" once they have finished less than half of the lessons
+// released so far.
 const BEHIND_SHARE = 0.5;
+
+// -- Report types -------------------------------------------------------------
 
 export type ScoreBand = "mastered" | "developing" | "support";
 export type StudentFlag = "low-scores" | "inactive" | "behind";
@@ -32,11 +54,9 @@ export type StudentReport = {
   completedCount: number;
   averagePercent: number | null;
   lastActiveKey: string | null;
-  // Null when the student has no activity in the calendar window at all.
-  daysSinceActive: number | null;
+  daysSinceActive: number | null; // Null when there is no activity in the 12-week window.
   activeDaysLast7: number;
-  // Completed lessons only, keyed by lesson id.
-  results: Map<string, StudentLessonResult>;
+  results: Map<string, StudentLessonResult>; // Completed lessons only, keyed by lesson id.
   flags: StudentFlag[];
 };
 
@@ -47,8 +67,7 @@ export type LessonReport = {
   releaseDate: string;
   hasQuiz: boolean;
   completedCount: number;
-  // Class average of each student's best attempt.
-  averagePercent: number | null;
+  averagePercent: number | null; // Class average of each student's best attempt.
   firstAttemptAverage: number | null;
   bands: Record<ScoreBand | "notAttempted", number>;
   medianMinutes: number | null;
@@ -68,6 +87,8 @@ export type ClassReport = {
   activeThisWeek: number;
   needsAttention: number;
 };
+
+// -- Database row shapes ------------------------------------------------------
 
 type ClassroomRow = {
   classroom_id: string;
@@ -98,23 +119,7 @@ type AttemptRow = {
 };
 type ActivityRow = { student_id: string; activity_date: string };
 
-const PAGE_SIZE = 1000;
-
-// Supabase caps a response at 1000 rows, so page through anything that can grow with class size.
-async function fetchAllRows<T>(
-  page: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
-) {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await page(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    rows.push(...(data ?? []));
-    if (!data || data.length < PAGE_SIZE) return rows;
-  }
-}
+// -- Small maths helpers ------------------------------------------------------
 
 export const average = (values: number[]) =>
   values.length
@@ -131,19 +136,59 @@ const median = (values: number[]) => {
 const percentOf = (score: number | null, ceiling: number | null) =>
   score !== null && ceiling ? Math.round((score / ceiling) * 100) : null;
 
-// Loads every report for the teacher's classrooms (or just one) in a fixed number of queries.
+// The higher of two percentages, where null means "no score yet".
+const bestOf = (a: number | null, b: number | null) =>
+  a === null ? b : b === null ? a : Math.max(a, b);
+
+// Drops the nulls from a list of percentages.
+const scoredOnly = (values: (number | null)[]) =>
+  values.filter((value): value is number => value !== null);
+
+// Adds an item to the list stored under a key in a Map.
+function pushTo<T>(map: Map<string, T[]>, key: string, item: T) {
+  map.set(key, [...(map.get(key) ?? []), item]);
+}
+
+// -- Paging -------------------------------------------------------------------
+
+const PAGE_SIZE = 1000;
+
+// Supabase returns at most 1000 rows per request, so tables that grow with
+// class size are read page by page until a short page comes back.
+async function fetchAllRows<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
+) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return rows;
+  }
+}
+
+// -- Main loader --------------------------------------------------------------
+
+// Loads reports for all of the teacher's classrooms, or just one when
+// classroomId is given.
 export async function loadClassReports(
   teacherId: string,
   classroomId?: string,
 ): Promise<ClassReport[]> {
+  // Step 1: the teacher's classrooms.
   let classroomQuery = supabase
     .from("classrooms")
     .select("classroom_id, classroom_name, cover_image_path")
     .eq("teacher_id", teacherId)
     .order("classroom_name");
   if (classroomId) classroomQuery = classroomQuery.eq("classroom_id", classroomId);
+
   const { data: classroomData, error: classroomError } = await classroomQuery;
   if (classroomError) throw classroomError;
+
   const classrooms = (classroomData ?? []) as ClassroomRow[];
   if (!classrooms.length) return [];
   const classroomIds = classrooms.map((classroom) => classroom.classroom_id);
@@ -152,8 +197,10 @@ export async function loadClassReports(
   const todayKey = toDateKey(today);
   const windowStartKey = buildActivityWeeks(today)[0][0].key;
 
+  // Step 2: lessons and enrolments for those classrooms.
   const [lessonResult, enrolmentResult] = await Promise.all([
-    // Scheduled lessons aren't available to students yet, so they don't count against completion.
+    // Scheduled lessons aren't open to students yet, so they don't count
+    // against completion.
     supabase
       .from("lessons")
       .select("lesson_id, classroom_id, title, lesson_image_path, release_date")
@@ -166,11 +213,14 @@ export async function loadClassReports(
   ]);
   if (lessonResult.error) throw lessonResult.error;
   if (enrolmentResult.error) throw enrolmentResult.error;
+
   const lessons = (lessonResult.data ?? []) as LessonRow[];
   const enrolments = (enrolmentResult.data ?? []) as EnrolmentRow[];
   const lessonIds = lessons.map((lesson) => lesson.lesson_id);
   const studentIds = [...new Set(enrolments.map((enrolment) => enrolment.student_id))];
 
+  // Step 3: everything about those students and lessons, in parallel.
+  // Each query is skipped when there is nothing to look up.
   const [profiles, mcqs, attempts, activity] = await Promise.all([
     studentIds.length
       ? supabase
@@ -219,23 +269,19 @@ export async function loadClassReports(
       : [],
   ]);
 
+  // Step 4: index the rows for quick lookup.
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
   const ceilings = new Map(mcqs.map((mcq) => [mcq.lesson_id, mcq.score_ceiling]));
+
   const activityByStudent = new Map<string, string[]>();
-  for (const row of activity)
-    activityByStudent.set(row.student_id, [
-      ...(activityByStudent.get(row.student_id) ?? []),
-      row.activity_date,
-    ]);
+  for (const row of activity) pushTo(activityByStudent, row.student_id, row.activity_date);
 
-  // Attempts arrive oldest first, so the first one seen per student and lesson is their first try.
+  // Attempts arrive oldest first, so the first one seen per student and lesson
+  // is that student's first try.
   const attemptsByLesson = new Map<string, AttemptRow[]>();
-  for (const attempt of attempts)
-    attemptsByLesson.set(attempt.lesson_id, [
-      ...(attemptsByLesson.get(attempt.lesson_id) ?? []),
-      attempt,
-    ]);
+  for (const attempt of attempts) pushTo(attemptsByLesson, attempt.lesson_id, attempt);
 
+  // Step 5: build one report per classroom.
   return classrooms.map((classroom) => {
     const classLessons = lessons
       .filter((lesson) => lesson.classroom_id === classroom.classroom_id)
@@ -245,34 +291,39 @@ export async function loadClassReports(
       .map((enrolment) => enrolment.student_id);
     const classStudentSet = new Set(classStudentIds);
 
+    // Per student: lesson id to their result on that lesson. Filled in while
+    // the lesson reports are built, then reused for the student reports.
     const resultsByStudent = new Map<string, Map<string, StudentLessonResult>>(
       classStudentIds.map((id) => [id, new Map()]),
     );
+
+    // -- Lesson reports --
+
     const lessonReports: LessonReport[] = classLessons.map((lesson) => {
       const ceiling = ceilings.get(lesson.lesson_id) ?? null;
       const lessonAttempts = (attemptsByLesson.get(lesson.lesson_id) ?? []).filter((attempt) =>
         classStudentSet.has(attempt.student_id),
       );
       const minutes: number[] = [];
+
+      // Fold each attempt into that student's result for this lesson.
       for (const attempt of lessonAttempts) {
         const results = resultsByStudent.get(attempt.student_id)!;
         const percent = percentOf(attempt.score === null ? null : Number(attempt.score), ceiling);
         const previous = results.get(lesson.lesson_id);
+
         results.set(
           lesson.lesson_id,
           previous
             ? {
                 attempts: previous.attempts + 1,
-                firstPercent: previous.firstPercent,
-                bestPercent:
-                  previous.bestPercent === null
-                    ? percent
-                    : percent === null
-                      ? previous.bestPercent
-                      : Math.max(previous.bestPercent, percent),
+                firstPercent: previous.firstPercent, // The first try never changes.
+                bestPercent: bestOf(previous.bestPercent, percent),
               }
             : { attempts: 1, firstPercent: percent, bestPercent: percent },
         );
+
+        // Time on task, in minutes, when the start time was recorded.
         if (attempt.started_at) {
           const elapsed =
             (new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) /
@@ -281,13 +332,14 @@ export async function loadClassReports(
         }
       }
 
+      // One result per student who completed the lesson.
       const studentResults = classStudentIds.flatMap((id) => {
         const result = resultsByStudent.get(id)!.get(lesson.lesson_id);
         return result ? [result] : [];
       });
-      const bestPercents = studentResults.flatMap((result) =>
-        result.bestPercent === null ? [] : [result.bestPercent],
-      );
+      const bestPercents = scoredOnly(studentResults.map((result) => result.bestPercent));
+
+      // How many students fall in each score band.
       const bands = {
         mastered: 0,
         developing: 0,
@@ -295,6 +347,7 @@ export async function loadClassReports(
         notAttempted: classStudentIds.length - studentResults.length,
       };
       for (const percent of bestPercents) bands[scoreBand(percent)] += 1;
+
       const medianMinutes = median(minutes);
 
       return {
@@ -306,9 +359,7 @@ export async function loadClassReports(
         completedCount: studentResults.length,
         averagePercent: average(bestPercents),
         firstAttemptAverage: average(
-          studentResults.flatMap((result) =>
-            result.firstPercent === null ? [] : [result.firstPercent],
-          ),
+          scoredOnly(studentResults.map((result) => result.firstPercent)),
         ),
         bands,
         medianMinutes: medianMinutes === null ? null : Math.max(1, Math.round(medianMinutes)),
@@ -316,7 +367,10 @@ export async function loadClassReports(
       };
     });
 
+    // -- Student reports --
+
     const activeStudentsByDay = new Map<string, number>();
+
     const studentReports: StudentReport[] = classStudentIds.map((id) => {
       const profile = profilesById.get(id);
       const name =
@@ -324,24 +378,28 @@ export async function loadClassReports(
       const initials =
         `${profile?.name?.[0] ?? ""}${profile?.surname?.[0] ?? ""}`.toUpperCase() ||
         name[0].toUpperCase();
+
       const results = resultsByStudent.get(id)!;
       const days = activityByStudent.get(id) ?? [];
+
+      // Count this student towards the class-wide "active students per day" map.
       for (const day of days) activeStudentsByDay.set(day, (activeStudentsByDay.get(day) ?? 0) + 1);
+
       const lastActiveKey = days.length
         ? days.reduce((latest, day) => (day > latest ? day : latest))
         : null;
       const daysSinceActive = lastActiveKey ? daysBetween(lastActiveKey, todayKey) : null;
       const averagePercent = average(
-        [...results.values()].flatMap((result) =>
-          result.bestPercent === null ? [] : [result.bestPercent],
-        ),
+        scoredOnly([...results.values()].map((result) => result.bestPercent)),
       );
 
+      // Flags shown as "needs attention" badges on the report.
       const flags: StudentFlag[] = [];
       if (averagePercent !== null && averagePercent < SUPPORT_PERCENT) flags.push("low-scores");
       if (daysSinceActive === null || daysSinceActive >= INACTIVE_DAYS) flags.push("inactive");
-      if (classLessons.length >= 2 && results.size / classLessons.length < BEHIND_SHARE)
+      if (classLessons.length >= 2 && results.size / classLessons.length < BEHIND_SHARE) {
         flags.push("behind");
+      }
 
       return {
         id,
@@ -357,12 +415,17 @@ export async function loadClassReports(
       };
     });
 
+    // -- Class totals --
+
     const allBest = studentReports.flatMap((student) =>
-      [...student.results.values()].flatMap((result) =>
-        result.bestPercent === null ? [] : [result.bestPercent],
-      ),
+      scoredOnly([...student.results.values()].map((result) => result.bestPercent)),
     );
     const possibleCompletions = studentReports.length * lessonReports.length;
+    const totalCompletions = studentReports.reduce(
+      (total, student) => total + student.completedCount,
+      0,
+    );
+    const masteredCount = allBest.filter((percent) => percent >= MASTERY_PERCENT).length;
 
     return {
       classroomId: classroom.classroom_id,
@@ -373,22 +436,16 @@ export async function loadClassReports(
       activeStudentsByDay,
       averagePercent: average(allBest),
       completionRate: possibleCompletions
-        ? Math.round(
-            (studentReports.reduce((total, student) => total + student.completedCount, 0) /
-              possibleCompletions) *
-              100,
-          )
+        ? Math.round((totalCompletions / possibleCompletions) * 100)
         : null,
-      masteryRate: allBest.length
-        ? Math.round(
-            (allBest.filter((percent) => percent >= MASTERY_PERCENT).length / allBest.length) * 100,
-          )
-        : null,
+      masteryRate: allBest.length ? Math.round((masteredCount / allBest.length) * 100) : null,
       activeThisWeek: studentReports.filter((student) => student.activeDaysLast7 > 0).length,
       needsAttention: studentReports.filter((student) => student.flags.length > 0).length,
     };
   });
 }
+
+// -- Labels -------------------------------------------------------------------
 
 export const FLAG_LABELS: Record<StudentFlag, string> = {
   "low-scores": `Average below ${SUPPORT_PERCENT}%`,

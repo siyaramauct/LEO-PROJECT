@@ -1,11 +1,27 @@
+// -----------------------------------------------------------------------------
+// Classroom Form
+//
+// The "create a classroom" form: name, description, proficiency level and a
+// cover image. Built with react-hook-form, which handles the field values and
+// validation messages. On submit it inserts the classroom and returns the
+// teacher to their classroom list. A database trigger then creates the private
+// invite code students use to join.
+//
+// Used by: CreateClassroom
+// -----------------------------------------------------------------------------
+
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
+import { bucketImageUrl } from "../utils/images";
 import ClassroomFormField from "./ClassroomFormField";
 
+// -- Options ------------------------------------------------------------------
+
+// Cover images teachers can pick from, stored in the images bucket.
 const coverOptions = [
   { id: "everyday", alt: "Learner studying from a book", path: "classroomImgs/fetchbook.jpg" },
   { id: "reading", alt: "Library illustration", path: "classroomImgs/libIl.jpg" },
@@ -26,14 +42,13 @@ const coverOptions = [
     alt: "Guy patched into a classroom",
     path: "classroomImgs/guypatchclassroom.avif",
   },
-].map((cover) => ({
-  ...cover,
-  image: supabase.storage.from("images").getPublicUrl(cover.path).data.publicUrl,
-}));
+].map((cover) => ({ ...cover, image: bucketImageUrl(cover.path) }));
 
 const inputClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100";
 
+// Fills the legacy classrooms.join_code column, which must still be unique.
+// Students join with the private invite code instead (see ClassroomInvitePanel).
 const generateJoinCode = (classroomName: string) => {
   const namePrefix = classroomName
     .replace(/[^a-zA-Z0-9]/g, "")
@@ -50,6 +65,8 @@ const generateJoinCode = (classroomName: string) => {
   return `${namePrefix}-${randomSuffix}`;
 };
 
+// -- Form ---------------------------------------------------------------------
+
 type ClassroomFormValues = {
   name: string;
   description: string;
@@ -58,7 +75,7 @@ type ClassroomFormValues = {
 };
 
 type ClassroomFormProps = {
-  idPrefix: string;
+  idPrefix: string; // Keeps input ids unique when the form is rendered twice (mobile and desktop).
 };
 
 export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
@@ -68,7 +85,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ClassroomFormValues>({
     mode: "onSubmit",
@@ -76,7 +93,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
     defaultValues: { proficiencyLevel: "Elementary", coverId: coverOptions[0].id },
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const selectedCover = watch("coverId");
+  const selectedCover = useWatch({ control, name: "coverId" });
 
   const submitClassroom: SubmitHandler<ClassroomFormValues> = async (values) => {
     if (!session?.user) {
@@ -96,8 +113,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
       classroom_name: values.name.trim(),
       description: values.description.trim(),
       proficiency_level: values.proficiencyLevel,
-      // The language picker was removed; every classroom is English. Kept because the column may be required.
-      language: "English",
+      language: "English", // Every classroom is English; the column is kept for the schema.
       cover_image_path: selectedCoverOption.path,
       invite_only: true,
       join_code: generateJoinCode(values.name),
@@ -172,6 +188,9 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
         hint="Choose an image that gives learners a quick sense of the class."
         error={errors.coverId?.message}
       >
+        {
+          // The cover buttons write to this hidden field so react-hook-form validates it.
+        }
         <input type="hidden" {...register("coverId", { required: "Choose a classroom cover." })} />
         <div className="grid grid-cols-3 gap-2">
           {coverOptions.map((cover) => (

@@ -1,3 +1,11 @@
+// -----------------------------------------------------------------------------
+// Stat Card
+//
+// A small summary tile: icon, big value, label and an optional progress bar.
+//
+// Used by: TeacherLessonReport
+// -----------------------------------------------------------------------------
+
 import { cloneElement, type ReactElement } from "react";
 
 type StatCardProps = {
@@ -5,8 +13,7 @@ type StatCardProps = {
   label: string;
   value: string;
   progress?: number;
-  // Optional filled icon tile, e.g. "bg-sky-100 text-sky-700". Defaults to a plain violet icon.
-  iconClassName?: string;
+  iconClassName?: string; // Optional filled icon tile, e.g. "bg-sky-100 text-sky-700".
 };
 
 export default function StatCard({ icon, label, value, progress, iconClassName }: StatCardProps) {

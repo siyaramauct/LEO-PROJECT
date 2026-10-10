@@ -1,3 +1,11 @@
+// -----------------------------------------------------------------------------
+// Progress Bar
+//
+// A thin violet bar filled to a percentage. Values outside 0 to 100 are clamped.
+//
+// Used by: ClassroomReport || StudentLearningReport
+// -----------------------------------------------------------------------------
+
 type ProgressBarProps = {
   value: number;
   className?: string;

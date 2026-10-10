@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Classroom Form Field
+//
+// Wraps one input with its label, an optional hint and an optional error message,
+// so every field in the classroom form looks the same.
+//
+// Used by: ClassroomForm
+// -----------------------------------------------------------------------------
+
 import type { ReactNode } from "react";
 
 type ClassroomFormFieldProps = {
@@ -8,7 +17,6 @@ type ClassroomFormFieldProps = {
   children: ReactNode;
 };
 
-// Shared field framing keeps classroom forms visually consistent.
 export default function ClassroomFormField({
   label,
   htmlFor,

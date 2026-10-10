@@ -1,6 +1,12 @@
-// File types teachers may upload as classroom materials, keyed by extension.
-// The MIME type is sent to Storage explicitly because browsers often leave
-// File.type empty for Office documents.
+// -----------------------------------------------------------------------------
+// Classroom Material File Types
+//
+// Which files teachers may upload as classroom materials, and how each one is
+// labelled in the materials list.
+// -----------------------------------------------------------------------------
+
+// Allowed extensions and the MIME type sent to Storage. The type is set
+// explicitly because browsers often leave File.type empty for Office files.
 const MATERIAL_FILE_TYPES: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -11,8 +17,8 @@ const MATERIAL_FILE_TYPES: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
-// For the file picker's `accept` attribute. It only filters the dialog,
-// so uploads are still checked with validateMaterialFile.
+// For the file picker's accept attribute. It only filters the dialog, so
+// uploads are still checked with validateMaterialFile.
 export const MATERIAL_FILE_ACCEPT = Object.keys(MATERIAL_FILE_TYPES)
   .map((extension) => `.${extension}`)
   .join(",");
@@ -33,10 +39,15 @@ export const materialTypeLabel = (resourceType: "document" | "link", path: strin
 export function validateMaterialFile(file: File): { contentType: string } | { error: string } {
   const extension = fileExtension(file.name);
   const contentType = MATERIAL_FILE_TYPES[extension];
+
   if (!contentType) {
+    const reason = extension
+      ? `because .${extension} files aren't supported`
+      : "because it has no file extension";
     return {
-      error: `"${file.name}" can't be uploaded${extension ? ` because .${extension} files aren't supported` : " because it has no file extension"}. Choose a ${MATERIAL_FILE_LABEL} file.`,
+      error: `"${file.name}" can't be uploaded ${reason}. Choose a ${MATERIAL_FILE_LABEL} file.`,
     };
   }
+
   return { contentType };
 }

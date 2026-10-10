@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Signup Form
+//
+// Creates an email account. If the project needs email confirmation the user is
+// told to check their inbox; otherwise they go straight to picking a role.
+//
+// Used by: Signup
+// -----------------------------------------------------------------------------
+
 import { useRef, useState, type FormEventHandler } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +19,7 @@ type Inputs = {
   password: string;
 };
 
+// Shared input and label styles.
 const field =
   "w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100";
 
@@ -29,6 +39,8 @@ export default function SignupForm() {
   const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const submitLock = useRef(false);
 
+  // submitLock blocks a second submit while the first is still running, even
+  // before React has re-rendered the disabled button.
   const handleSignup: SubmitHandler<Inputs> = async (data) => {
     if (submitLock.current) return;
 
@@ -38,6 +50,8 @@ export default function SignupForm() {
     setSaving(true);
     try {
       const session = await signup(data.email, data.password, data.firstName, data.lastName);
+      // A session means the account is ready now; null means the user must
+      // confirm their email first.
       if (session) {
         navigate("/select-role");
       } else {
@@ -46,7 +60,6 @@ export default function SignupForm() {
         );
       }
     } catch (error: unknown) {
-      console.error("[Signup] ✗ Signup failed:", error);
       setAuthError(
         error instanceof Error ? error.message : "Something went wrong. Please try again.",
       );
@@ -56,14 +69,12 @@ export default function SignupForm() {
     }
   };
 
-  const onSubmit: SubmitHandler<Inputs> = (data) => handleSignup(data);
   const onFormSubmit: FormEventHandler<HTMLFormElement> = (event) => {
-    void handleSubmit(onSubmit)(event);
+    void handleSubmit(handleSignup)(event);
   };
 
   return (
     <form onSubmit={onFormSubmit} className="flex flex-col gap-4.5">
-      {/* First name */}
       <div>
         <label htmlFor="firstName" className={label}>
           First Name
@@ -86,7 +97,6 @@ export default function SignupForm() {
         )}
       </div>
 
-      {/* Last name */}
       <div>
         <label htmlFor="lastName" className={label}>
           Last Name
@@ -109,7 +119,6 @@ export default function SignupForm() {
         )}
       </div>
 
-      {/* Email */}
       <div>
         <label htmlFor="email" className={label}>
           Email Address
@@ -130,7 +139,6 @@ export default function SignupForm() {
         {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email.message}</p>}
       </div>
 
-      {/* Password */}
       <div>
         <label htmlFor="password" className={label}>
           Password
@@ -157,7 +165,6 @@ export default function SignupForm() {
         )}
       </div>
 
-      {/* Submit */}
       {authError && (
         <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-[12px] text-red-600">{authError}</p>
       )}

@@ -1,3 +1,14 @@
+// -----------------------------------------------------------------------------
+// Classroom Invite Panel
+//
+// Shows a classroom's invite code with buttons to copy, email, share and
+// replace it. When given the student list it also shows a searchable roster
+// underneath. Once the classroom reaches its 30-student limit, the email and
+// share buttons are hidden.
+//
+// Used by: ClassroomDetail
+// -----------------------------------------------------------------------------
+
 import { Copy, Mail, RefreshCw, Share2, Users } from "lucide-react";
 import { useState } from "react";
 import { MAX_CLASSROOM_STUDENTS } from "../config/limits";
@@ -22,10 +33,8 @@ type Props = {
   classroomName: string;
   code: string | null;
   codeError: string | null;
-  // Omit students to render only the invite code (e.g. inside the desktop banner popover).
-  students?: StudentProfile[];
-  // Enrolment timestamps by student id, used for "Recently joined" sorting.
-  enrolledAt?: Record<string, string>;
+  students?: StudentProfile[]; // Leave out to show only the invite code.
+  enrolledAt?: Record<string, string>; // Join time per student id, for "Recently joined".
   rosterError?: string | null;
   isRotating: boolean;
   onRotate: () => void;
@@ -55,6 +64,8 @@ export default function ClassroomInvitePanel({
   const [shareMessage, setShareMessage] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
   const [studentSort, setStudentSort] = useState<StudentSort>("name-asc");
+
+  // Search, then sort. Every sort falls back to name order to break ties.
   const visibleStudents = (students ?? [])
     .filter((student) =>
       matchesSearch(studentQuery, student.name, student.surname, student.username),
@@ -69,6 +80,7 @@ export default function ClassroomInvitePanel({
         );
       return byName;
     });
+
   const invitation = `You're invited to ${classroomName} on LEO Vocabulary App. Sign in, open My Classrooms, and enter this code: ${code}`;
   const isFull = (students?.length ?? 0) >= MAX_CLASSROOM_STUDENTS;
 
@@ -82,6 +94,7 @@ export default function ClassroomInvitePanel({
     }
   };
 
+  // Opens the phone's share sheet where available; elsewhere copies the code.
   const share = async () => {
     if (!code) return;
     if (!navigator.share) {
@@ -92,8 +105,10 @@ export default function ClassroomInvitePanel({
       await navigator.share({ title: `Join ${classroomName}`, text: invitation });
       setShareMessage("");
     } catch (error) {
-      if (error instanceof Error && error.name !== "AbortError")
+      // AbortError just means the user closed the share sheet.
+      if (error instanceof Error && error.name !== "AbortError") {
         setShareMessage("Sharing failed. Copy the code instead.");
+      }
     }
   };
 

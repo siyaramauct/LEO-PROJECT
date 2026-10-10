@@ -1,3 +1,15 @@
+// -----------------------------------------------------------------------------
+// Classroom Materials Panel
+//
+// The compact materials list for phones and tablets: upload a file, add a
+// link, and see or delete what has been shared. Uploading and saving are done by
+// the parent page through the callback props.
+//
+// Also defines the ClassroomMaterial type used by both materials views.
+//
+// Used by: ClassroomDetail (below lg)
+// -----------------------------------------------------------------------------
+
 import { FileText, Link as LinkIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { MaterialSpine, MaterialTypeTag } from "./MaterialTypeMarks";
@@ -18,7 +30,6 @@ export type ClassroomMaterial = {
   uploadedDate?: string;
 };
 
-// Parent-owned callbacks keep this panel reusable with any materials store.
 type ClassroomMaterialsPanelProps = {
   materials: ClassroomMaterial[];
   onFileUpload: (file: File) => Promise<void>;
@@ -36,14 +47,12 @@ export default function ClassroomMaterialsPanel({
   isSaving = false,
   error,
 }: ClassroomMaterialsPanelProps) {
-  // Link-entry state belongs to the panel because it is only needed while editing.
+  // The link form's state lives here; uploads and saving are handled by the parent.
   const [isLinkFormOpen, setIsLinkFormOpen] = useState(false);
   const [url, setUrl] = useState("");
 
   const submitLink = async () => {
-    if (!url.trim()) {
-      return;
-    }
+    if (!url.trim()) return;
 
     await onAddLink(url.trim());
     setUrl("");
@@ -52,7 +61,6 @@ export default function ClassroomMaterialsPanel({
 
   return (
     <section className="rounded-xl border border-slate-100 bg-white p-3">
-      {/* Panel heading and current material count */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-slate-900">Class materials</h2>
@@ -64,7 +72,6 @@ export default function ClassroomMaterialsPanel({
         </span>
       </div>
 
-      {/* Document picker and URL-entry trigger */}
       <div className="mt-3 flex gap-2">
         <label
           htmlFor="classroom-material-upload"
@@ -81,10 +88,8 @@ export default function ClassroomMaterialsPanel({
           disabled={isSaving}
           onChange={(event) => {
             const [file] = Array.from(event.target.files ?? []);
-            if (file) {
-              void onFileUpload(file);
-            }
-            event.target.value = "";
+            if (file) void onFileUpload(file);
+            event.target.value = ""; // Lets the same file be picked again.
           }}
         />
 
@@ -99,7 +104,6 @@ export default function ClassroomMaterialsPanel({
         </button>
       </div>
 
-      {/* The URL form is only shown when the teacher adds an external resource. */}
       {isLinkFormOpen && (
         <div className="mt-2 flex gap-2">
           <input
@@ -134,11 +138,11 @@ export default function ClassroomMaterialsPanel({
         </p>
       )}
 
-      {/* Existing classroom resources */}
       <div className="mt-3 divide-y divide-slate-100">
         {materials.map((material) => {
           const isLink = material.kind === "Link";
           const Icon = isLink ? LinkIcon : FileText;
+          // Links and uploaded files open in a new tab; anything without a URL is plain text.
           const content = (
             <>
               <MaterialSpine isLink={isLink} />

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, { type Classroom } from "../Components/ClassroomMobileCard";
-import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import ConfirmDialog from "../Components/ConfirmDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
 import NavItem from "../Components/NavItem";
 import SearchSortBar from "../Components/SearchSortBar";
@@ -414,7 +414,7 @@ export default function TeacherClassrooms() {
         </main>
       </div>
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(classroomToDelete)}
         isDeleting={isDeletingClassroom}
         onCancel={() => setClassroomToDelete(null)}

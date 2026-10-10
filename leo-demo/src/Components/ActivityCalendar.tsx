@@ -1,6 +1,19 @@
+// -----------------------------------------------------------------------------
+// Activity Calendar
+//
+// A heat map of the last 12 weeks, one square per day, like a GitHub
+// contribution graph. Darker squares mean more activity. The parent page decides
+// what "activity" means by passing getLevel (how dark a day is) and getTitle
+// (the hover text), so the same calendar serves students and teachers.
+//
+// The day grid itself comes from utils/activityCalendar.ts.
+//
+// Used by: StudentLearningReport (one student's streak) || ClassroomReport (whole class)
+// -----------------------------------------------------------------------------
+
 import type { ActivityDay } from "../utils/activityCalendar";
 
-// Shade per level: 0 = no activity, up to 3 = the busiest days.
+// Square colour per activity level, from 0 (none) to 3 (busiest).
 const LEVEL_CLASSES = ["bg-slate-100", "bg-violet-200", "bg-violet-400", "bg-violet-700"];
 const WEEKDAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
 
@@ -32,6 +45,7 @@ export default function ActivityCalendar({
             ))}
           </div>
           {weeks.map((week, weekIndex) => {
+            // Label a column with the month name when a new month begins.
             const startsMonth =
               weekIndex === 0 ||
               week[0].date.getMonth() !== weeks[weekIndex - 1][0].date.getMonth();

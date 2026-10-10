@@ -1,3 +1,16 @@
+// -----------------------------------------------------------------------------
+// Classroom Students Tab
+//
+// The Students tab of a classroom: four summary tiles (enrolled, active this
+// week, average score, completion) and a searchable, sortable roster table with
+// each student's progress and a remove button.
+//
+// The statistics are loaded here, when the tab is opened, so the classroom page
+// itself stays quick to load.
+//
+// Used by: ClassroomDetail
+// -----------------------------------------------------------------------------
+
 import { Activity, BarChart3, CheckCircle2, UserMinus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -5,6 +18,8 @@ import ClassroomMetric from "./ClassroomMetric";
 import SearchSortBar from "./SearchSortBar";
 import type { StudentProfile } from "./ClassroomInvitePanel";
 import { supabase } from "../supabase-client";
+import { daysBetween } from "../utils/activityCalendar";
+import { toDateKey } from "../utils/releaseDate";
 import {
   compareNullableNumbers,
   compareText,
@@ -28,6 +43,7 @@ type StudentStats = {
   lastActive: string | null;
 };
 
+// How far back "last active" looks.
 const ACTIVITY_WINDOW_DAYS = 30;
 
 type StudentSort =
@@ -47,22 +63,19 @@ const studentSortOptions: SortOption<StudentSort>[] = [
   { value: "recently-active", label: "Recently active" },
 ];
 
-// student_activity.activity_date is a plain date, so compare against local YYYY-MM-DD strings.
+// -- Helpers ------------------------------------------------------------------
+
+// student_activity.activity_date is a plain date, so dates are compared as
+// local "YYYY-MM-DD" keys.
 const localDate = (daysAgo = 0) => {
   const date = new Date();
   date.setDate(date.getDate() - daysAgo);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return toDateKey(date);
 };
 
 const lastActiveLabel = (activityDate: string | null) => {
   if (!activityDate) return `Not active in ${ACTIVITY_WINDOW_DAYS} days`;
-  const [year, month, day] = activityDate.split("-").map(Number);
-  const today = new Date();
-  const days = Math.round(
-    (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() -
-      new Date(year, month - 1, day).getTime()) /
-      86_400_000,
-  );
+  const days = daysBetween(activityDate, localDate());
   if (days <= 0) return "Active today";
   if (days === 1) return "Active yesterday";
   return `Active ${days} days ago`;
@@ -73,7 +86,8 @@ const fullName = (student: StudentProfile) =>
 const initials = (student: StudentProfile) =>
   `${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S";
 
-// Rudimentary roster with light statistics. Stats load only when this tab is first shown.
+// -- Component ----------------------------------------------------------------
+
 export default function ClassroomStudentsTab({
   classroomId,
   students,
@@ -85,15 +99,23 @@ export default function ClassroomStudentsTab({
   const [stats, setStats] = useState<Record<string, StudentStats>>({});
   const [statsError, setStatsError] = useState<string | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  // Lessons with an MCQ. Flashcards-only lessons can't be completed, so they're left out of completion stats.
+  // Lessons that have a quiz. Flashcards-only lessons have no score, so they
+  // are left out of the completion figures.
   const [quizLessonCount, setQuizLessonCount] = useState<number | null>(null);
+  // The effect below depends on these strings rather than the arrays, so it
+  // only re-runs when the actual ids change.
   const studentKey = students.map((student) => student.id).join(",");
   const lessonKey = lessonIds.join(",");
   const [studentQuery, setStudentQuery] = useState("");
   const [studentSort, setStudentSort] = useState<StudentSort>("name-asc");
 
+  // -- Load statistics --
+  //
+  // One round of three queries for the whole roster: quiz ceilings per lesson,
+  // completed attempts, and recent activity days. Results are combined per
+  // student into lessons completed, average best score and last active day.
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false; // Ignore a slow response after the roster changed.
     const studentIds = studentKey ? studentKey.split(",") : [];
     const classLessonIds = lessonKey ? lessonKey.split(",") : [];
 
@@ -136,10 +158,10 @@ export default function ClassroomStudentsTab({
         ]),
       );
       setQuizLessonCount(mcqResult.error ? null : ceilings.size);
-      // Keep each student's best percentage per lesson so retakes don't drag the average down.
+      // Best percentage per student per lesson, so retakes never lower the average.
       const bestPercent = new Map<string, Map<string, number | null>>();
       for (const attempt of attemptResult.data ?? []) {
-        // Finishing a flashcards-only lesson records an unscored attempt; completion here counts quiz lessons only.
+        // Skip unscored attempts from flashcards-only lessons.
         if (!mcqResult.error && !ceilings.has(attempt.lesson_id)) continue;
         const ceiling = ceilings.get(attempt.lesson_id);
         const percent =
@@ -155,11 +177,13 @@ export default function ClassroomStudentsTab({
         bestPercent.set(attempt.student_id, lessons);
       }
 
+      // Most recent activity day per student.
       const lastActive = new Map<string, string>();
       for (const row of activityResult.data ?? []) {
         const current = lastActive.get(row.student_id);
-        if (!current || row.activity_date > current)
+        if (!current || row.activity_date > current) {
           lastActive.set(row.student_id, row.activity_date);
+        }
       }
 
       setStats(
@@ -191,6 +215,8 @@ export default function ClassroomStudentsTab({
     };
   }, [studentKey, lessonKey]);
 
+  // -- Class summary figures --
+
   const lessonCount = quizLessonCount ?? lessonIds.length;
   const flashcardOnlyCount = lessonIds.length - lessonCount;
   const studentStats = students.map((student) => stats[student.id]).filter(Boolean);
@@ -213,7 +239,9 @@ export default function ClassroomStudentsTab({
     : null;
   const pending = isLoadingStats ? "…" : null;
 
-  // Stat-based sorts put students without a value (or still loading) last, then fall back to name.
+  // -- Search and sort --
+  // Stat-based sorts put students without a value (or still loading) last,
+  // then fall back to name order.
   const compareStudents = (a: StudentProfile, b: StudentProfile) => {
     const byName = compareText(fullName(a), fullName(b));
     const statA = stats[a.id];

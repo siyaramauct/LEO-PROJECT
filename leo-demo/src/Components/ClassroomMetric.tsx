@@ -1,6 +1,14 @@
+// -----------------------------------------------------------------------------
+// Classroom Metric
+//
+// A compact summary tile for classroom figures, with an icon, a value, a label
+// and a short detail in the corner.
+//
+// Used by: ClassroomStudentsTab
+// -----------------------------------------------------------------------------
+
 import type { ReactNode } from "react";
 
-// Reusable compact metric card for classroom summaries.
 type ClassroomMetricProps = {
   icon: ReactNode;
   label: string;
@@ -10,7 +18,6 @@ type ClassroomMetricProps = {
 
 export default function ClassroomMetric({ icon, label, value, detail }: ClassroomMetricProps) {
   return (
-    // Top row pairs the metric icon with supporting context.
     <div className="rounded-lg border border-slate-100 bg-white p-3">
       <div className="flex items-center justify-between text-violet-700">
         <span className="flex h-8 w-8 items-center justify-center">{icon}</span>

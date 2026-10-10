@@ -1,7 +1,7 @@
 import { BookOpen, Check, Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import DeleteAccountDialog from "../Components/DeleteAccountDialog";
+import ConfirmDialog from "../Components/ConfirmDialog";
 import JoinClassroomForm from "../Components/JoinClassroomForm";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
@@ -187,7 +187,7 @@ export default function StudentClassrooms() {
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
 
-      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+      <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         {/* Header */}
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between">
@@ -306,7 +306,7 @@ export default function StudentClassrooms() {
         </div>
       </main>
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={Boolean(classroomToLeave)}
         isDeleting={isLeavingClassroom}
         onCancel={() => setClassroomToLeave(null)}

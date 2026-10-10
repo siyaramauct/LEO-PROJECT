@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Google Sign-In Button
+//
+// Starts the Google sign-in flow. The browser leaves the app for Google and
+// returns to "/", where the auth context picks up the new session.
+//
+// Used by: Login || Signup
+// -----------------------------------------------------------------------------
+
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 

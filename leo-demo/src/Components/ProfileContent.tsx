@@ -1,11 +1,28 @@
+// -----------------------------------------------------------------------------
+// Profile Content
+//
+// The body of the profile page for both students and teachers: a banner with
+// the user's initials, their personal details, a password section, a danger
+// zone for deleting the account, and a log out button.
+//
+// The role prop switches the few things that differ: the banner wording, the
+// username field (students only) and the danger zone border.
+//
+// The page that renders this owns the logout and delete actions; this
+// component only owns its two popups, ConfirmDialog and ChangePasswordDialog.
+//
+// Used by: StudentProfile || TeacherProfile
+// -----------------------------------------------------------------------------
+
 import { LockKeyhole, LogOut, Trash2, User } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import DeleteAccountDialog from "./DeleteAccountDialog";
 import ChangePasswordDialog from "./ChangePasswordDialog";
+import ConfirmDialog from "./ConfirmDialog";
 
-type StudentProfileContentProps = {
+type ProfileContentProps = {
+  role: "student" | "teacher";
   fullName: string;
-  username: string | null;
+  username?: string | null; // Shown for students only.
   initials: string;
   loggingOut: boolean;
   onLogout: () => Promise<void>;
@@ -13,17 +30,21 @@ type StudentProfileContentProps = {
   onDeleteAccount: () => Promise<void>;
 };
 
-export default function StudentProfileContent({
+export default function ProfileContent({
+  role,
   fullName,
-  username,
+  username = null,
   initials,
   loggingOut,
   onLogout,
   deletingAccount,
   onDeleteAccount,
-}: StudentProfileContentProps) {
+}: ProfileContentProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+
+  const isStudent = role === "student";
+  const [firstName, ...otherNames] = fullName.split(" ");
 
   return (
     <div className="space-y-5">
@@ -34,10 +55,12 @@ export default function StudentProfileContent({
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-200">
-              Student account
+              {isStudent ? "Student account" : "Teacher account"}
             </p>
             <h3 className="mt-1 text-xl font-bold">{fullName}</h3>
-            <p className="mt-1 text-sm text-violet-100">@{username ?? "student"}</p>
+            <p className="mt-1 text-sm text-violet-100">
+              {isStudent ? `@${username ?? "student"}` : "Your learning workspace"}
+            </p>
           </div>
         </div>
       </section>
@@ -51,12 +74,12 @@ export default function StudentProfileContent({
           </div>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <ProfileField label="First name" value={fullName.split(" ")[0] || "Student"} />
           <ProfileField
-            label="Last name"
-            value={fullName.split(" ").slice(1).join(" ") || "Not provided"}
+            label="First name"
+            value={firstName || (isStudent ? "Student" : "Teacher")}
           />
-          <ProfileField label="Username" value={username ?? "Not assigned"} />
+          <ProfileField label="Last name" value={otherNames.join(" ") || "Not provided"} />
+          {isStudent && <ProfileField label="Username" value={username ?? "Not assigned"} />}
         </div>
       </section>
 
@@ -72,7 +95,11 @@ export default function StudentProfileContent({
         </div>
       </section>
 
-      <section className="rounded-xl border border-rose-200 bg-white p-5 shadow-sm sm:p-6">
+      <section
+        className={`rounded-xl border bg-white p-5 shadow-sm sm:p-6 ${
+          isStudent ? "border-rose-200" : "border-slate-200"
+        }`}
+      >
         <h3 className="font-bold text-rose-700">Danger zone</h3>
         <p className="mt-1 text-sm text-slate-500">
           Permanently delete your account and profile data.
@@ -97,7 +124,7 @@ export default function StudentProfileContent({
         {loggingOut ? "Logging out..." : "Log out"}
       </button>
 
-      <DeleteAccountDialog
+      <ConfirmDialog
         open={showDeleteDialog}
         isDeleting={deletingAccount}
         onCancel={() => setShowDeleteDialog(false)}
@@ -112,6 +139,8 @@ export default function StudentProfileContent({
   );
 }
 
+// -- Small building blocks ----------------------------------------------------
+
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-slate-50 px-4 py-3">
@@ -121,17 +150,14 @@ function ProfileField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProfileOption({
-  icon,
-  title,
-  description,
-  onClick,
-}: {
+type ProfileOptionProps = {
   icon: ReactNode;
   title: string;
   description: string;
   onClick?: () => void;
-}) {
+};
+
+function ProfileOption({ icon, title, description, onClick }: ProfileOptionProps) {
   return (
     <button
       type="button"

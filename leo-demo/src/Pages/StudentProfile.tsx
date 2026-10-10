@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import StudentProfileContent from "../Components/StudentProfileContent";
+import ProfileContent from "../Components/ProfileContent";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../supabase-client";
 
@@ -71,7 +71,7 @@ export default function StudentProfile() {
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
 
-      <main className="min-h-dvh bg-slate-50 pb-20 md:ml-56 md:pb-0">
+      <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
             <div>
@@ -83,7 +83,8 @@ export default function StudentProfile() {
         </header>
 
         <div className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
-          <StudentProfileContent
+          <ProfileContent
+            role="student"
             fullName={fullName}
             username={studentProfile?.username ?? null}
             initials={initials}

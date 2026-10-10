@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Notifications
+//
+// Writes rows to the notifications table. The NotificationBell component
+// listens for new rows in real time and shows them to the recipient.
+//
+// Sending is best effort: a failure is logged but never stops the action that
+// triggered it (creating a lesson, sharing a material, and so on).
+// -----------------------------------------------------------------------------
+
 import { supabase } from "../supabase-client";
 
 type NotificationInput = {
@@ -5,7 +15,7 @@ type NotificationInput = {
   type: string;
   title: string;
   body?: string | null;
-  link_url?: string | null;
+  link_url?: string | null; // In-app path opened when the notification is clicked.
 };
 
 export async function notifyUsers(notifications: NotificationInput[]) {
@@ -19,6 +29,7 @@ export async function notifyUser(notification: NotificationInput) {
   await notifyUsers([notification]);
 }
 
+// Sends the same notification to every student enrolled in a classroom.
 export async function notifyClassroomStudents(
   classroomId: string,
   notification: Omit<NotificationInput, "recipient_id">,

@@ -1,3 +1,12 @@
+// -----------------------------------------------------------------------------
+// Sidebar Item
+//
+// One entry in the violet desktop sidebar. Renders as a link when given a
+// destination, otherwise as a button with an onClick handler.
+//
+// Used by: TeacherShell and the teacher pages that draw their own navigation
+// -----------------------------------------------------------------------------
+
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,7 +19,6 @@ type SidebarItemProps = {
   onClick?: () => void;
 };
 
-// Renders as a Link when a destination is provided, otherwise a static button.
 export default function SidebarItem({
   icon,
   label,

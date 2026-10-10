@@ -1,3 +1,16 @@
+// -----------------------------------------------------------------------------
+// Change Password Dialog
+//
+// Popup for changing the account password. Asks for the current password and
+// the new one twice, checks them locally, then lets Supabase verify the current
+// password and save the new one. Accounts that only sign in with Google see a
+// link to Google's security settings instead.
+//
+// Closes with the X button, Done, or the Escape key.
+//
+// Used by: ProfileContent
+// -----------------------------------------------------------------------------
+
 import { LockKeyhole, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +26,8 @@ export default function ChangePasswordDialog({ onClose }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  // Google-only accounts have no password here, so the form is replaced by a
+  // link to Google's own security settings.
   const providers = session?.user.app_metadata?.providers as string[] | undefined;
   const isGoogleOnly = providers?.includes("google") && !providers.includes("email");
 
@@ -32,6 +47,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
       return;
     }
 
+    // Supabase checks current_password before applying the change.
     setIsSaving(true);
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
