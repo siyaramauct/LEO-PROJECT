@@ -27,7 +27,7 @@ import { bucketImageUrl } from "../utils/images";
 // -- Types --------------------------------------------------------------------
 
 type StudentProfile = { name: string | null; surname: string | null };
-// Returned by the get_student_progress database function (db/2026-08-28_student_progress.sql).
+// Returned by the get_student_progress database function in Supabase.
 type StudentProgress = {
   current_streak: number;
   longest_streak: number;

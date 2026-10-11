@@ -2,7 +2,7 @@
 // App Limits
 //
 // Size limits shown and checked in the interface. The database enforces the
-// same numbers with triggers (see supabase/migrations/20261006_growth_limits.sql),
+// same numbers with triggers in Supabase,
 // so change both places together.
 // -----------------------------------------------------------------------------
 
