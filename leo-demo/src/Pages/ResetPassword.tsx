@@ -12,7 +12,7 @@ import { LockKeyhole } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { signOut, updatePassword } from "../data/auth";
 
 export default function ResetPassword() {
   const { session, loading } = useAuth();
@@ -35,16 +35,19 @@ export default function ResetPassword() {
     }
 
     setIsSaving(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setIsSaving(false);
-      setError(updateError.message);
-      return;
-    }
 
-    await supabase.auth.signOut();
-    setIsSaving(false);
-    setComplete(true);
+    try {
+      // The recovery link already proves who this is, so no current password.
+      await updatePassword(password);
+      await signOut();
+      setComplete(true);
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error ? updateError.message : "Your password could not be reset.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (

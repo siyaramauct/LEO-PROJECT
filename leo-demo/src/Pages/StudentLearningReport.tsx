@@ -10,90 +10,54 @@
 //
 // Scores are each lesson's best attempt, so a retake never lowers them.
 //
-// On phones, choosing a classroom scrolls its details into view, because they
-// sit below the list rather than beside it.
+// It opens from the Reports picker (StudentReportPicker) with the chosen
+// classroom already selected; picking another classroom here updates the URL.
 //
-// Route: /student/report || Access: students
+// On phones, the chosen classroom's details sit below the list rather than
+// beside it, so they are scrolled into view on arrival and on each pick.
+//
+// Route: /student/report/:classroomId || Access: students
 // -----------------------------------------------------------------------------
 
-import { CheckCircle2, ChevronRight, Layers } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronRight, Layers } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import ActivityCalendar from "../Components/ActivityCalendar";
 import LoadingScreen from "../Components/LoadingScreen";
 import ProgressBar from "../Components/ProgressBar";
 import SegmentedControl from "../Components/SegmentedControl";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
+import type { StudentProgress } from "../data/progress";
+import { average, scoredOnly } from "../domain/statistics";
 import usePreloadImages from "../hooks/usePreloadImages";
-import { supabase } from "../supabase-client";
-import { bucketImageUrlOrBroken, projectImageUrl } from "../utils/images";
+import {
+  getLearningReport,
+  type StudentClassroomReport,
+  type StudentLessonReport,
+} from "../services/reportService";
+import { projectImageUrl } from "../utils/images";
 import { ACTIVITY_WEEKS, buildActivityWeeks } from "../utils/activityCalendar";
 
 // -- Types --------------------------------------------------------------------
 
-// Returned by the get_student_progress database function.
-type StudentProgress = {
-  current_streak: number;
-  longest_streak: number;
-  weekly_lessons_completed: number;
-  weekly_goal: number;
-};
-
-type LessonReport = {
-  lessonId: string;
-  title: string;
-  imageUrl: string;
-  releaseDate: string;
-  hasQuiz: boolean;
-  completed: boolean;
-  attempts: number;
-  bestScore: number | null; // Best attempt.
-  scoreCeiling: number | null;
-  bestPercent: number | null;
-};
-
-type ClassroomReport = {
-  classroomId: string;
-  name: string;
-  coverUrl: string;
-  lessons: LessonReport[];
-  completedCount: number;
-  averagePercent: number | null;
-};
-
 type ClassroomSort = "highest" | "lowest";
 type LessonSort = "order" | "highest" | "lowest";
 
-type AttemptRow = { lesson_id: string; score: number | null };
-type LessonRow = {
-  lesson_id: string;
-  classroom_id: string;
-  title: string;
-  lesson_image_path: string | null;
-  release_date: string;
-};
-type ClassroomRow = {
-  classroom_id: string;
-  classroom_name: string;
-  cover_image_path: string | null;
-};
-type McqRow = { lesson_id: string; score_ceiling: number | null };
-
 // -- Helpers ------------------------------------------------------------------
-
-const average = (values: number[]) =>
-  values.length
-    ? Math.round(values.reduce((total, value) => total + value, 0) / values.length)
-    : null;
 
 // Sorts a classroom's lessons. Course order is by release date. Score sorts
 // split the list: unscored lessons (flashcards only, or not attempted) are
 // returned separately and shown after the scored ones.
-function sortLessons(lessons: LessonReport[], sort: LessonSort) {
+function sortLessons(lessons: StudentLessonReport[], sort: LessonSort) {
   const byOrder = [...lessons].sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
-  if (sort === "order") return { scored: byOrder, unscored: [] as LessonReport[] };
+
+  if (sort === "order") {
+    return { scored: byOrder, unscored: [] as StudentLessonReport[] };
+  }
+
   const direction = sort === "highest" ? -1 : 1;
+
   return {
     scored: byOrder
       .filter((lesson) => lesson.bestPercent !== null)
@@ -103,7 +67,7 @@ function sortLessons(lessons: LessonReport[], sort: LessonSort) {
 }
 
 // One lesson row: cover, title, status and the best score with a bar.
-function LessonRowItem({ lesson }: { lesson: LessonReport }) {
+function LessonRowItem({ lesson }: { lesson: StudentLessonReport }) {
   const status = lesson.hasQuiz
     ? lesson.completed
       ? `Quiz · ${lesson.attempts} attempt${lesson.attempts === 1 ? "" : "s"}`
@@ -148,34 +112,40 @@ function LessonRowItem({ lesson }: { lesson: LessonReport }) {
 
 export default function StudentLearningReport() {
   const navigate = useNavigate();
+  const { classroomId } = useParams();
   const { session } = useAuth();
   const studentId = session?.user.id;
 
   // The 12-week grid is built once, when the page opens.
   const [activityWeeks] = useState(() => buildActivityWeeks(new Date()));
-  const [classrooms, setClassrooms] = useState<ClassroomReport[] | null>(null);
+  const [classrooms, setClassrooms] = useState<StudentClassroomReport[] | null>(null);
   const [activeDays, setActiveDays] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [error, setError] = useState("");
   const [classroomSort, setClassroomSort] = useState<ClassroomSort>("highest");
   const [lessonSort, setLessonSort] = useState<LessonSort>("order");
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(
+    classroomId ?? null,
+  );
   const classroomDetailRef = useRef<HTMLElement>(null);
+  const hasScrolledOnArrival = useRef(false);
 
   // Below 768px the details sit under the list, so bring them into view.
-  const selectClassroom = (classroomId: string) => {
-    setSelectedClassroomId(classroomId);
+  const scrollToDetailsOnPhones = () => {
     if (window.matchMedia("(max-width: 767px)").matches) {
       classroomDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
+  const selectClassroom = (id: string) => {
+    setSelectedClassroomId(id);
+    navigate(`/student/report/${id}`, { replace: true });
+    scrollToDetailsOnPhones();
+  };
+
   // -- Load the report --
-  //
-  // 1. Enrolments, the activity calendar days and the streak, in parallel.
-  // 2. The classrooms and their released lessons.
-  // 3. The student's attempts and each lesson's quiz size.
-  // Then each lesson gets its best score, and each classroom its average.
+  // reportService loads the classrooms, lessons and best scores, the calendar
+  // days and the streak.
 
   useEffect(() => {
     if (!studentId) return;
@@ -183,132 +153,22 @@ export default function StudentLearningReport() {
     let isCurrent = true;
 
     const load = async () => {
-      const failed = () => {
+      try {
+        const report = await getLearningReport(studentId, activityWeeks[0][0].key);
+
         if (!isCurrent) return;
+
+        setActiveDays(report.activeDays);
+        setProgress(report.progress);
+        setClassrooms(report.classrooms);
+      } catch (loadError) {
+        console.error("Could not load the learning report:", loadError);
+
+        if (!isCurrent) return;
+
         setError("Your learning report could not be loaded right now.");
         setClassrooms([]);
-      };
-
-      const [enrolmentResult, activityResult, progressResult] = await Promise.all([
-        supabase.from("classroom_students").select("classroom_id").eq("student_id", studentId),
-        supabase
-          .from("student_activity")
-          .select("activity_date")
-          .eq("student_id", studentId)
-          .gte("activity_date", activityWeeks[0][0].key),
-        supabase.rpc("get_student_progress"),
-      ]);
-      if (!isCurrent) return;
-
-      // Activity is secondary: a failure leaves the calendar empty instead of
-      // hiding the whole report.
-      if (activityResult.error) {
-        console.error("Could not load learning activity:", activityResult.error);
       }
-      if (progressResult.error) {
-        console.error("Could not load learning progress:", progressResult.error);
-      }
-      setActiveDays(new Set((activityResult.data ?? []).map((row) => row.activity_date as string)));
-      setProgress((progressResult.data?.[0] as StudentProgress | undefined) ?? null);
-
-      if (enrolmentResult.error) return failed();
-      const classroomIds = (enrolmentResult.data ?? []).map((row) => row.classroom_id as string);
-      if (!classroomIds.length) {
-        setClassrooms([]);
-        return;
-      }
-
-      const [classroomResult, lessonResult] = await Promise.all([
-        supabase
-          .from("classrooms")
-          .select("classroom_id, classroom_name, cover_image_path")
-          .in("classroom_id", classroomIds),
-        supabase
-          .from("lessons")
-          .select("lesson_id, classroom_id, title, lesson_image_path, release_date")
-          .in("classroom_id", classroomIds)
-          .lte("release_date", new Date().toISOString()),
-      ]);
-      if (!isCurrent) return;
-      if (classroomResult.error || lessonResult.error) return failed();
-
-      const lessonRows = (lessonResult.data ?? []) as LessonRow[];
-      const lessonIds = lessonRows.map((lesson) => lesson.lesson_id);
-      const [attemptResult, mcqResult] = lessonIds.length
-        ? await Promise.all([
-            supabase
-              .from("lesson_attempts")
-              .select("lesson_id, score")
-              .eq("student_id", studentId)
-              .in("lesson_id", lessonIds)
-              .not("completed_at", "is", null),
-            supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", lessonIds),
-          ])
-        : [
-            { data: [], error: null },
-            { data: [], error: null },
-          ];
-      if (!isCurrent) return;
-      if (attemptResult.error || mcqResult.error) return failed();
-
-      // Group attempts by lesson, then build each lesson's report.
-      const ceilings = new Map(
-        ((mcqResult.data ?? []) as McqRow[]).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]),
-      );
-      const attemptsByLesson = new Map<string, AttemptRow[]>();
-      for (const attempt of (attemptResult.data ?? []) as AttemptRow[]) {
-        attemptsByLesson.set(attempt.lesson_id, [
-          ...(attemptsByLesson.get(attempt.lesson_id) ?? []),
-          attempt,
-        ]);
-      }
-
-      const lessonsByClassroom = new Map<string, LessonReport[]>();
-      for (const lesson of lessonRows) {
-        const attempts = attemptsByLesson.get(lesson.lesson_id) ?? [];
-        const scores = attempts.flatMap((attempt) =>
-          attempt.score === null ? [] : [Number(attempt.score)],
-        );
-        const bestScore = scores.length ? Math.max(...scores) : null;
-        const scoreCeiling = ceilings.get(lesson.lesson_id) ?? null;
-        const report: LessonReport = {
-          lessonId: lesson.lesson_id,
-          title: lesson.title,
-          imageUrl: bucketImageUrlOrBroken(lesson.lesson_image_path),
-          releaseDate: lesson.release_date,
-          hasQuiz: ceilings.has(lesson.lesson_id),
-          completed: attempts.length > 0,
-          attempts: attempts.length,
-          bestScore,
-          scoreCeiling,
-          bestPercent:
-            bestScore !== null && scoreCeiling
-              ? Math.round((bestScore / scoreCeiling) * 100)
-              : null,
-        };
-        lessonsByClassroom.set(lesson.classroom_id, [
-          ...(lessonsByClassroom.get(lesson.classroom_id) ?? []),
-          report,
-        ]);
-      }
-
-      setClassrooms(
-        ((classroomResult.data ?? []) as ClassroomRow[]).map((classroom) => {
-          const lessons = lessonsByClassroom.get(classroom.classroom_id) ?? [];
-          return {
-            classroomId: classroom.classroom_id,
-            name: classroom.classroom_name,
-            coverUrl: bucketImageUrlOrBroken(classroom.cover_image_path),
-            lessons,
-            completedCount: lessons.filter((lesson) => lesson.completed).length,
-            averagePercent: average(
-              lessons.flatMap((lesson) =>
-                lesson.bestPercent === null ? [] : [lesson.bestPercent],
-              ),
-            ),
-          };
-        }),
-      );
     };
 
     void load();
@@ -324,6 +184,19 @@ export default function StudentLearningReport() {
     [classrooms],
   );
   const imagesReady = usePreloadImages(coverUrls);
+
+  // -- On arrival --
+  // Once the report is drawn: a classroom the student is not in sends them back
+  // to the picker; otherwise phones scroll straight to the chosen classroom.
+  useEffect(() => {
+    if (!classrooms || !imagesReady || hasScrolledOnArrival.current) return;
+    hasScrolledOnArrival.current = true;
+    if (classroomId && !classrooms.some((classroom) => classroom.classroomId === classroomId)) {
+      navigate("/student/report", { replace: true });
+      return;
+    }
+    scrollToDetailsOnPhones();
+  }, [classrooms, imagesReady, classroomId, navigate]);
 
   // -- Sorting --
   // Classrooms without scores sit at the end whichever way the list is sorted.
@@ -357,9 +230,7 @@ export default function StudentLearningReport() {
     ? Math.round((completedLessons / allLessons.length) * 100)
     : 0;
   const quizzesCompleted = allLessons.filter((lesson) => lesson.hasQuiz && lesson.completed).length;
-  const overallAverage = average(
-    allLessons.flatMap((lesson) => (lesson.bestPercent === null ? [] : [lesson.bestPercent])),
-  );
+  const overallAverage = average(scoredOnly(allLessons.map((lesson) => lesson.bestPercent)));
   const activeDayCount = activityWeeks.flat().filter((day) => activeDays.has(day.key)).length;
   const weeklyPercent = progress
     ? Math.round((progress.weekly_lessons_completed / Math.max(progress.weekly_goal, 1)) * 100)
@@ -406,12 +277,21 @@ export default function StudentLearningReport() {
       <StudentBottomNav />
       <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            <p className="text-xs font-medium text-violet-700">Student portal</p>
-            <h1 className="mt-1 text-xl font-bold">Learning report</h1>
-            <p className="mt-1 text-xs text-slate-500">
-              Your activity, progress and scores across every classroom you belong to.
-            </p>
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            <Link
+              to="/student/report"
+              aria-label="Back to class reports"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-violet-700">Student portal</p>
+              <h1 className="mt-1 text-xl font-bold">Learning report</h1>
+              <p className="mt-1 text-xs text-slate-500">
+                Your activity, progress and scores across every classroom you belong to.
+              </p>
+            </div>
           </div>
         </header>
 

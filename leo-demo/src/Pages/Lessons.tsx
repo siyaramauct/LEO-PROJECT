@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { supabase } from "../supabase-client";
+import { getVisibleReleasedLessons } from "../data/lessons";
 import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
 
 interface Lesson {
@@ -31,17 +31,14 @@ export default function Lessons() {
 
   useEffect(() => {
     const fetchLessons = async () => {
-      const { data, error } = await supabase
-        .from("lessons")
-        .select("lesson_id, title, description, lesson_image_path")
-        .lte("release_date", new Date().toISOString())
-        .order("title", { ascending: true });
-      if (error) {
+      try {
+        setLessons(await getVisibleReleasedLessons());
+      } catch (loadError) {
+        console.error("Failed to load lessons:", loadError);
         setErrorMessage("Could not load lessons. Please try again.");
-      } else {
-        setLessons(data ?? []);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     void fetchLessons();

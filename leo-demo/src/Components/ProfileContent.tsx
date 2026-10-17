@@ -5,8 +5,8 @@
 // the user's initials, their personal details, a password section, a danger
 // zone for deleting the account, and a log out button.
 //
-// The role prop switches the few things that differ: the banner wording, the
-// username field (students only) and the danger zone border.
+// The role prop switches the few things that differ: the banner wording and
+// the username field (students only).
 //
 // The page that renders this owns the logout and delete actions; this
 // component only owns its two popups, ConfirmDialog and ChangePasswordDialog.
@@ -95,12 +95,8 @@ export default function ProfileContent({
         </div>
       </section>
 
-      <section
-        className={`rounded-xl border bg-white p-5 shadow-sm sm:p-6 ${
-          isStudent ? "border-rose-200" : "border-slate-200"
-        }`}
-      >
-        <h3 className="font-bold text-rose-700">Danger zone</h3>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="font-bold">Danger zone</h3>
         <p className="mt-1 text-sm text-slate-500">
           Permanently delete your account and profile data.
         </p>

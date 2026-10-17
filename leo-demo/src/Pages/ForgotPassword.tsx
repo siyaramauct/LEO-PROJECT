@@ -11,7 +11,7 @@
 import { ArrowLeft, Mail } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "../supabase-client";
+import { sendPasswordResetEmail } from "../data/auth";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -25,16 +25,16 @@ export default function ForgotPassword() {
     setIsSending(true);
     setError("");
 
-    const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    setIsSending(false);
-    if (recoveryError) {
-      setError(recoveryError.message);
-      return;
+    try {
+      await sendPasswordResetEmail(email.trim());
+      setSent(true);
+    } catch (recoveryError) {
+      setError(
+        recoveryError instanceof Error ? recoveryError.message : "The email could not be sent.",
+      );
+    } finally {
+      setIsSending(false);
     }
-    setSent(true);
   }
 
   return (

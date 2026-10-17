@@ -15,7 +15,8 @@ import { useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { errorMessage } from "../data/errors";
+import { createClassroom } from "../services/teacherClassroomService";
 import { bucketImageUrl } from "../utils/images";
 import ClassroomFormField from "./ClassroomFormField";
 
@@ -46,24 +47,6 @@ const coverOptions = [
 
 const inputClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100";
-
-// Fills the legacy classrooms.join_code column, which must still be unique.
-// Students join with the private invite code instead (see ClassroomInvitePanel).
-const generateJoinCode = (classroomName: string) => {
-  const namePrefix = classroomName
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .toUpperCase()
-    .slice(0, 4)
-    .padEnd(4, "CLASS");
-  const randomSuffix = crypto
-    .getRandomValues(new Uint32Array(1))[0]
-    .toString(36)
-    .toUpperCase()
-    .slice(-4)
-    .padStart(4, "0");
-
-  return `${namePrefix}-${randomSuffix}`;
-};
 
 // -- Form ---------------------------------------------------------------------
 
@@ -108,23 +91,20 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
       return;
     }
 
-    const { error } = await supabase.from("classrooms").insert({
-      teacher_id: session.user.id,
-      classroom_name: values.name.trim(),
-      description: values.description.trim(),
-      proficiency_level: values.proficiencyLevel,
-      language: "English", // Every classroom is English; the column is kept for the schema.
-      cover_image_path: selectedCoverOption.path,
-      invite_only: true,
-      join_code: generateJoinCode(values.name),
-    });
+    try {
+      await createClassroom({
+        teacherId: session.user.id,
+        name: values.name,
+        description: values.description,
+        proficiencyLevel: values.proficiencyLevel,
+        coverImagePath: selectedCoverOption.path,
+      });
 
-    if (error) {
-      setSubmitError(error.message);
-      return;
+      navigate("/TeacherClassroom");
+    } catch (createError) {
+      console.error("Failed to create classroom:", createError);
+      setSubmitError(errorMessage(createError, "The classroom could not be created."));
     }
-
-    navigate("/TeacherClassroom");
   };
 
   return (

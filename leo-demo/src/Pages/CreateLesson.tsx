@@ -37,21 +37,14 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  MAX_FLASHCARD_IMAGE_BYTES,
-  MAX_FLASHCARDS_PER_LESSON,
-  MAX_LESSONS_PER_CLASSROOM,
-} from "../config/limits";
+import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON } from "../config/limits";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { askAi } from "../data/ai";
+import { getTeacherClassrooms } from "../data/classrooms";
+import { errorMessage } from "../data/errors";
+import { checkLessonLimit, createLesson } from "../services/lessonAuthoringService";
 import { bucketImageUrl } from "../utils/images";
-import { notifyClassroomStudents } from "../utils/notifications";
-import {
-  formatDateKey,
-  parseFutureDateKey,
-  releaseDateToIso,
-  toDateKey,
-} from "../utils/releaseDate";
+import { formatDateKey, parseFutureDateKey, toDateKey } from "../utils/releaseDate";
 
 // -- Types --------------------------------------------------------------------
 
@@ -141,10 +134,6 @@ const inputClassName =
 
 function emptyFlashcard(id: number): Flashcard {
   return { id, term: "", definition: "", imageFile: null, imagePreview: null };
-}
-
-function safeImageName(fileName: string): string {
-  return fileName.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
 }
 
 // Checks the AI reply before the review step trusts it.
@@ -302,18 +291,16 @@ export default function CreateLesson() {
   // The teacher's classrooms, for the classroom picker.
   useEffect(() => {
     if (!session?.user) return;
+
     const loadClassrooms = async () => {
-      const { data, error: loadError } = await supabase
-        .from("classrooms")
-        .select("classroom_id, classroom_name")
-        .eq("teacher_id", session.user.id)
-        .order("classroom_name");
-      if (loadError) {
+      try {
+        setClassrooms(await getTeacherClassrooms(session.user.id));
+      } catch (loadError) {
+        console.error("Failed to load classrooms:", loadError);
         setError("Your classrooms could not be loaded. Please try again.");
-        return;
       }
-      setClassrooms((data ?? []) as ClassroomOption[]);
     };
+
     void loadClassrooms();
   }, [session?.user]);
 
@@ -398,21 +385,19 @@ export default function CreateLesson() {
       return;
     }
     setIsCheckingLessonLimit(true);
-    const { count, error: countError } = await supabase
-      .from("lessons")
-      .select("lesson_id", { count: "exact", head: true })
-      .eq("classroom_id", classroomId);
-    setIsCheckingLessonLimit(false);
-    if (countError) {
-      setError("The lesson limit could not be checked. Please try again.");
-      return;
+
+    try {
+      await checkLessonLimit(classroomId);
+
+      setError("");
+      setStep("flashcards");
+    } catch (limitError) {
+      setError(
+        errorMessage(limitError, "The lesson limit could not be checked. Please try again."),
+      );
+    } finally {
+      setIsCheckingLessonLimit(false);
     }
-    if ((count ?? 0) >= MAX_LESSONS_PER_CLASSROOM) {
-      setError(`This classroom has reached its ${MAX_LESSONS_PER_CLASSROOM}-lesson limit.`);
-      return;
-    }
-    setError("");
-    setStep("flashcards");
   }
 
   // Step 2 to 3: blank cards are dropped; half-filled ones block moving on.
@@ -440,13 +425,8 @@ export default function CreateLesson() {
     setGenerationFailed(false);
     setError("");
     try {
-      const prompt = buildMcqPrompt(selectedMcqFormat, flashcards);
-      const { data, error: functionError } = await supabase.functions.invoke("gemini-API-Query", {
-        body: { prompt },
-      });
-
-      if (functionError) throw functionError;
-      const generatedMcq = parseGeneratedMcq(data?.result, flashcards.length);
+      const reply = await askAi(buildMcqPrompt(selectedMcqFormat, flashcards));
+      const generatedMcq = parseGeneratedMcq(reply, flashcards.length);
 
       setGeneratedTitle(generatedMcq.title.trim());
       setGeneratedQuestions(
@@ -479,15 +459,12 @@ export default function CreateLesson() {
   }
 
   // -- Final save --
-  //
-  // Saves everything in order, stopping at the first failure:
-  //   1. the lesson row (with a release date if scheduled)
-  //   2. any PDFs, uploaded then recorded (uploads are removed if recording fails)
-  //   3. flashcard images, then the flashcard rows
-  //   4. the quiz and its questions, unless this is a flashcards-only lesson
-  //   5. a notification to the students, if the lesson is released now
-  async function createLesson() {
+  // lessonAuthoringService saves the lesson, its PDFs, flashcards and quiz in
+  // order, stopping at the first failure, then tells the students if the lesson
+  // is released now.
+  async function handleCreateLesson() {
     if (!classroomId) return;
+
     if (includeMcq && findIncompleteQuestion(generatedTitle, generatedQuestions)) {
       setError("Give the activity a title and fill in every question and option before saving.");
       return;
@@ -495,132 +472,23 @@ export default function CreateLesson() {
 
     setIsSaving(true);
     setError("");
+
     try {
-      const { data: lesson, error: lessonError } = await supabase
-        .from("lessons")
-        .insert({
-          classroom_id: classroomId,
-          title: title.trim(),
-          description: description.trim(),
-          lesson_image_path: selectedCover.path,
-          // Omitted for immediate lessons so the column's now() default applies.
-          ...(releaseDate ? { release_date: releaseDateToIso(releaseDate) } : {}),
-        })
-        .select("lesson_id")
-        .single();
-
-      if (lessonError || !lesson) {
-        throw new Error(lessonError?.message ?? "The lesson could not be created.");
-      }
-
-      if (lessonDocuments.length) {
-        const uploadedDocumentPaths = await Promise.all(
-          lessonDocuments.map(async (file) => {
-            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-            const storagePath = `lesson_documents/${classroomId}/${lesson.lesson_id}/${crypto.randomUUID()}-${safeName}`;
-            const { error: uploadError } = await supabase.storage
-              .from("documents")
-              .upload(storagePath, file, {
-                contentType: "application/pdf",
-                upsert: false,
-              });
-            if (uploadError) {
-              throw new Error(`Could not upload "${file.name}": ${uploadError.message}`);
-            }
-            return storagePath;
-          }),
-        );
-
-        const { error: documentError } = await supabase.from("learning_resources").insert(
-          uploadedDocumentPaths.map((resourceUrl) => ({
-            classroom_id: classroomId,
-            lesson_id: lesson.lesson_id,
-            resource_type: "document",
-            resource_url: resourceUrl,
-          })),
-        );
-        if (documentError) {
-          await supabase.storage.from("documents").remove(uploadedDocumentPaths);
-          throw new Error(`The lesson documents could not be attached: ${documentError.message}`);
-        }
-      }
-
-      const flashcardsToInsert = await Promise.all(
-        flashcards.map(async (flashcard, index) => {
-          let imagePath: string | null = null;
-          if (flashcard.imageFile) {
-            imagePath = `flashcards/${lesson.lesson_id}/${index + 1}-${crypto.randomUUID()}-${safeImageName(flashcard.imageFile.name)}`;
-            const { error: uploadError } = await supabase.storage
-              .from("images")
-              .upload(imagePath, flashcard.imageFile, {
-                contentType: flashcard.imageFile.type,
-                upsert: false,
-              });
-            if (uploadError) {
-              throw new Error(
-                `Could not upload the image for "${flashcard.term}": ${uploadError.message}`,
-              );
-            }
-          }
-          return {
-            lesson_id: lesson.lesson_id,
-            word: flashcard.term.trim(),
-            definition: flashcard.definition.trim(),
-            image_path: imagePath,
-          };
-        }),
-      );
-
-      const { error: flashcardError } = await supabase
-        .from("flashcards")
-        .insert(flashcardsToInsert);
-
-      if (flashcardError) throw new Error(flashcardError.message);
-      if (includeMcq) {
-        const { data: mcq, error: mcqError } = await supabase
-          .from("mcqs")
-          .insert({
-            lesson_id: lesson.lesson_id,
-            score_ceiling: generatedQuestions.length,
-            title: generatedTitle.trim(),
-          })
-          .select("mcq_id")
-          .single();
-
-        if (mcqError || !mcq) {
-          throw new Error(mcqError?.message ?? "The MCQ activity could not be created.");
-        }
-        const { error: questionError } = await supabase.from("questions").insert(
-          generatedQuestions.map((question) => ({
-            mcq_id: mcq.mcq_id,
-            question_text: question.question_text.trim(),
-            option_a: question.option_a.trim(),
-            option_b: question.option_b.trim(),
-            option_c: question.option_c.trim(),
-            option_d: question.option_d.trim(),
-            correct_option: question.correct_option,
-          })),
-        );
-
-        if (questionError) throw new Error(questionError.message);
-      }
-
-      // Best effort: a failed notification never blocks the lesson. Scheduled
-      // lessons aren't open yet, so students aren't told about them now.
-      if (!releaseDate) {
-        await notifyClassroomStudents(classroomId, {
-          type: "new_lesson",
-          title: "New lesson available",
-          body: `Your teacher added "${title.trim()}".`,
-          link_url: `/lesson/${lesson.lesson_id}`,
-        });
-      }
+      await createLesson({
+        classroomId,
+        title,
+        description,
+        coverImagePath: selectedCover.path,
+        releaseDateKey: releaseDate,
+        documents: lessonDocuments,
+        flashcards,
+        quiz: includeMcq ? { title: generatedTitle, questions: generatedQuestions } : null,
+      });
 
       navigate(`/teacher-classroom/${classroomId}`);
     } catch (creationError) {
-      setError(
-        creationError instanceof Error ? creationError.message : "The lesson could not be created.",
-      );
+      console.error("Failed to create lesson:", creationError);
+      setError(errorMessage(creationError, "The lesson could not be created."));
     } finally {
       setIsSaving(false);
     }
@@ -1093,7 +961,7 @@ export default function CreateLesson() {
                 <button
                   type="button"
                   disabled={isSaving}
-                  onClick={createLesson}
+                  onClick={handleCreateLesson}
                   className={PRIMARY_BUTTON}
                 >
                   {saveLabel}
@@ -1219,7 +1087,7 @@ export default function CreateLesson() {
               <button
                 type="button"
                 disabled={isSaving || isGenerating}
-                onClick={createLesson}
+                onClick={handleCreateLesson}
                 className={PRIMARY_BUTTON}
               >
                 {saveLabel}

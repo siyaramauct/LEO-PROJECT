@@ -11,10 +11,10 @@
 // fails to load with a single placeholder.
 // -----------------------------------------------------------------------------
 
-import { supabase } from "../supabase-client";
+import { publicImageUrl } from "../data/imageFiles";
 
 export function bucketImageUrl(path: string): string {
-  return supabase.storage.from("images").getPublicUrl(path).data.publicUrl;
+  return publicImageUrl(path);
 }
 
 export function projectImageUrl(fileName: string): string {

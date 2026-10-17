@@ -4,11 +4,9 @@
 // The lesson's multiple-choice quiz, one question at a time. Students can move
 // back and forth and change answers until they press "Complete attempt".
 //
-// On completion the page:
-//   1. works out the score and saves it as a lesson attempt
-//   2. notifies the classroom's teacher
-//   3. logs today as an active day for the streak
-//   4. stores the detailed results in sessionStorage and opens the summary page
+// On completion, lessonService marks and saves the attempt, notifies the
+// teacher and logs today for the streak. The page then stores the detailed
+// result in sessionStorage and opens the summary page.
 //
 // Route: /quiz/:lessonId || Access: students
 // -----------------------------------------------------------------------------
@@ -18,31 +16,21 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { notifyUser } from "../utils/notifications";
-import { supabase } from "../supabase-client";
-
-// -- Types --------------------------------------------------------------------
-
-type Mcq = { mcq_id: string; title: string | null; score_ceiling: number | null };
-type Question = {
-  question_id: string;
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_option: "A" | "B" | "C" | "D";
-};
+import { errorMessage } from "../data/errors";
+import { getQuiz, getQuizQuestions, type Quiz } from "../data/quizzes";
+import type { AnswerOption, QuizAnswers, QuizQuestion } from "../domain/scoring";
+import { studentDisplayName } from "../services/classroomService";
+import { submitQuiz } from "../services/lessonService";
 
 // -- Page ---------------------------------------------------------------------
 
 export default function QuickQuiz() {
   const { lessonId } = useParams<{ lessonId: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const navigate = useNavigate();
-  const [mcq, setMcq] = useState<Mcq | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({}); // By question id.
+  const [mcq, setMcq] = useState<Quiz | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [answers, setAnswers] = useState<QuizAnswers>({}); // By question id.
   const [index, setIndex] = useState(0);
   const [startedAt] = useState(() => new Date().toISOString());
   const [isLoading, setIsLoading] = useState(() => Boolean(lessonId));
@@ -54,28 +42,22 @@ export default function QuickQuiz() {
     if (!lessonId) return;
 
     const loadQuiz = async () => {
-      const { data: mcqData, error: mcqError } = await supabase
-        .from("mcqs")
-        .select("mcq_id, title, score_ceiling")
-        .eq("lesson_id", lessonId)
-        .maybeSingle();
-      if (mcqError || !mcqData) {
-        setError(mcqError?.message ?? "This lesson does not have a quiz yet.");
+      try {
+        const quiz = await getQuiz(lessonId);
+
+        if (!quiz) {
+          setError("This lesson does not have a quiz yet.");
+          return;
+        }
+
+        setQuestions(await getQuizQuestions(quiz.mcq_id));
+        setMcq(quiz);
+      } catch (loadError) {
+        console.error("Failed to load quiz:", loadError);
+        setError(errorMessage(loadError, "The quiz could not be loaded right now."));
+      } finally {
         setIsLoading(false);
-        return;
       }
-      const { data: questionData, error: questionError } = await supabase
-        .from("questions")
-        .select(
-          "question_id, question_text, option_a, option_b, option_c, option_d, correct_option",
-        )
-        .eq("mcq_id", mcqData.mcq_id);
-      if (questionError) setError(questionError.message);
-      else {
-        setMcq(mcqData as Mcq);
-        setQuestions((questionData ?? []) as Question[]);
-      }
-      setIsLoading(false);
     };
     void loadQuiz();
   }, [lessonId]);
@@ -89,84 +71,26 @@ export default function QuickQuiz() {
     if (!session?.user || !lessonId || !mcq) return;
     setIsSubmitting(true);
 
-    // 1. Score: the share of correct answers, scaled to the quiz's maximum.
-    const correctCount = questions.filter(
-      (item) => answers[item.question_id] === item.correct_option,
-    ).length;
-    const scoreCeiling = mcq.score_ceiling ?? questions.length;
-    const score = questions.length
-      ? Math.round((correctCount / questions.length) * scoreCeiling)
-      : 0;
-
-    const { error: attemptError } = await supabase.from("lesson_attempts").insert({
-      student_id: session.user.id,
-      lesson_id: lessonId,
-      score,
-      started_at: startedAt,
-      completed_at: new Date().toISOString(),
-    });
-    setIsSubmitting(false);
-    if (attemptError) {
-      setError(attemptError.message);
-      return;
-    }
-
-    // 2. Tell the teacher. The classroom comes back as an object or a
-    //    one-item array depending on how Supabase reads the relationship.
-    const { data: lesson } = await supabase
-      .from("lessons")
-      .select("title, classrooms(classroom_id, teacher_id, classroom_name)")
-      .eq("lesson_id", lessonId)
-      .maybeSingle();
-    const classroom = (
-      Array.isArray(lesson?.classrooms) ? lesson.classrooms[0] : lesson?.classrooms
-    ) as { classroom_id: string; teacher_id: string; classroom_name: string } | null | undefined;
-    if (classroom?.teacher_id) {
-      const studentName = session.user.user_metadata?.name || session.user.email || "A student";
-      await notifyUser({
-        recipient_id: classroom.teacher_id,
-        type: "lesson_completed",
-        title: "A student completed a lesson",
-        body: `${studentName} scored ${score}/${scoreCeiling} on "${lesson?.title ?? "the lesson"}" in "${classroom.classroom_name}".`,
-        link_url: `/teacher-classroom/${classroom.classroom_id}`,
+    try {
+      const result = await submitQuiz({
+        studentId: session.user.id,
+        studentName: studentDisplayName(profile, session.user.email),
+        lessonId,
+        quiz: mcq,
+        questions,
+        answers,
+        startedAt,
       });
+
+      // Hand the detailed result to the summary page.
+      sessionStorage.setItem("quiz-result", JSON.stringify(result));
+      navigate("/summary");
+    } catch (submitError) {
+      console.error("Failed to submit quiz:", submitError);
+      setError(errorMessage(submitError, "Your attempt could not be saved."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // 3. Count today towards the streak. Best effort: a failure here must never
-    //    stop the student from seeing their result.
-    const { error: activityError } = await supabase
-      .from("student_activity")
-      .upsert(
-        { student_id: session.user.id, source: "lesson_quiz" },
-        { onConflict: "student_id,activity_date", ignoreDuplicates: true },
-      );
-    if (activityError) console.error("Could not record learning activity:", activityError);
-
-    // 4. Hand the detailed results to the summary page.
-    sessionStorage.setItem(
-      "quiz-result",
-      JSON.stringify({
-        score,
-        totalQuestions: scoreCeiling,
-        correct: correctCount,
-        incorrect: questions.length - correctCount,
-        results: questions.map((item) => ({
-          questionId: item.question_id,
-          question: item.question_text,
-          studentAnswer: answers[item.question_id] ?? "Not answered",
-          correctAnswer:
-            item[
-              `option_${item.correct_option.toLowerCase()}` as
-                | "option_a"
-                | "option_b"
-                | "option_c"
-                | "option_d"
-            ],
-          isCorrect: answers[item.question_id] === item.correct_option,
-        })),
-      }),
-    );
-    navigate("/summary");
   }
 
   // -- Loading and error screens --
@@ -204,7 +128,7 @@ export default function QuickQuiz() {
 
   // -- Question screen --
 
-  const options: Array<["A" | "B" | "C" | "D", string]> = [
+  const options: Array<[AnswerOption, string]> = [
     ["A", question.option_a],
     ["B", question.option_b],
     ["C", question.option_c],
@@ -261,7 +185,7 @@ export default function QuickQuiz() {
                     onClick={() =>
                       setAnswers((current) => ({ ...current, [question.question_id]: key }))
                     }
-                    className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left text-sm transition ${selected ? "border-violet-700 bg-violet-50 ring-2 ring-violet-100" : "border-slate-200 hover:bg-slate-50"}`}
+                    className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left text-sm transition ${selected ? "border-violet-700 inset-ring inset-ring-violet-700" : "border-slate-200 hover:bg-slate-50"}`}
                   >
                     <span
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${selected ? "bg-violet-700 text-white" : "bg-slate-100 text-slate-600"}`}

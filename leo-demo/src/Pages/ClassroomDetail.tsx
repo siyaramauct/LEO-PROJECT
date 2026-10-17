@@ -39,33 +39,29 @@ import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
 import UserIdentity from "../Components/UserIdentity";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import {
+  getClassroom,
+  getInviteCode,
+  rotateInviteCode,
+  type ClassroomSummary,
+} from "../data/classrooms";
+import { getClassroomRoster, type RosterEntry } from "../data/enrolments";
+import { errorMessage } from "../data/errors";
+import { getFlashcardCounts } from "../data/flashcards";
+import { deleteLesson, getClassroomLessons, type LessonListing } from "../data/lessons";
+import { getClassroomMaterials, materialUrl, type Material } from "../data/materials";
+import { getStudentProfiles } from "../data/profiles";
+import { getQuizCeilings } from "../data/quizzes";
+import {
+  removeMaterial,
+  removeStudent,
+  shareDocument,
+  shareLink,
+} from "../services/teacherClassroomService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { validateMaterialFile } from "../utils/materialFileTypes";
-import { notifyClassroomStudents, notifyUser } from "../utils/notifications";
 
 // -- Types --------------------------------------------------------------------
-
-type ClassroomRow = {
-  classroom_id: string;
-  classroom_name: string;
-  description: string | null;
-  cover_image_path: string | null;
-};
-
-type LessonRow = {
-  lesson_id: string;
-  title: string;
-  lesson_image_path: string | null;
-  release_date: string;
-};
-
-type MaterialRow = {
-  resource_id: string;
-  resource_type: "document" | "link";
-  resource_url: string;
-  uploaded_date: string;
-};
 
 type DesktopTab = "lessons" | "materials" | "students";
 const DESKTOP_TABS: DesktopTab[] = ["lessons", "materials", "students"];
@@ -74,7 +70,7 @@ const DESKTOP_TABS: DesktopTab[] = ["lessons", "materials", "students"];
 
 // Materials have no title column: links show their website, documents their
 // file name without the "<uuid>-" prefix added on upload.
-const materialTitle = (row: MaterialRow) => {
+const materialTitle = (row: Material) => {
   if (row.resource_type === "link") {
     try {
       return new URL(row.resource_url).hostname;
@@ -89,13 +85,7 @@ const materialTitle = (row: MaterialRow) => {
   );
 };
 
-// Links open as they are; documents open from the documents bucket.
-const materialUrl = (row: MaterialRow) =>
-  row.resource_type === "link" || /^https?:\/\//i.test(row.resource_url)
-    ? row.resource_url
-    : supabase.storage.from("documents").getPublicUrl(row.resource_url).data.publicUrl;
-
-const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
+const toMaterialDisplay = (row: Material): ClassroomMaterial => ({
   id: row.resource_id,
   title: materialTitle(row),
   kind: row.resource_type === "link" ? "Link" : "Document",
@@ -107,7 +97,7 @@ const toMaterialDisplay = (row: MaterialRow): ClassroomMaterial => ({
 });
 
 // One flashcard is one word. Lessons with a release date ahead are "Scheduled".
-const toLessonDisplay = (row: LessonRow, hasQuiz: boolean, words: number): ClassroomLesson => ({
+const toLessonDisplay = (row: LessonListing, hasQuiz: boolean, words: number): ClassroomLesson => ({
   id: row.lesson_id,
   title: row.title,
   image: bucketImageUrlOrBroken(row.lesson_image_path),
@@ -118,6 +108,33 @@ const toLessonDisplay = (row: LessonRow, hasQuiz: boolean, words: number): Class
   hasQuiz,
 });
 
+// Adds each lesson's quiz flag and word count. Both lookups are secondary: a
+// failure is logged and the lessons still show.
+async function describeLessons(lessonRows: LessonListing[]): Promise<ClassroomLesson[]> {
+  const lessonIds = lessonRows.map((row) => row.lesson_id);
+
+  const [ceilings, wordCounts] = await Promise.all([
+    getQuizCeilings(lessonIds).catch((quizError) => {
+      console.error("Failed to load lesson quizzes:", quizError);
+      return null;
+    }),
+    getFlashcardCounts(lessonIds).catch((countError) => {
+      console.error("Failed to load lesson word counts:", countError);
+      return new Map<string, number>();
+    }),
+  ]);
+
+  // Lessons without a quiz are flashcards-only. If that lookup failed, assume a
+  // quiz rather than mislabel them.
+  return lessonRows.map((row) =>
+    toLessonDisplay(
+      row,
+      ceilings === null || ceilings.has(row.lesson_id),
+      wordCounts.get(row.lesson_id) ?? 0,
+    ),
+  );
+}
+
 // -- Page ---------------------------------------------------------------------
 
 export default function ClassroomDetail() {
@@ -125,7 +142,7 @@ export default function ClassroomDetail() {
   const navigate = useNavigate();
   const { classroomId } = useParams<{ classroomId: string }>();
   const teacherId = session?.user?.id;
-  const [classroom, setClassroom] = useState<ClassroomRow | null>(null);
+  const [classroom, setClassroom] = useState<ClassroomSummary | null>(null);
   const [lessons, setLessons] = useState<ClassroomLesson[]>([]);
   const [materials, setMaterials] = useState<ClassroomMaterial[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
@@ -151,10 +168,11 @@ export default function ClassroomDetail() {
 
   // -- Load the classroom --
   //
-  // 1. In parallel: the classroom, its lessons, enrolments, shared materials
-  //    and the private invite code.
+  // 1. Together: the classroom, its lessons, the roster, the shared materials
+  //    and the private invite code. Each part can fail on its own without
+  //    hiding the rest of the page.
   // 2. For the lessons: which have a quiz, and how many flashcards each has.
-  // 3. For the enrolments: the students' profiles.
+  // 3. For the roster: the students' profiles.
   useEffect(() => {
     if (!classroomId || !teacherId) return;
 
@@ -162,116 +180,70 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, enrollmentResult, materialsResult, inviteResult] =
-        await Promise.all([
-          supabase
-            .from("classrooms")
-            .select("classroom_id, classroom_name, description, cover_image_path")
-            .eq("classroom_id", classroomId)
-            .single(),
-          supabase
-            .from("lessons")
-            .select("lesson_id, title, lesson_image_path, release_date")
-            .eq("classroom_id", classroomId),
-          supabase
-            .from("classroom_students")
-            .select("student_id, enrolled_at")
-            .eq("classroom_id", classroomId),
-          supabase
-            .from("learning_resources")
-            .select("resource_id, resource_type, resource_url, uploaded_date")
-            .eq("classroom_id", classroomId)
-            .is("lesson_id", null)
-            .order("uploaded_date", { ascending: false }),
-          supabase.rpc("get_classroom_invite_code", { p_classroom_id: classroomId }),
+      const [classroomResult, lessonsResult, rosterResult, materialsResult, inviteResult] =
+        await Promise.allSettled([
+          getClassroom(classroomId),
+          getClassroomLessons(classroomId),
+          getClassroomRoster(classroomId),
+          getClassroomMaterials(classroomId),
+          getInviteCode(classroomId),
         ]);
 
-      setInviteCode(inviteResult.data ?? null);
-      setInviteCodeError(
-        inviteResult.error ? `Could not load invitation code: ${inviteResult.error.message}` : null,
-      );
+      // The invite code.
+      if (inviteResult.status === "fulfilled") {
+        setInviteCode(inviteResult.value);
+        setInviteCodeError(null);
+      } else {
+        setInviteCode(null);
+        setInviteCodeError(errorMessage(inviteResult.reason, "Could not load invitation code."));
+      }
 
-      if (classroomResult.error) {
-        console.error("Failed to load classroom:", classroomResult.error);
-        setLoadError(`Could not load this classroom: ${classroomResult.error.message}`);
-      } else if (!classroomResult.data) {
+      // The classroom itself.
+      if (classroomResult.status === "rejected") {
+        console.error("Failed to load classroom:", classroomResult.reason);
+        setLoadError(errorMessage(classroomResult.reason, "Could not load this classroom."));
+      } else if (!classroomResult.value) {
         setLoadError("This classroom no longer exists or is unavailable.");
       } else {
-        setClassroom(classroomResult.data as ClassroomRow);
+        setClassroom(classroomResult.value);
       }
 
-      if (!lessonsResult.error && lessonsResult.data) {
-        const lessonRows = lessonsResult.data as LessonRow[];
-        const lessonIds = lessonRows.map((row) => row.lesson_id);
-        const noRows = { data: [], error: null };
-
-        const [mcqResult, flashcardResult] = lessonIds.length
-          ? await Promise.all([
-              supabase.from("mcqs").select("lesson_id").in("lesson_id", lessonIds),
-              supabase.from("flashcards").select("lesson_id").in("lesson_id", lessonIds),
-            ])
-          : [noRows, noRows];
-        if (mcqResult.error) console.error("Failed to load lesson quizzes:", mcqResult.error);
-        if (flashcardResult.error) {
-          console.error("Failed to load lesson word counts:", flashcardResult.error);
-        }
-
-        // Lessons without an mcqs row are flashcards-only. If that lookup
-        // failed, assume a quiz rather than mislabel them.
-        const quizLessonIds = new Set((mcqResult.data ?? []).map((mcq) => mcq.lesson_id as string));
-        const wordCounts: Record<string, number> = {};
-        for (const card of flashcardResult.data ?? []) {
-          wordCounts[card.lesson_id] = (wordCounts[card.lesson_id] ?? 0) + 1;
-        }
-
-        setLessons(
-          lessonRows.map((row) =>
-            toLessonDisplay(
-              row,
-              Boolean(mcqResult.error) || quizLessonIds.has(row.lesson_id),
-              wordCounts[row.lesson_id] ?? 0,
-            ),
-          ),
-        );
+      // 2. Lessons and materials. A failure leaves that list empty.
+      if (lessonsResult.status === "fulfilled") {
+        setLessons(await describeLessons(lessonsResult.value));
       }
 
-      if (!materialsResult.error) {
-        setMaterials(((materialsResult.data ?? []) as MaterialRow[]).map(toMaterialDisplay));
+      if (materialsResult.status === "fulfilled") {
+        setMaterials(materialsResult.value.map(toMaterialDisplay));
       }
 
-      if (enrollmentResult.error) {
-        console.error("Failed to load enrolled students:", enrollmentResult.error);
-        setEnrollmentError(`Could not load enrolled students: ${enrollmentResult.error.message}`);
+      // 3. The roster and the students' profiles.
+      if (rosterResult.status === "rejected") {
+        console.error("Failed to load enrolled students:", rosterResult.reason);
+        setEnrollmentError(errorMessage(rosterResult.reason, "Could not load enrolled students."));
       } else {
-        const studentIds = enrollmentResult.data.map((enrollment) => enrollment.student_id);
-        setEnrolledStudentIds(studentIds);
-        setEnrolledAt(
-          Object.fromEntries(
-            enrollmentResult.data.map((enrollment) => [
-              enrollment.student_id,
-              enrollment.enrolled_at,
-            ]),
-          ),
-        );
-        if (studentIds.length) {
-          const { data: enrolledProfiles, error: enrolledProfilesError } = await supabase
-            .from("profiles")
-            .select("id, name, surname, username, user_role")
-            .in("id", studentIds);
-          if (enrolledProfilesError) {
-            console.error("Failed to load enrolled student profiles:", enrolledProfilesError);
-            setEnrollmentError(
-              `Students are enrolled, but their profiles could not be loaded: ${enrolledProfilesError.message}`,
-            );
-          } else {
-            setStudentProfiles((enrolledProfiles ?? []) as StudentProfile[]);
-          }
-        } else {
-          setStudentProfiles([]);
-        }
+        await showRoster(rosterResult.value);
       }
 
       setIsLoading(false);
+    };
+
+    const showRoster = async (roster: RosterEntry[]) => {
+      const studentIds = roster.map((entry) => entry.student_id);
+
+      setEnrolledStudentIds(studentIds);
+      setEnrolledAt(
+        Object.fromEntries(roster.map((entry) => [entry.student_id, entry.enrolled_at])),
+      );
+
+      try {
+        setStudentProfiles(await getStudentProfiles(studentIds));
+      } catch (profilesError) {
+        console.error("Failed to load enrolled student profiles:", profilesError);
+        setEnrollmentError(
+          `Students are enrolled, but their profiles could not be loaded: ${errorMessage(profilesError, "please try again.")}`,
+        );
+      }
     };
 
     void load();
@@ -319,201 +291,145 @@ export default function ClassroomDetail() {
   }, [isInviteOpen]);
 
   // Replaces the invite code; the old one stops working straight away.
-  async function rotateInviteCode() {
-    if (
-      !classroomId ||
-      isRotatingCode ||
-      !window.confirm("Create a new classroom code? The old code will stop working.")
-    )
-      return;
+  async function handleRotateCode() {
+    const confirmed = window.confirm(
+      "Create a new classroom code? The old code will stop working.",
+    );
+
+    if (!classroomId || isRotatingCode || !confirmed) return;
+
     setIsRotatingCode(true);
     setInviteCodeError(null);
-    const { data, error } = await supabase.rpc("rotate_classroom_invite_code", {
-      p_classroom_id: classroomId,
-    });
-    setIsRotatingCode(false);
-    if (error || !data) {
-      setInviteCodeError(error?.message ?? "Could not create a new code.");
-      return;
+
+    try {
+      setInviteCode(await rotateInviteCode(classroomId));
+    } catch (rotateError) {
+      setInviteCodeError(errorMessage(rotateError, "Could not create a new code."));
+    } finally {
+      setIsRotatingCode(false);
     }
-    setInviteCode(data);
   }
 
   // -- Materials --
 
-  // Uploads a file to the documents bucket, records it as a classroom
-  // material, then tells the students.
-  const addFile = async (file: File) => {
+  // Checks the file type here, so the teacher sees the reason straight away;
+  // teacherClassroomService uploads it, shares it and tells the students.
+  const handleAddFile = async (file: File) => {
     if (!classroomId || !teacherId) return;
+
     const validation = validateMaterialFile(file);
+
     if ("error" in validation) {
       setMaterialError(validation.error);
       return;
     }
+
     setIsSavingMaterial(true);
     setMaterialError(null);
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    // Storage "folders" are just path prefixes. The random id stops a second
-    // upload with the same name overwriting a file another row still uses.
-    const storagePath = `classroom_documents/${classroomId}/${crypto.randomUUID()}-${safeFileName}`;
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(storagePath, file, {
+
+    try {
+      const material = await shareDocument({
+        classroomId,
+        classroomName: classroom?.classroom_name ?? "your classroom",
+        file,
         contentType: validation.contentType,
-        upsert: false,
       });
-    if (uploadError) {
-      console.error("Document storage upload failed:", uploadError);
-      setMaterialError(`The document could not be uploaded: ${uploadError.message}`);
+
+      setMaterials((prev) => [toMaterialDisplay(material), ...prev]);
+    } catch (shareError) {
+      console.error("Failed to share document:", shareError);
+      setMaterialError(errorMessage(shareError, "The document could not be shared."));
+    } finally {
       setIsSavingMaterial(false);
-      return;
     }
-    const { data, error } = await supabase
-      .from("learning_resources")
-      .insert({
-        classroom_id: classroomId,
-        resource_type: "document",
-        resource_url: storagePath,
-      })
-      .select("resource_id, resource_type, resource_url, uploaded_date")
-      .single();
-    setIsSavingMaterial(false);
-    if (error || !data) {
-      console.error("Learning resource insert failed:", error);
-      setMaterialError(
-        `The document was uploaded but could not be shared: ${error?.message ?? "No resource was returned."}`,
-      );
-      return;
-    }
-    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
-    await notifyClassroomStudents(classroomId, {
-      type: "new_material",
-      title: "New classroom material",
-      body: `Your teacher shared "${file.name}" in "${classroom?.classroom_name ?? "your classroom"}".`,
-      link_url: `/student/classrooms/${classroomId}`,
-    });
   };
 
-  // Shares a web link with the class. Only http and https addresses are
-  // accepted; "example.com" is treated as "https://example.com".
-  const addLink = async (url: string) => {
+  const handleAddLink = async (url: string) => {
     if (!classroomId || !teacherId) return;
-    setMaterialError(null);
-
-    const externalUrl = url.includes("://") ? url : `https://${url}`;
-    try {
-      const { protocol } = new URL(externalUrl);
-      if (protocol !== "http:" && protocol !== "https:") throw new Error("Unsupported link");
-    } catch {
-      setMaterialError("Enter a web address that starts with http:// or https://.");
-      return;
-    }
 
     setIsSavingMaterial(true);
-    const { data, error } = await supabase
-      .from("learning_resources")
-      .insert({
-        classroom_id: classroomId,
-        resource_type: "link",
-        resource_url: externalUrl,
-      })
-      .select("resource_id, resource_type, resource_url, uploaded_date")
-      .single();
-    setIsSavingMaterial(false);
-    if (error || !data) {
-      setMaterialError("The link could not be shared with learners. Please try again.");
-      return;
+    setMaterialError(null);
+
+    try {
+      const material = await shareLink({
+        classroomId,
+        classroomName: classroom?.classroom_name ?? "your classroom",
+        url,
+      });
+
+      setMaterials((prev) => [toMaterialDisplay(material), ...prev]);
+    } catch (shareError) {
+      setMaterialError(
+        errorMessage(shareError, "The link could not be shared with learners. Please try again."),
+      );
+    } finally {
+      setIsSavingMaterial(false);
     }
-    setMaterials((prev) => [toMaterialDisplay(data as MaterialRow), ...prev]);
-    await notifyClassroomStudents(classroomId, {
-      type: "new_material",
-      title: "New classroom material",
-      body: `Your teacher shared a link in "${classroom?.classroom_name ?? "your classroom"}".`,
-      link_url: `/student/classrooms/${classroomId}`,
-    });
   };
 
   // -- Confirmed deletions (each runs after its ConfirmDialog) --
 
-  const deleteLesson = async () => {
+  const handleDeleteLesson = async () => {
     if (!lessonToDelete) return;
 
     setIsDeletingLesson(true);
     setLoadError(null);
 
-    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonToDelete.id);
+    try {
+      await deleteLesson(lessonToDelete.id);
 
-    setIsDeletingLesson(false);
-    if (error) {
-      setLoadError(`Could not delete lesson: ${error.message}`);
-      return;
+      setLessons((currentLessons) =>
+        currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id),
+      );
+      setLessonToDelete(null);
+    } catch (deleteError) {
+      setLoadError(errorMessage(deleteError, "Could not delete lesson."));
+    } finally {
+      setIsDeletingLesson(false);
     }
-
-    setLessons((currentLessons) =>
-      currentLessons.filter((lesson) => lesson.id !== lessonToDelete.id),
-    );
-    setLessonToDelete(null);
   };
 
-  const removeStudent = async () => {
+  const handleRemoveStudent = async () => {
     if (!classroomId || !studentToRemove) return;
 
     setIsRemovingStudent(true);
     setEnrollmentError(null);
 
-    const { error } = await supabase
-      .from("classroom_students")
-      .delete()
-      .eq("classroom_id", classroomId)
-      .eq("student_id", studentToRemove.id);
+    try {
+      await removeStudent({
+        classroomId,
+        classroomName: classroom?.classroom_name ?? "a classroom",
+        studentId: studentToRemove.id,
+      });
 
-    setIsRemovingStudent(false);
-    if (error) {
-      setEnrollmentError(`Could not remove this student: ${error.message}`);
-      return;
+      setStudentProfiles((students) =>
+        students.filter((student) => student.id !== studentToRemove.id),
+      );
+      setEnrolledStudentIds((studentIds) => studentIds.filter((id) => id !== studentToRemove.id));
+      setStudentToRemove(null);
+    } catch (removeError) {
+      setEnrollmentError(errorMessage(removeError, "Could not remove this student."));
+    } finally {
+      setIsRemovingStudent(false);
     }
-
-    setStudentProfiles((students) =>
-      students.filter((student) => student.id !== studentToRemove.id),
-    );
-    setEnrolledStudentIds((studentIds) => studentIds.filter((id) => id !== studentToRemove.id));
-    await notifyUser({
-      recipient_id: studentToRemove.id,
-      type: "removed_from_classroom",
-      title: "You were removed from a classroom",
-      body: `You were removed from "${classroom?.classroom_name ?? "a classroom"}".`,
-      link_url: "/student/classrooms",
-    });
-    setStudentToRemove(null);
   };
 
-  // Removes the stored file first (if any), then the material row.
-  const deleteMaterial = async () => {
+  const handleDeleteMaterial = async () => {
     if (!materialToDelete) return;
 
     setIsDeletingMaterial(true);
     setMaterialError(null);
 
-    if (materialToDelete.resourceType === "document") {
-      const { error: storageError } = await supabase.storage
-        .from("documents")
-        .remove([materialToDelete.resourcePath]);
-      if (storageError) console.error("Failed to delete document from storage:", storageError);
+    try {
+      await removeMaterial(materialToDelete);
+
+      setMaterials((prev) => prev.filter((material) => material.id !== materialToDelete.id));
+      setMaterialToDelete(null);
+    } catch (deleteError) {
+      setMaterialError(errorMessage(deleteError, "Could not delete this material."));
+    } finally {
+      setIsDeletingMaterial(false);
     }
-
-    const { error } = await supabase
-      .from("learning_resources")
-      .delete()
-      .eq("resource_id", materialToDelete.id);
-
-    setIsDeletingMaterial(false);
-    if (error) {
-      setMaterialError(`Could not delete this material: ${error.message}`);
-      return;
-    }
-
-    setMaterials((prev) => prev.filter((material) => material.id !== materialToDelete.id));
-    setMaterialToDelete(null);
   };
 
   // -- Derived values --
@@ -582,8 +498,8 @@ export default function ClassroomDetail() {
             <div className="mt-3">
               <ClassroomMaterialsPanel
                 materials={materials}
-                onFileUpload={addFile}
-                onAddLink={addLink}
+                onFileUpload={handleAddFile}
+                onAddLink={handleAddLink}
                 onDeleteMaterial={setMaterialToDelete}
                 isSaving={isSavingMaterial}
                 error={materialError}
@@ -600,7 +516,7 @@ export default function ClassroomDetail() {
                 enrolledAt={enrolledAt}
                 rosterError={enrollmentError}
                 isRotating={isRotatingCode}
-                onRotate={() => void rotateInviteCode()}
+                onRotate={() => void handleRotateCode()}
               />
             </section>
           </div>
@@ -725,7 +641,7 @@ export default function ClassroomDetail() {
                     code={inviteCode}
                     codeError={inviteCodeError}
                     isRotating={isRotatingCode}
-                    onRotate={() => void rotateInviteCode()}
+                    onRotate={() => void handleRotateCode()}
                   />
                 </div>
               )}
@@ -798,8 +714,8 @@ export default function ClassroomDetail() {
               {activeTab === "materials" && (
                 <ClassroomMaterialsTimeline
                   materials={materials}
-                  onFileUpload={addFile}
-                  onAddLink={addLink}
+                  onFileUpload={handleAddFile}
+                  onAddLink={handleAddLink}
                   onDeleteMaterial={setMaterialToDelete}
                   isSaving={isSavingMaterial}
                   error={materialError}
@@ -825,7 +741,7 @@ export default function ClassroomDetail() {
         open={Boolean(lessonToDelete)}
         isDeleting={isDeletingLesson}
         onCancel={() => setLessonToDelete(null)}
-        onConfirm={() => void deleteLesson()}
+        onConfirm={() => void handleDeleteLesson()}
         title={`Delete ${lessonToDelete?.title ?? "this lesson"}?`}
         description="This will permanently remove this lesson from the classroom. This action cannot be undone."
         confirmLabel="Delete lesson"
@@ -836,7 +752,7 @@ export default function ClassroomDetail() {
         open={Boolean(studentToRemove)}
         isDeleting={isRemovingStudent}
         onCancel={() => setStudentToRemove(null)}
-        onConfirm={() => void removeStudent()}
+        onConfirm={() => void handleRemoveStudent()}
         title={`Remove ${[studentToRemove?.name, studentToRemove?.surname].filter(Boolean).join(" ") || "this student"}?`}
         description="This will unenrol the student from this classroom. They can rejoin later with the classroom code."
         confirmLabel="Remove student"
@@ -847,7 +763,7 @@ export default function ClassroomDetail() {
         open={Boolean(materialToDelete)}
         isDeleting={isDeletingMaterial}
         onCancel={() => setMaterialToDelete(null)}
-        onConfirm={() => void deleteMaterial()}
+        onConfirm={() => void handleDeleteMaterial()}
         title={`Delete ${materialToDelete?.title ?? "this material"}?`}
         description="This will permanently remove this material from the classroom and its stored file, if any. This action cannot be undone."
         confirmLabel="Delete material"

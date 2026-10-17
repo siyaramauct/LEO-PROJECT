@@ -1,9 +1,10 @@
 // -----------------------------------------------------------------------------
 // Join Classroom Form
 //
-// Lets a student join a classroom with the code their teacher shared. The code
-// is checked by the join_classroom_with_code database function, which also
-// enforces the 30-student limit. On success the student is taken to the classroom.
+// Lets a student join a classroom with the code their teacher shared, through
+// classroomService. The code is checked by the join_classroom_with_code
+// database function, which also enforces the 30-student limit. On success the
+// student is taken to the classroom.
 //
 // Used by: StudentClassrooms
 // -----------------------------------------------------------------------------
@@ -11,7 +12,8 @@
 import { KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supabase-client";
+import { errorMessage } from "../data/errors";
+import { joinClassroom } from "../services/classroomService";
 
 type Props = {
   inputId: string;
@@ -24,28 +26,27 @@ export default function JoinClassroomForm({ inputId, className = "" }: Props) {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
 
-  async function joinClassroom(event: FormEvent<HTMLFormElement>) {
+  async function handleJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!code.trim() || isJoining) return;
 
     setIsJoining(true);
     setError("");
-    const { data, error: joinError } = await supabase.rpc("join_classroom_with_code", {
-      p_code: code.trim(),
-    });
-    setIsJoining(false);
 
-    if (joinError || !data) {
-      setError(joinError?.message ?? "Could not join this classroom.");
-      return;
+    try {
+      const classroomId = await joinClassroom(code);
+
+      setCode("");
+      navigate(`/student/classrooms/${classroomId}`);
+    } catch (joinError) {
+      setError(errorMessage(joinError, "Could not join this classroom."));
+    } finally {
+      setIsJoining(false);
     }
-
-    setCode("");
-    navigate(`/student/classrooms/${data}`);
   }
 
   return (
-    <form onSubmit={(event) => void joinClassroom(event)} className={className}>
+    <form onSubmit={(event) => void handleJoin(event)} className={className}>
       <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-bold">
         <KeyRound size={17} className="text-violet-700" /> Join a classroom
       </label>

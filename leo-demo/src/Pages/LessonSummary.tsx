@@ -18,22 +18,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
-
-// The shape QuickQuiz writes to sessionStorage.
-type QuizResult = {
-  score: number;
-  totalQuestions: number;
-  correct: number;
-  incorrect: number;
-  results: Array<{
-    questionId: string;
-    question: string;
-    studentAnswer: string;
-    correctAnswer: string;
-    isCorrect: boolean;
-  }>;
-};
+import { getLatestQuizResult, type QuizResult } from "../services/lessonService";
+import { projectImageUrl } from "../utils/images";
 
 export default function LessonSummary() {
   const navigate = useNavigate();
@@ -49,27 +35,13 @@ export default function LessonSummary() {
     if (result || !session?.user) return;
 
     const loadLatestAttempt = async () => {
-      const { data } = await supabase
-        .from("lesson_attempts")
-        .select("score, lesson_id")
-        .eq("student_id", session.user.id)
-        // Flashcards-only completions have no score to summarise.
-        .not("score", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Only the score is stored, so the counts below are an estimate out of 10.
-      if (data) {
-        setResult({
-          score: data.score,
-          totalQuestions: 10,
-          correct: Math.round((data.score / 100) * 10),
-          incorrect: 10 - Math.round((data.score / 100) * 10),
-          results: [],
-        });
+      try {
+        setResult(await getLatestQuizResult(session.user.id));
+      } catch (loadError) {
+        console.error("Failed to load latest quiz result:", loadError);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     void loadLatestAttempt();
@@ -134,10 +106,8 @@ export default function LessonSummary() {
         </header>
         <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
           <section className="rounded-xl border border-slate-100 bg-white p-5 text-center sm:p-6">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-              <ClipboardCheck size={23} />
-            </span>
-            <h2 className="mt-4 text-2xl font-bold">{percentage}%</h2>
+            <img src={projectImageUrl("winning.png")} alt="Trophy" className="mx-auto h-20 w-20" />
+            <h2 className="mt-3 text-2xl font-bold">{percentage}%</h2>
             <p className="mt-2 text-sm text-slate-500">{message}</p>
             <div className="mx-auto mt-5 h-2 max-w-md overflow-hidden rounded-full bg-slate-100">
               <div
@@ -152,7 +122,7 @@ export default function LessonSummary() {
               <p className="mt-1 text-xs text-slate-500">Score out of {result.totalQuestions}</p>
             </article>
             <article className="rounded-xl border border-slate-100 bg-white p-4">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                 <Check size={16} />
               </span>
               <p className="mt-3 text-2xl font-bold">{result.correct}</p>

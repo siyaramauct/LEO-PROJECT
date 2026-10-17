@@ -20,28 +20,21 @@ import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import LoadingScreen from "../Components/LoadingScreen";
 import { useAuth } from "../context/AuthContext";
+import { type ClassroomSummary } from "../data/classrooms";
+import { errorMessage } from "../data/errors";
+import { getReleasedLessons } from "../data/lessons";
+import { getProfileName, type ProfileName } from "../data/profiles";
+import { getStudentProgress, type StudentProgress } from "../data/progress";
 import usePreloadImages from "../hooks/usePreloadImages";
-import { supabase } from "../supabase-client";
+import { getEnrolledClassrooms } from "../services/classroomService";
 import { bucketImageUrl } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------
 
-type StudentProfile = { name: string | null; surname: string | null };
-// Returned by the get_student_progress database function in Supabase.
-type StudentProgress = {
-  current_streak: number;
-  longest_streak: number;
-  weekly_lessons_completed: number;
-  weekly_goal: number;
-};
+type StudentProfile = ProfileName;
 
-type Classroom = {
-  classroom_id: string;
-  classroom_name: string;
-  description: string | null;
-  cover_image_path: string | null; // Replaced with the full image URL once loaded.
-  created_date: string | null;
-};
+// cover_image_path is replaced with the full image URL once loaded.
+type Classroom = ClassroomSummary;
 
 // -- Settings -----------------------------------------------------------------
 
@@ -86,21 +79,29 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!session?.user) return;
 
+    // Both are best effort: a failure falls back to the sign-in name and an
+    // empty progress card.
     const loadProfile = async () => {
-      const [{ data }, { data: progressData }] = await Promise.all([
-        supabase.from("profiles").select("name, surname").eq("id", session.user.id).maybeSingle(),
-        supabase.rpc("get_student_progress"),
+      const [profileName, studentProgress] = await Promise.all([
+        getProfileName(session.user.id).catch((profileError) => {
+          console.error("Could not load profile:", profileError);
+          return null;
+        }),
+        getStudentProgress().catch((progressError) => {
+          console.error("Could not load learning progress:", progressError);
+          return null;
+        }),
       ]);
-      setStudentProfile(data);
-      setProgress((progressData?.[0] as StudentProgress) ?? null);
+
+      setStudentProfile(profileName);
+      setProgress(studentProgress);
     };
 
     void loadProfile().finally(() => setIsProfileLoading(false));
   }, [session?.user]);
 
   // -- Load: newest classrooms --
-  // Enrolments first (newest first), then the classroom details, put back in
-  // enrolment order.
+  // The most recently joined classrooms, newest first (classroomService).
   useEffect(() => {
     if (!session?.user) return;
 
@@ -108,60 +109,35 @@ export default function StudentDashboard() {
 
     const loadClassroom = async () => {
       setClassroomError(null);
-      const { data: enrolments, error: enrolmentError } = await supabase
-        .from("classroom_students")
-        .select("classroom_id, enrolled_at")
-        .eq("student_id", session.user.id)
-        .order("enrolled_at", { ascending: false, nullsFirst: false })
-        .limit(DASHBOARD_CLASSROOM_LIMIT);
 
-      if (enrolmentError) {
-        if (isCurrent) {
-          setClassroomError("Your classrooms could not be loaded right now.");
-          setClassrooms([]);
-        }
-        return;
-      }
+      try {
+        const newestClassrooms = await getEnrolledClassrooms(session.user.id, {
+          order: "newest",
+          limit: DASHBOARD_CLASSROOM_LIMIT,
+        });
 
-      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
-      if (!classroomIds.length) {
-        if (isCurrent) {
-          setClassrooms([]);
-          setStudentClassroom(null);
-        }
-        return;
-      }
-
-      const { data: classroomData, error: classroomsError } = await supabase
-        .from("classrooms")
-        .select("classroom_id, classroom_name, description, cover_image_path, created_date")
-        .in("classroom_id", classroomIds);
-
-      if (classroomsError) {
-        if (isCurrent) {
-          setClassroomError("Your classroom details could not be loaded right now.");
-          setClassrooms([]);
-        }
-        return;
-      }
-
-      const classroomsById = new Map(
-        (classroomData ?? []).map((classroom) => [classroom.classroom_id, classroom]),
-      );
-      const orderedClassrooms = classroomIds
-        .map((classroomId) => classroomsById.get(classroomId))
-        .filter((classroom): classroom is Classroom => Boolean(classroom))
-        .map((classroom) => ({
+        // Swap each cover's storage path for its full image URL.
+        const classroomsWithCovers = newestClassrooms.map((classroom) => ({
           ...classroom,
           cover_image_path: classroom.cover_image_path
             ? bucketImageUrl(classroom.cover_image_path)
             : null,
         }));
 
-      if (isCurrent) {
-        setClassrooms(orderedClassrooms);
-        // The banner always shows the newest classroom.
-        setStudentClassroom(orderedClassrooms[0] ?? null);
+        if (isCurrent) {
+          setClassrooms(classroomsWithCovers);
+          // The banner always shows the newest classroom.
+          setStudentClassroom(classroomsWithCovers[0] ?? null);
+        }
+      } catch (loadError) {
+        console.error("Failed to load classrooms:", loadError);
+
+        if (isCurrent) {
+          setClassroomError(
+            errorMessage(loadError, "Your classrooms could not be loaded right now."),
+          );
+          setClassrooms([]);
+        }
       }
     };
 
@@ -179,58 +155,39 @@ export default function StudentDashboard() {
 
     const loadRecentlyAdded = async () => {
       setRecentlyAddedError(null);
-      const { data: enrolments, error: enrolmentError } = await supabase
-        .from("classroom_students")
-        .select("classroom_id")
-        .eq("student_id", session.user.id);
 
-      if (enrolmentError) {
+      try {
+        // 1. The student's classrooms, for their names.
+        const enrolledClassrooms = await getEnrolledClassrooms(session.user.id);
+        const classroomNames = new Map(
+          enrolledClassrooms.map((classroom) => [classroom.classroom_id, classroom.classroom_name]),
+        );
+
+        // 2. Their newest lessons. A scheduled lesson counts as "added" on its release date.
+        const newestLessons = await getReleasedLessons([...classroomNames.keys()], {
+          order: "newest",
+          limit: RECENTLY_ADDED_LIMIT,
+        });
+
         if (isCurrent) {
-          setRecentlyAddedError("Recently added lessons could not be loaded right now.");
-          setRecentlyAddedLessons([]);
-        }
-        return;
-      }
-
-      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
-      if (!classroomIds.length) {
-        if (isCurrent) setRecentlyAddedLessons([]);
-        return;
-      }
-
-      const { data: lessonData, error: lessonsError } = await supabase
-        .from("lessons")
-        .select("lesson_id, title, lesson_image_path, classrooms(classroom_name)")
-        .in("classroom_id", classroomIds)
-        // A scheduled lesson counts as "added" on its release date.
-        .lte("release_date", new Date().toISOString())
-        .order("release_date", { ascending: false })
-        .limit(RECENTLY_ADDED_LIMIT);
-
-      if (lessonsError) {
-        if (isCurrent) {
-          setRecentlyAddedError("Recently added lessons could not be loaded right now.");
-          setRecentlyAddedLessons([]);
-        }
-        return;
-      }
-
-      if (isCurrent) {
-        setRecentlyAddedLessons(
-          (lessonData ?? []).map((lesson) => {
-            const classroom = Array.isArray(lesson.classrooms)
-              ? lesson.classrooms[0]
-              : lesson.classrooms;
-            return {
+          setRecentlyAddedLessons(
+            newestLessons.map((lesson) => ({
               lesson_id: lesson.lesson_id,
               title: lesson.title,
-              classroomName: classroom?.classroom_name ?? "Classroom",
+              classroomName: classroomNames.get(lesson.classroom_id) ?? "Classroom",
               lesson_image_path: lesson.lesson_image_path
                 ? bucketImageUrl(lesson.lesson_image_path)
                 : null,
-            };
-          }),
-        );
+            })),
+          );
+        }
+      } catch (loadError) {
+        console.error("Failed to load recently added lessons:", loadError);
+
+        if (isCurrent) {
+          setRecentlyAddedError("Recently added lessons could not be loaded right now.");
+          setRecentlyAddedLessons([]);
+        }
       }
     };
 

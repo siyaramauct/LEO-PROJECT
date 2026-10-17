@@ -25,8 +25,11 @@ import type { ScheduledLesson, ScheduledLessonEdits } from "../Components/Schedu
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
 import { useAuth } from "../context/AuthContext";
+import { getTeacherClassrooms, getTeacherClassroomsWithCounts } from "../data/classrooms";
+import { errorMessage } from "../data/errors";
+import { getFlashcardCounts } from "../data/flashcards";
+import { deleteLesson, getRecentLessons, getScheduledLessons, updateLesson } from "../data/lessons";
 import usePreloadImages from "../hooks/usePreloadImages";
-import { supabase } from "../supabase-client";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { releaseDateToIso, toDateKey } from "../utils/releaseDate";
 
@@ -55,13 +58,6 @@ type DashboardLesson = {
 
 // The dashboard previews the newest few; the full lists live on their own pages.
 const DASHBOARD_ROW_LIMIT = 3;
-
-// Counts rows per key: [{ id: "a" }, { id: "a" }, { id: "b" }] becomes { a: 2, b: 1 }.
-function countBy<T>(rows: T[], key: (row: T) => string) {
-  const counts: Record<string, number> = {};
-  for (const row of rows) counts[key(row)] = (counts[key(row)] ?? 0) + 1;
-  return counts;
-}
 
 // -- Page ---------------------------------------------------------------------
 
@@ -95,58 +91,31 @@ export default function TeacherDashboard() {
   }
 
   // -- Load: classrooms with student and lesson counts --
-  // The classrooms come newest first. The counts are worked out by fetching
-  // the enrolment and lesson rows for those classrooms and tallying them.
+  // The classrooms come newest first, with their counts in the same query.
   useEffect(() => {
     if (!session?.user) return;
 
     const loadClassrooms = async () => {
-      const { data, error } = await supabase
-        .from("classrooms")
-        .select("classroom_id, classroom_name, cover_image_path")
-        .eq("teacher_id", session.user.id)
-        .order("created_date", { ascending: false });
+      try {
+        const teacherClassrooms = await getTeacherClassroomsWithCounts(session.user.id, {
+          order: "newest",
+        });
 
-      if (error) {
-        console.error("Failed to load the active classroom:", error);
+        setClassrooms(
+          teacherClassrooms.map((classroom) => ({
+            id: classroom.classroom_id,
+            name: classroom.classroom_name,
+            image: bucketImageUrlOrBroken(classroom.cover_image_path),
+            imageAlt: `${classroom.classroom_name} classroom cover`,
+            studentCount: classroom.studentCount,
+            lessonCount: classroom.lessonCount,
+          })),
+        );
+      } catch (loadError) {
+        console.error("Failed to load the active classroom:", loadError);
         setClassroomsError("Your classrooms could not be loaded right now.");
         setClassrooms([]);
-        return;
       }
-      if (!data?.length) {
-        setClassrooms([]);
-        return;
-      }
-
-      const classroomIds = data.map((classroom) => classroom.classroom_id);
-      const [
-        { data: enrolments, error: enrolmentsError },
-        { data: classLessons, error: lessonsError },
-      ] = await Promise.all([
-        supabase
-          .from("classroom_students")
-          .select("classroom_id, student_id")
-          .in("classroom_id", classroomIds),
-        supabase.from("lessons").select("lesson_id, classroom_id").in("classroom_id", classroomIds),
-      ]);
-
-      // Counts are a nice-to-have: on failure they show as zero.
-      if (enrolmentsError) console.error("Failed to load classroom enrollments:", enrolmentsError);
-      if (lessonsError) console.error("Failed to load lesson counts:", lessonsError);
-
-      const studentCounts = countBy(enrolments ?? [], (row) => row.classroom_id);
-      const lessonCounts = countBy(classLessons ?? [], (row) => row.classroom_id);
-
-      setClassrooms(
-        data.map((classroom) => ({
-          id: classroom.classroom_id,
-          name: classroom.classroom_name,
-          image: bucketImageUrlOrBroken(classroom.cover_image_path),
-          imageAlt: `${classroom.classroom_name} classroom cover`,
-          studentCount: studentCounts[classroom.classroom_id] ?? 0,
-          lessonCount: lessonCounts[classroom.classroom_id] ?? 0,
-        })),
-      );
     };
 
     void loadClassrooms();
@@ -158,71 +127,42 @@ export default function TeacherDashboard() {
     if (!session?.user) return;
 
     const loadLessons = async () => {
-      const { data: teacherClassrooms, error: classroomsError } = await supabase
-        .from("classrooms")
-        .select("classroom_id")
-        .eq("teacher_id", session.user.id);
-
-      if (classroomsError) {
-        console.error("Failed to load classrooms for lessons:", classroomsError);
-        setLessonsError("Your recent lessons could not be loaded right now.");
-        return;
-      }
-      if (!teacherClassrooms?.length) {
-        setLessons([]);
-        return;
-      }
-
-      // classrooms(classroom_name) pulls in each lesson's classroom name in the
-      // same query, through the classroom_id foreign key.
-      const { data: recentLessons, error: lessonsError } = await supabase
-        .from("lessons")
-        .select(
-          "lesson_id, classroom_id, title, description, lesson_image_path, created_at, classrooms(classroom_name)",
-        )
-        .in(
-          "classroom_id",
-          teacherClassrooms.map((classroom) => classroom.classroom_id),
-        )
-        // nullsFirst: false keeps undated lessons from jumping to the top.
-        .order("created_at", { ascending: false, nullsFirst: false })
-        .limit(DASHBOARD_ROW_LIMIT);
-
-      if (lessonsError) {
-        console.error("Failed to load the lessons:", lessonsError);
-        setLessonsError("Your recent lessons could not be loaded right now.");
-        return;
-      }
-
-      const { data: flashcards, error: flashcardsError } = await supabase
-        .from("flashcards")
-        .select("flashcard_id, lesson_id")
-        .in(
-          "lesson_id",
-          recentLessons.map((lesson) => lesson.lesson_id),
+      try {
+        // 1. The teacher's classrooms, for their names.
+        const teacherClassrooms = await getTeacherClassrooms(session.user.id);
+        const classroomNames = new Map(
+          teacherClassrooms.map((classroom) => [classroom.classroom_id, classroom.classroom_name]),
         );
-      if (flashcardsError)
-        console.error("Failed to load flashcards for word count:", flashcardsError);
-      const wordCounts = countBy(flashcards ?? [], (row) => row.lesson_id);
 
-      setLessons(
-        recentLessons.map((lesson) => {
-          const classroom = Array.isArray(lesson.classrooms)
-            ? lesson.classrooms[0]
-            : lesson.classrooms;
-          return {
+        // 2. The newest lessons, and how many words (flashcards) each has.
+        const recentLessons = await getRecentLessons(
+          [...classroomNames.keys()],
+          DASHBOARD_ROW_LIMIT,
+        );
+        const wordCounts = await getFlashcardCounts(
+          recentLessons.map((lesson) => lesson.lesson_id),
+        ).catch((countError) => {
+          console.error("Failed to load flashcards for word count:", countError);
+          return new Map<string, number>();
+        });
+
+        setLessons(
+          recentLessons.map((lesson) => ({
             lesson_id: lesson.lesson_id,
             classroom_id: lesson.classroom_id,
-            classroomName: classroom?.classroom_name ?? "Unknown classroom",
+            classroomName: classroomNames.get(lesson.classroom_id) ?? "Unknown classroom",
             title: lesson.title,
-            description: lesson.description,
+            description: lesson.description ?? "",
             lesson_image_path: bucketImageUrlOrBroken(lesson.lesson_image_path),
-            wordCount: wordCounts[lesson.lesson_id] ?? 0,
+            wordCount: wordCounts.get(lesson.lesson_id) ?? 0,
             imageAlt: `${lesson.title} lesson cover`,
-            created_at: lesson.created_at,
-          };
-        }),
-      );
+            created_at: lesson.created_at ? new Date(lesson.created_at) : new Date(0),
+          })),
+        );
+      } catch (loadError) {
+        console.error("Failed to load the lessons:", loadError);
+        setLessonsError("Your recent lessons could not be loaded right now.");
+      }
     };
 
     // Every exit path must end loading, or the page would stay on the loader.
@@ -230,43 +170,29 @@ export default function TeacherDashboard() {
   }, [session?.user]);
 
   // -- Load: scheduled lessons for the planner --
-  // The !inner join keeps only lessons in this teacher's classrooms.
   useEffect(() => {
     if (!session?.user) return;
 
     const loadScheduledLessons = async () => {
-      const { data, error } = await supabase
-        .from("lessons")
-        .select(
-          "lesson_id, classroom_id, title, description, release_date, classrooms!inner(classroom_name, teacher_id)",
-        )
-        .eq("classrooms.teacher_id", session.user.id)
-        .gt("release_date", new Date().toISOString())
-        .order("release_date", { ascending: true });
+      try {
+        const scheduled = await getScheduledLessons(session.user.id);
 
-      if (error) {
-        console.error("Failed to load scheduled lessons:", error);
-        setScheduledLessonsError("Scheduled lessons could not be loaded right now.");
-        setScheduledLessons([]);
-        return;
-      }
-
-      setScheduledLessons(
-        data.map((lesson) => {
-          const classroom = Array.isArray(lesson.classrooms)
-            ? lesson.classrooms[0]
-            : lesson.classrooms;
-          return {
+        setScheduledLessons(
+          scheduled.map((lesson) => ({
             lessonId: lesson.lesson_id,
             classroomId: lesson.classroom_id,
-            classroomName: classroom?.classroom_name ?? "Unknown classroom",
+            classroomName: lesson.classroom_name,
             title: lesson.title,
             description: lesson.description ?? "",
             // Grouped by the teacher's local calendar day, matching how it was picked.
             releaseDateKey: toDateKey(new Date(lesson.release_date)),
-          };
-        }),
-      );
+          })),
+        );
+      } catch (loadError) {
+        console.error("Failed to load scheduled lessons:", loadError);
+        setScheduledLessonsError("Scheduled lessons could not be loaded right now.");
+        setScheduledLessons([]);
+      }
     };
 
     void loadScheduledLessons();
@@ -279,18 +205,15 @@ export default function TeacherDashboard() {
     lesson: ScheduledLesson,
     edits: ScheduledLessonEdits,
   ): Promise<string | null> {
-    const { error } = await supabase
-      .from("lessons")
-      .update({
+    try {
+      await updateLesson(lesson.lessonId, {
         title: edits.title,
         description: edits.description,
-        release_date: releaseDateToIso(edits.releaseDateKey),
-      })
-      .eq("lesson_id", lesson.lessonId);
-
-    if (error) {
-      console.error("Failed to update the scheduled lesson:", error);
-      return "The lesson could not be updated. Please try again.";
+        releaseDateIso: releaseDateToIso(edits.releaseDateKey),
+      });
+    } catch (updateError) {
+      console.error("Failed to update the scheduled lesson:", updateError);
+      return errorMessage(updateError, "The lesson could not be updated. Please try again.");
     }
 
     setScheduledLessons((current) =>
@@ -316,14 +239,16 @@ export default function TeacherDashboard() {
 
     setIsDeletingScheduledLesson(true);
     setScheduledLessonsError(null);
-    const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonId);
-    setIsDeletingScheduledLesson(false);
 
-    if (error) {
-      console.error("Failed to delete the scheduled lesson:", error);
+    try {
+      await deleteLesson(lessonId);
+    } catch (deleteError) {
+      console.error("Failed to delete the scheduled lesson:", deleteError);
       setScheduledLessonsError("The lesson could not be deleted. Please try again.");
       setScheduledLessonToDelete(null);
       return;
+    } finally {
+      setIsDeletingScheduledLesson(false);
     }
 
     // Remove it everywhere it appears and lower its classroom's lesson count.

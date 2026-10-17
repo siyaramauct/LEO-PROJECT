@@ -4,8 +4,8 @@
 // The student portal's navigation. It renders one of three layouts, chosen by
 // screen width with Tailwind breakpoints (no JavaScript involved):
 //
-//   Phone   (under 768px)    bottom bar: Home, Classrooms, Practice, Lessons, Profile
-//   Tablet  (768 to 1023px)  full-width bottom bar that adds Report and Hub
+//   Phone   (under 768px)    bottom bar: Home, Classrooms, Practice, Report, Profile
+//   Tablet  (768 to 1023px)  full-width bottom bar that adds Lessons and Hub
 //   Desktop (1024px and up)  fixed violet sidebar with every link and Log out
 //
 // Student pages leave room for it with "pb-20 lg:pb-0 lg:ml-56" on their main
@@ -27,6 +27,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { projectImageUrl } from "../utils/images";
 
 // -- Links --------------------------------------------------------------------
 
@@ -55,10 +56,10 @@ const desktopItems = [
 const barStartItems = [
   { ...navItems.home, tabletOnly: false },
   { ...navItems.classrooms, tabletOnly: false },
-  { ...navItems.report, tabletOnly: true },
+  { ...navItems.lessons, tabletOnly: true },
 ];
 const barEndItems = [
-  { ...navItems.lessons, tabletOnly: false },
+  { ...navItems.report, tabletOnly: false },
   { ...navItems.hub, tabletOnly: true },
   { ...navItems.profile, tabletOnly: false },
 ];
@@ -97,8 +98,12 @@ export default function StudentBottomNav() {
   const desktopSidebar = (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col bg-violet-800 px-4 py-5 text-white shadow-xl lg:flex">
       <Link to="/student/dashboard" className="mb-8 px-2">
-        <span className="block text-2xl font-black leading-none tracking-tight">LEO</span>
-        <span className="mt-1 block text-xs font-semibold text-violet-100">Student Portal</span>
+        <img
+          src={projectImageUrl("logo-wordmark-light.svg")}
+          alt="LEO - Learn English Online"
+          className="h-auto w-40"
+        />
+        <span className="mt-2 block text-xs font-semibold text-violet-100">Student Portal</span>
       </Link>
 
       <nav className="flex flex-1 flex-col gap-2">

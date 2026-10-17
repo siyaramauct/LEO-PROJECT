@@ -36,52 +36,21 @@ import ConfirmDialog from "../Components/ConfirmDialog";
 import StatCard from "../Components/StatCard";
 import { MAX_FLASHCARD_IMAGE_BYTES } from "../config/limits";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { errorMessage } from "../data/errors";
+import type { LessonFlashcard } from "../data/flashcards";
+import type { TeacherLesson } from "../data/lessons";
+import type { Quiz } from "../data/quizzes";
+import {
+  addLessonDocument,
+  removeFlashcard,
+  removeLessonDocument,
+  saveFlashcardEdit,
+  type LessonDocument,
+} from "../services/lessonAuthoringService";
+import { getTeacherLessonReport, type LessonStudentResult } from "../services/reportService";
 import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------
-
-type ClassroomRow = { classroom_id: string; classroom_name: string; teacher_id: string };
-
-type LessonRow = {
-  lesson_id: string;
-  title: string;
-  description: string | null;
-  lesson_image_path: string | null;
-};
-
-type McqRow = { mcq_id: string; title: string | null; score_ceiling: number | null };
-
-type FlashcardRow = {
-  flashcard_id: string;
-  word: string;
-  definition: string;
-  image_path: string | null;
-};
-type LessonDocument = {
-  resource_id: string;
-  resource_url: string;
-  uploaded_date: string;
-  signedUrl: string;
-};
-
-type StudentProfile = {
-  id: string;
-  name: string | null;
-  surname: string | null;
-  username: string | null;
-};
-
-type AttemptRow = { student_id: string; score: number | null; completed_at: string | null };
-
-type StudentResult = {
-  id: string;
-  name: string;
-  attempted: boolean;
-  score: number | null;
-  scorePercent: number | null;
-  completedAt: string | null;
-};
 
 // -- Small building blocks ----------------------------------------------------
 
@@ -120,13 +89,13 @@ export default function TeacherLessonReport() {
   const { classroomId, lessonId } = useParams<{ classroomId: string; lessonId: string }>();
   const teacherId = session?.user?.id;
 
-  const [classroom, setClassroom] = useState<ClassroomRow | null>(null);
-  const [lesson, setLesson] = useState<LessonRow | null>(null);
-  const [flashcards, setFlashcards] = useState<FlashcardRow[]>([]);
-  const [mcq, setMcq] = useState<McqRow | null>(null);
+  const [classroom, setClassroom] = useState<{ classroom_name: string } | null>(null);
+  const [lesson, setLesson] = useState<TeacherLesson | null>(null);
+  const [flashcards, setFlashcards] = useState<LessonFlashcard[]>([]);
+  const [mcq, setMcq] = useState<Quiz | null>(null);
   // Only true when the quiz lookup succeeded and found no quiz.
   const [isFlashcardsOnly, setIsFlashcardsOnly] = useState(false);
-  const [results, setResults] = useState<StudentResult[]>([]);
+  const [results, setResults] = useState<LessonStudentResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -139,7 +108,7 @@ export default function TeacherLessonReport() {
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isSavingCard, setIsSavingCard] = useState(false);
   const [cardError, setCardError] = useState("");
-  const [cardToDelete, setCardToDelete] = useState<FlashcardRow | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<LessonFlashcard | null>(null);
   const [isDeletingCard, setIsDeletingCard] = useState(false);
   // Lesson documents.
   const [documents, setDocuments] = useState<LessonDocument[]>([]);
@@ -147,12 +116,9 @@ export default function TeacherLessonReport() {
   const [documentError, setDocumentError] = useState("");
 
   // -- Load the lesson --
-  //
-  // 1. In parallel: the classroom (checked to belong to this teacher), the
-  //    lesson, enrolments, flashcards and documents. Documents get signed
-  //    links that last an hour.
-  // 2. Student profiles and the lesson's quiz.
-  // 3. Completed attempts, reduced to each student's latest one.
+  // reportService loads the classroom (checked to belong to this teacher), the
+  // lesson, its flashcards and documents, its quiz, and each student's latest
+  // attempt.
   useEffect(() => {
     if (!classroomId || !lessonId || !teacherId) return;
 
@@ -160,146 +126,23 @@ export default function TeacherLessonReport() {
       setIsLoading(true);
       setError("");
 
-      const [classroomResult, lessonResult, enrollmentResult, flashcardsResult, documentsResult] =
-        await Promise.all([
-          supabase
-            .from("classrooms")
-            .select("classroom_id, classroom_name, teacher_id")
-            .eq("classroom_id", classroomId)
-            .single(),
-          supabase
-            .from("lessons")
-            .select("lesson_id, title, description, lesson_image_path")
-            .eq("lesson_id", lessonId)
-            .eq("classroom_id", classroomId)
-            .single(),
-          supabase.from("classroom_students").select("student_id").eq("classroom_id", classroomId),
-          supabase
-            .from("flashcards")
-            .select("flashcard_id, word, definition, image_path")
-            .eq("lesson_id", lessonId)
-            .order("created_at"),
-          supabase
-            .from("learning_resources")
-            .select("resource_id, resource_url, uploaded_date")
-            .eq("lesson_id", lessonId)
-            .eq("resource_type", "document")
-            .order("uploaded_date", { ascending: false }),
-        ]);
+      try {
+        const report = await getTeacherLessonReport(teacherId, classroomId, lessonId);
 
-      if (
-        classroomResult.error ||
-        !classroomResult.data ||
-        classroomResult.data.teacher_id !== teacherId
-      ) {
-        setError("This classroom could not be found.");
+        setClassroom({ classroom_name: report.classroomName });
+        setLesson(report.lesson);
+        setFlashcards(report.flashcards);
+        setDocuments(report.documents);
+        setDocumentError(report.documentsError ?? "");
+        setMcq(report.quiz);
+        setIsFlashcardsOnly(report.isFlashcardsOnly);
+        setResults(report.results);
+      } catch (loadError) {
+        console.error("Failed to load lesson report:", loadError);
+        setError(errorMessage(loadError, "This lesson could not be loaded right now."));
+      } finally {
         setIsLoading(false);
-        return;
       }
-      if (lessonResult.error || !lessonResult.data) {
-        setError("This lesson could not be found.");
-        setIsLoading(false);
-        return;
-      }
-
-      setClassroom(classroomResult.data as ClassroomRow);
-      setLesson(lessonResult.data as LessonRow);
-      setFlashcards((flashcardsResult.data ?? []) as FlashcardRow[]);
-      if (documentsResult.error) {
-        setDocumentError(documentsResult.error.message);
-      } else {
-        const signedDocuments = await Promise.all(
-          (documentsResult.data ?? []).map(async (document) => {
-            const { data: signedData, error: signedError } = await supabase.storage
-              .from("documents")
-              .createSignedUrl(document.resource_url, 60 * 60);
-            if (signedError) console.error("Could not sign lesson document:", signedError);
-            return { ...document, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument;
-          }),
-        );
-        setDocuments(signedDocuments);
-      }
-
-      const studentIds = (enrollmentResult.data ?? []).map((row) => row.student_id as string);
-
-      const [profilesResult, mcqResult] = await Promise.all([
-        studentIds.length
-          ? supabase.from("profiles").select("id, name, surname, username").in("id", studentIds)
-          : Promise.resolve({ data: [] as StudentProfile[], error: null }),
-        supabase
-          .from("mcqs")
-          .select("mcq_id, title, score_ceiling")
-          .eq("lesson_id", lessonId)
-          .maybeSingle(),
-      ]);
-
-      const profiles = (profilesResult.data ?? []) as StudentProfile[];
-      const mcqData = (mcqResult.data ?? null) as McqRow | null;
-      setMcq(mcqData);
-      setIsFlashcardsOnly(!mcqResult.error && !mcqData);
-
-      let attempts: AttemptRow[] = [];
-      if (studentIds.length) {
-        const { data: attemptData, error: attemptError } = await supabase
-          .from("lesson_attempts")
-          .select("student_id, score, completed_at")
-          .eq("lesson_id", lessonId)
-          .in("student_id", studentIds)
-          .not("completed_at", "is", null);
-        if (attemptError) {
-          setError(attemptError.message);
-        } else {
-          attempts = (attemptData ?? []) as AttemptRow[];
-        }
-      }
-
-      // A student may have retaken the quiz; keep only their latest attempt.
-      const latestByStudent: Record<string, AttemptRow> = {};
-      for (const attempt of attempts) {
-        const existing = latestByStudent[attempt.student_id];
-        if (!existing || (attempt.completed_at ?? "") > (existing.completed_at ?? "")) {
-          latestByStudent[attempt.student_id] = attempt;
-        }
-      }
-
-      const ceiling = mcqData?.score_ceiling ?? null;
-
-      const studentResults: StudentResult[] = profiles.map((profile) => {
-        const attempt = latestByStudent[profile.id];
-        const name =
-          `${profile.name ?? ""} ${profile.surname ?? ""}`.trim() || profile.username || "Student";
-        if (!attempt) {
-          return {
-            id: profile.id,
-            name,
-            attempted: false,
-            score: null,
-            scorePercent: null,
-            completedAt: null,
-          };
-        }
-        const scorePercent =
-          ceiling && ceiling > 0 && attempt.score !== null
-            ? Math.round((Number(attempt.score) / ceiling) * 100)
-            : null;
-        return {
-          id: profile.id,
-          name,
-          attempted: true,
-          score: attempt.score,
-          scorePercent,
-          completedAt: attempt.completed_at,
-        };
-      });
-
-      // Students who attempted come first, highest score first.
-      studentResults.sort((a, b) => {
-        if (a.attempted !== b.attempted) return a.attempted ? -1 : 1;
-        return (b.scorePercent ?? b.score ?? 0) - (a.scorePercent ?? a.score ?? 0);
-      });
-
-      setResults(studentResults);
-      setIsLoading(false);
     };
 
     void load();
@@ -325,7 +168,7 @@ export default function TeacherLessonReport() {
   // -- Flashcard editing --
 
   // Copies the card's current values into the edit form.
-  function startEditingCard(card: FlashcardRow) {
+  function startEditingCard(card: LessonFlashcard) {
     setCardError("");
     setEditingCardId(card.flashcard_id);
     setEditWord(card.word);
@@ -358,159 +201,109 @@ export default function TeacherLessonReport() {
     setRemoveExistingImage(false);
   }
 
-  // Saves the edit in three steps:
-  //   1. upload a new image, if one was chosen
-  //   2. update the flashcard row
-  //   3. remove the old image from storage once nothing points to it
+  // lessonService uploads a new picture if one was chosen, saves the card, then
+  // removes the old picture once nothing points to it.
   async function saveEditingCard() {
-    if (!editingCardId || isSavingCard) return;
+    if (!editingCardId || isSavingCard || !lessonId) return;
+
     const word = editWord.trim();
     const definition = editDefinition.trim();
+    const currentCard = flashcards.find((card) => card.flashcard_id === editingCardId);
+
     if (!word || !definition) {
       setCardError("A flashcard needs both a word and a definition.");
       return;
     }
+
+    if (!currentCard) return;
+
     setIsSavingCard(true);
     setCardError("");
-    const currentCard = flashcards.find((card) => card.flashcard_id === editingCardId);
-    let imagePath = removeExistingImage ? null : (currentCard?.image_path ?? null);
-    if (editImageFile && lessonId) {
-      const safeName = editImageFile.name.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
-      imagePath = `flashcards/${lessonId}/${editingCardId}-${crypto.randomUUID()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("images")
-        .upload(imagePath, editImageFile, {
-          contentType: editImageFile.type,
-          upsert: false,
-        });
-      if (uploadError) {
-        setIsSavingCard(false);
-        setCardError(uploadError.message);
-        return;
-      }
+
+    try {
+      const imagePath = await saveFlashcardEdit({
+        lessonId,
+        card: currentCard,
+        word,
+        definition,
+        newImage: editImageFile,
+        removeImage: removeExistingImage,
+      });
+
+      setFlashcards((cards) =>
+        cards.map((card) =>
+          card.flashcard_id === editingCardId
+            ? { ...card, word, definition, image_path: imagePath }
+            : card,
+        ),
+      );
+      cancelEditingCard();
+    } catch (saveError) {
+      setCardError(errorMessage(saveError, "The flashcard could not be saved."));
+    } finally {
+      setIsSavingCard(false);
     }
-    const { error: updateError } = await supabase
-      .from("flashcards")
-      .update({ word, definition, image_path: imagePath })
-      .eq("flashcard_id", editingCardId);
-    setIsSavingCard(false);
-    if (updateError) {
-      setCardError(updateError.message);
-      return;
-    }
-    if (currentCard?.image_path && currentCard.image_path !== imagePath) {
-      const { error: removeError } = await supabase.storage
-        .from("images")
-        .remove([currentCard.image_path]);
-      if (removeError) console.error("Could not remove the replaced flashcard image:", removeError);
-    }
-    setFlashcards((cards) =>
-      cards.map((card) =>
-        card.flashcard_id === editingCardId
-          ? { ...card, word, definition, image_path: imagePath }
-          : card,
-      ),
-    );
-    cancelEditingCard();
   }
 
-  // Runs after the teacher confirms. Deletes the card, then its image.
+  // Runs after the teacher confirms. Deletes the card, then its picture.
   async function deleteFlashcard() {
     if (!cardToDelete || isDeletingCard) return;
     setIsDeletingCard(true);
-    const { error: deleteError } = await supabase
-      .from("flashcards")
-      .delete()
-      .eq("flashcard_id", cardToDelete.flashcard_id);
-    setIsDeletingCard(false);
-    if (deleteError) {
-      setCardError(deleteError.message);
+
+    try {
+      await removeFlashcard(cardToDelete);
+
+      setFlashcards((cards) =>
+        cards.filter((card) => card.flashcard_id !== cardToDelete.flashcard_id),
+      );
+    } catch (deleteError) {
+      setCardError(errorMessage(deleteError, "The flashcard could not be deleted."));
+    } finally {
       setCardToDelete(null);
-      return;
+      setIsDeletingCard(false);
     }
-    if (cardToDelete.image_path) {
-      const { error: imageDeleteError } = await supabase.storage
-        .from("images")
-        .remove([cardToDelete.image_path]);
-      if (imageDeleteError) {
-        console.error("Could not remove the deleted flashcard image:", imageDeleteError);
-      }
-    }
-    setFlashcards((cards) =>
-      cards.filter((card) => card.flashcard_id !== cardToDelete.flashcard_id),
-    );
-    setCardToDelete(null);
   }
 
   // -- Lesson documents --
 
-  // Uploads a PDF to lesson_documents/<classroom>/<lesson>/ and records it.
-  // If recording fails, the uploaded file is removed again.
   async function uploadLessonDocument(file: File) {
     if (!classroomId || !lessonId || isSavingDocument) return;
+
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setDocumentError("Please choose a PDF document.");
       return;
     }
+
     setIsSavingDocument(true);
     setDocumentError("");
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const storagePath = `lesson_documents/${classroomId}/${lessonId}/${crypto.randomUUID()}-${safeName}`;
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(storagePath, file, {
-        contentType: "application/pdf",
-        upsert: false,
-      });
-    if (uploadError) {
-      setDocumentError(uploadError.message);
+
+    try {
+      const document = await addLessonDocument({ classroomId, lessonId, file });
+
+      if (!document.signedUrl) {
+        setDocumentError("The document was uploaded but its preview link could not be created.");
+      }
+
+      setDocuments((current) => [document, ...current]);
+    } catch (uploadError) {
+      setDocumentError(errorMessage(uploadError, "The lesson document could not be saved."));
+    } finally {
       setIsSavingDocument(false);
-      return;
     }
-    const { data, error: insertError } = await supabase
-      .from("learning_resources")
-      .insert({
-        classroom_id: classroomId,
-        lesson_id: lessonId,
-        resource_type: "document",
-        resource_url: storagePath,
-      })
-      .select("resource_id, resource_url, uploaded_date")
-      .single();
-    if (insertError || !data) {
-      await supabase.storage.from("documents").remove([storagePath]);
-      setDocumentError(insertError?.message ?? "The lesson document could not be saved.");
-      setIsSavingDocument(false);
-      return;
-    }
-    const { data: signedData, error: signedError } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(storagePath, 60 * 60);
-    if (signedError) {
-      setDocumentError("The document was uploaded but its preview link could not be created.");
-    }
-    setDocuments((current) => [
-      { ...data, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument,
-      ...current,
-    ]);
-    setIsSavingDocument(false);
   }
 
   async function deleteLessonDocument(document: LessonDocument) {
     setDocumentError("");
-    const { error: deleteError } = await supabase
-      .from("learning_resources")
-      .delete()
-      .eq("resource_id", document.resource_id);
-    if (deleteError) {
-      setDocumentError(deleteError.message);
-      return;
+
+    try {
+      await removeLessonDocument(document);
+
+      setDocuments((current) =>
+        current.filter((item) => item.resource_id !== document.resource_id),
+      );
+    } catch (deleteError) {
+      setDocumentError(errorMessage(deleteError, "The document could not be deleted."));
     }
-    const { error: storageError } = await supabase.storage
-      .from("documents")
-      .remove([document.resource_url]);
-    if (storageError) console.error("Could not remove lesson document from Storage:", storageError);
-    setDocuments((current) => current.filter((item) => item.resource_id !== document.resource_id));
   }
 
   const coverUrl = bucketImageUrlOrBroken(lesson?.lesson_image_path);

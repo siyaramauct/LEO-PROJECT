@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // Teacher Sidebar
 //
-// The violet navigation column on the left of every teacher page on desktop
+// The deep violet navigation column on the left of every teacher page on desktop
 // (1024px and up). Pages render it inside their desktop layout and say which
 // entry to highlight. Phones and tablets use TeacherBottomNav instead.
 //
@@ -9,6 +9,7 @@
 // -----------------------------------------------------------------------------
 
 import { BarChart3, Home, Settings, Sparkles, Users } from "lucide-react";
+import { projectImageUrl } from "../utils/images";
 import SidebarItem from "./SidebarItem";
 
 // Which navigation entry is highlighted. Shared with TeacherBottomNav.
@@ -16,10 +17,14 @@ export type TeacherNavKey = "dashboard" | "classes" | "explore" | "reports" | "p
 
 export default function TeacherSidebar({ active }: { active?: TeacherNavKey }) {
   return (
-    <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-700 px-4 py-6 text-white xl:w-64 xl:px-5">
+    <aside className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col bg-violet-950 px-4 py-6 text-white xl:w-64 xl:px-5">
       <div className="mb-10 px-2">
-        <p className="text-2xl font-bold tracking-tight">LEO</p>
-        <p className="text-xs text-violet-200">Teacher Portal</p>
+        <img
+          src={projectImageUrl("logo-wordmark-light.svg")}
+          alt="LEO - Learn English Online"
+          className="h-auto w-40 xl:w-44"
+        />
+        <p className="mt-2 text-xs text-violet-200">Teacher Portal</p>
       </div>
 
       <nav className="space-y-2">

@@ -15,7 +15,7 @@ import ProfileContent from "../Components/ProfileContent";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { deleteAccount } from "../services/accountService";
 
 export default function TeacherProfile() {
   const { session, profile, logout } = useAuth();
@@ -33,14 +33,12 @@ export default function TeacherProfile() {
     }
   }
 
-  // Deletes the profile row, then signs out.
+  // accountService deletes the profile row, then signs out.
   async function handleDeleteAccount() {
     if (!session?.user) return;
     setDeletingAccount(true);
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", session.user.id);
-      if (error) throw error;
-      await logout();
+      await deleteAccount(session.user.id);
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Failed to delete account:", error);

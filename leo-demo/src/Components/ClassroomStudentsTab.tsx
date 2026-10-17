@@ -17,7 +17,7 @@ import { Link } from "react-router-dom";
 import ClassroomMetric from "./ClassroomMetric";
 import SearchSortBar from "./SearchSortBar";
 import type { StudentProfile } from "./ClassroomInvitePanel";
-import { supabase } from "../supabase-client";
+import { getRosterStats, type RosterStats } from "../services/reportService";
 import { daysBetween } from "../utils/activityCalendar";
 import { toDateKey } from "../utils/releaseDate";
 import {
@@ -37,11 +37,7 @@ type ClassroomStudentsTabProps = {
   onRemove: (student: StudentProfile) => void;
 };
 
-type StudentStats = {
-  completedLessons: number;
-  averagePercent: number | null;
-  lastActive: string | null;
-};
+type StudentStats = RosterStats;
 
 // How far back "last active" looks.
 const ACTIVITY_WINDOW_DAYS = 30;
@@ -110,10 +106,9 @@ export default function ClassroomStudentsTab({
   const [studentSort, setStudentSort] = useState<StudentSort>("name-asc");
 
   // -- Load statistics --
-  //
-  // One round of three queries for the whole roster: quiz ceilings per lesson,
-  // completed attempts, and recent activity days. Results are combined per
-  // student into lessons completed, average best score and last active day.
+  // reportService works out, per student: lessons completed, average best
+  // score and last active day. Any part that fails is reported, and the rest
+  // still shows.
   useEffect(() => {
     let cancelled = false; // Ignore a slow response after the roster changed.
     const studentIds = studentKey ? studentKey.split(",") : [];
@@ -122,90 +117,24 @@ export default function ClassroomStudentsTab({
     const load = async () => {
       setIsLoadingStats(true);
       setStatsError(null);
-      if (!studentIds.length) {
+
+      if (studentIds.length === 0) {
         setStats({});
         setIsLoadingStats(false);
         return;
       }
 
-      const [mcqResult, attemptResult, activityResult] = await Promise.all([
-        classLessonIds.length
-          ? supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", classLessonIds)
-          : Promise.resolve({ data: [], error: null }),
-        classLessonIds.length
-          ? supabase
-              .from("lesson_attempts")
-              .select("student_id, lesson_id, score")
-              .in("lesson_id", classLessonIds)
-              .in("student_id", studentIds)
-              .not("completed_at", "is", null)
-          : Promise.resolve({ data: [], error: null }),
-        supabase
-          .from("student_activity")
-          .select("student_id, activity_date")
-          .in("student_id", studentIds)
-          .gte("activity_date", localDate(ACTIVITY_WINDOW_DAYS)),
-      ]);
+      const result = await getRosterStats(
+        studentIds,
+        classLessonIds,
+        localDate(ACTIVITY_WINDOW_DAYS),
+      );
+
       if (cancelled) return;
 
-      const error = mcqResult.error ?? attemptResult.error ?? activityResult.error;
-      if (error) setStatsError(`Some statistics could not be loaded: ${error.message}`);
-
-      const ceilings = new Map(
-        (mcqResult.data ?? []).map((mcq) => [
-          mcq.lesson_id as string,
-          mcq.score_ceiling as number | null,
-        ]),
-      );
-      setQuizLessonCount(mcqResult.error ? null : ceilings.size);
-      // Best percentage per student per lesson, so retakes never lower the average.
-      const bestPercent = new Map<string, Map<string, number | null>>();
-      for (const attempt of attemptResult.data ?? []) {
-        // Skip unscored attempts from flashcards-only lessons.
-        if (!mcqResult.error && !ceilings.has(attempt.lesson_id)) continue;
-        const ceiling = ceilings.get(attempt.lesson_id);
-        const percent =
-          ceiling && attempt.score !== null
-            ? Math.round((Number(attempt.score) / ceiling) * 100)
-            : null;
-        const lessons = bestPercent.get(attempt.student_id) ?? new Map<string, number | null>();
-        const previous = lessons.get(attempt.lesson_id);
-        lessons.set(
-          attempt.lesson_id,
-          previous == null ? percent : percent == null ? previous : Math.max(previous, percent),
-        );
-        bestPercent.set(attempt.student_id, lessons);
-      }
-
-      // Most recent activity day per student.
-      const lastActive = new Map<string, string>();
-      for (const row of activityResult.data ?? []) {
-        const current = lastActive.get(row.student_id);
-        if (!current || row.activity_date > current) {
-          lastActive.set(row.student_id, row.activity_date);
-        }
-      }
-
-      setStats(
-        Object.fromEntries(
-          studentIds.map((id) => {
-            const lessons = bestPercent.get(id) ?? new Map<string, number | null>();
-            const percents = [...lessons.values()].filter(
-              (value): value is number => value !== null,
-            );
-            return [
-              id,
-              {
-                completedLessons: lessons.size,
-                averagePercent: percents.length
-                  ? Math.round(percents.reduce((sum, value) => sum + value, 0) / percents.length)
-                  : null,
-                lastActive: lastActive.get(id) ?? null,
-              },
-            ];
-          }),
-        ),
-      );
+      setStats(result.stats);
+      setQuizLessonCount(result.quizLessonCount);
+      setStatsError(result.errorMessage);
       setIsLoadingStats(false);
     };
 

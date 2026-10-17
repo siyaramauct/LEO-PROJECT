@@ -15,14 +15,12 @@ import { ArrowLeft, CheckCircle2, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import { supabase } from "../supabase-client";
+import { errorMessage } from "../data/errors";
+import { getFlashcards, type LessonFlashcard } from "../data/flashcards";
 import { bucketImageUrl } from "../utils/images";
 
-type MatchCard = {
-  flashcard_id: string;
-  word: string;
-  image_path: string;
-};
+// A flashcard that has a picture.
+type MatchCard = LessonFlashcard & { image_path: string };
 
 // Returns a shuffled copy using the Fisher-Yates method: walk backwards
 // through the list, swapping each item with a random one at or before it.
@@ -52,16 +50,16 @@ export default function ImageMatchActivity() {
     if (!lessonId) return;
     const loadCards = async () => {
       setIsLoading(true);
-      const { data, error: loadError } = await supabase
-        .from("flashcards")
-        .select("flashcard_id, word, image_path")
-        .eq("lesson_id", lessonId)
-        .not("image_path", "is", null)
-        .order("created_at");
 
-      if (loadError) setError(loadError.message);
-      else setCards((data ?? []).filter((card): card is MatchCard => Boolean(card.image_path)));
-      setIsLoading(false);
+      try {
+        const imageCards = await getFlashcards(lessonId, { imagesOnly: true });
+        setCards(imageCards.filter((card): card is MatchCard => card.image_path !== null));
+      } catch (loadError) {
+        console.error("Failed to load matching cards:", loadError);
+        setError(errorMessage(loadError, "The matching game could not be loaded right now."));
+      } finally {
+        setIsLoading(false);
+      }
     };
     void loadCards();
   }, [lessonId]);

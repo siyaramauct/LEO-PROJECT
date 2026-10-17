@@ -23,24 +23,18 @@ import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
 import UserIdentity from "../Components/UserIdentity";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import {
+  deleteClassroom,
+  getTeacherClassroomsWithCounts,
+  type ClassroomWithCounts,
+} from "../data/classrooms";
+import { errorMessage } from "../data/errors";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
 // -- Data ---------------------------------------------------------------------
 
-type ClassroomRow = {
-  classroom_id: string;
-  classroom_name: string;
-  description: string | null;
-  cover_image_path: string | null;
-  created_date: Date | null;
-  // Counts embedded by the query below, returned as [{ count: 3 }].
-  lessons?: { count: number }[] | null;
-  classroom_students?: { count: number }[] | null;
-};
-
-const formatCreatedDate = (createdAt: Date | null) => {
+const formatCreatedDate = (createdAt: string | null) => {
   if (!createdAt) return "recently";
   return new Intl.DateTimeFormat("en-ZA", {
     day: "numeric",
@@ -50,13 +44,13 @@ const formatCreatedDate = (createdAt: Date | null) => {
 };
 
 // Turns a database row into what the classroom cards display.
-const toClassroom = (classroom: ClassroomRow): Classroom => {
+const toClassroom = (classroom: ClassroomWithCounts): Classroom => {
   return {
     id: classroom.classroom_id,
     name: classroom.classroom_name,
     description: classroom.description ?? "No description has been added yet.",
-    studentCount: classroom.classroom_students?.[0]?.count ?? 0,
-    lessonCount: classroom.lessons?.[0]?.count ?? 0,
+    studentCount: classroom.studentCount,
+    lessonCount: classroom.lessonCount,
     createdDate: formatCreatedDate(classroom.created_date),
     createdTime: toTime(classroom.created_date),
     image: bucketImageUrlOrBroken(classroom.cover_image_path),
@@ -135,29 +129,19 @@ export default function TeacherClassrooms() {
     const loadClassrooms = async () => {
       setIsLoading(true);
       setLoadError(null);
-      const { data, error } = await supabase
-        .from("classrooms")
-        .select(
-          `
-          classroom_id,
-          classroom_name,
-          description,
-          cover_image_path,
-          created_date,
-          lessons(count),
-          classroom_students(count)
-        `,
-        )
-        .eq("teacher_id", session.user.id)
-        .order("classroom_name", { ascending: true });
 
-      if (error) {
-        setLoadError("We could not load your classrooms. Please try again.");
+      try {
+        const teacherClassrooms = await getTeacherClassroomsWithCounts(session.user.id);
+        setClassrooms(teacherClassrooms.map(toClassroom));
+      } catch (loadError) {
+        console.error("Failed to load classrooms:", loadError);
+        setLoadError(
+          errorMessage(loadError, "We could not load your classrooms. Please try again."),
+        );
         setClassrooms([]);
-      } else {
-        setClassrooms((data as ClassroomRow[]).map(toClassroom));
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     void loadClassrooms();
@@ -166,28 +150,25 @@ export default function TeacherClassrooms() {
   const totalStudents = classrooms.reduce((total, classroom) => total + classroom.studentCount, 0);
 
   // Runs after the teacher confirms in the dialog.
-  async function deleteClassroom() {
+  async function handleDeleteClassroom() {
     if (!classroomToDelete || !session?.user || isDeletingClassroom) return;
-
     setIsDeletingClassroom(true);
-    const { error } = await supabase
-      .from("classrooms")
-      .delete()
-      .eq("classroom_id", classroomToDelete.id)
-      .eq("teacher_id", session.user.id);
 
-    if (error) {
-      console.error("Failed to delete classroom:", error);
+    try {
+      await deleteClassroom(session.user.id, classroomToDelete.id);
+
+      setClassrooms((currentClassrooms) =>
+        currentClassrooms.filter((classroom) => classroom.id !== classroomToDelete.id),
+      );
+      setClassroomToDelete(null);
+    } catch (deleteError) {
+      console.error("Failed to delete classroom:", deleteError);
+      window.alert(
+        errorMessage(deleteError, "The classroom could not be deleted. Please try again."),
+      );
+    } finally {
       setIsDeletingClassroom(false);
-      window.alert("The classroom could not be deleted. Please try again.");
-      return;
     }
-
-    setClassrooms((currentClassrooms) =>
-      currentClassrooms.filter((classroom) => classroom.id !== classroomToDelete.id),
-    );
-    setClassroomToDelete(null);
-    setIsDeletingClassroom(false);
   }
 
   return (
@@ -384,7 +365,7 @@ export default function TeacherClassrooms() {
         open={Boolean(classroomToDelete)}
         isDeleting={isDeletingClassroom}
         onCancel={() => setClassroomToDelete(null)}
-        onConfirm={() => void deleteClassroom()}
+        onConfirm={() => void handleDeleteClassroom()}
         title={`Delete ${classroomToDelete?.name ?? "this classroom"}?`}
         description="This will permanently remove this classroom, its lessons, and its student links. This action cannot be undone."
         confirmLabel="Delete classroom"

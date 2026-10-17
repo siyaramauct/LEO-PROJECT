@@ -14,7 +14,7 @@
 import { LockKeyhole, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { updatePassword } from "../data/auth";
 
 type Props = { onClose: () => void };
 
@@ -47,22 +47,23 @@ export default function ChangePasswordDialog({ onClose }: Props) {
       return;
     }
 
-    // Supabase checks current_password before applying the change.
+    // Supabase checks the current password before applying the change.
     setIsSaving(true);
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-      current_password: currentPassword,
-    });
-    setIsSaving(false);
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
 
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSuccess(true);
+    try {
+      await updatePassword(newPassword, currentPassword);
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setSuccess(true);
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error ? updateError.message : "Your password could not be changed.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (

@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // Classroom Report
 //
-// The full progress report for one classroom, built by utils/classReport.ts:
+// The full progress report for one classroom, built by services/reportService.ts:
 //   Summary      class size, class average, completion, weekly activity and
 //                how many students need attention
 //   Check-ins    students flagged for low scores, inactivity or falling behind
@@ -33,12 +33,14 @@ import {
   MASTERY_PERCENT,
   SUPPORT_PERCENT,
   inactiveLabel,
-  loadClassReports,
   scoreBand,
+} from "../domain/progress";
+import {
+  getClassReports,
   type ClassReport,
   type LessonReport,
   type StudentReport,
-} from "../utils/classReport";
+} from "../services/reportService";
 import { compareNullableNumbers } from "../utils/listControls";
 
 // -- Sorting and display helpers ----------------------------------------------
@@ -183,7 +185,7 @@ export default function ClassroomReport() {
   useEffect(() => {
     if (!teacherId || !classroomId) return;
     let isCurrent = true;
-    loadClassReports(teacherId, classroomId)
+    getClassReports(teacherId, classroomId)
       .then((reports) => {
         if (isCurrent) setReport(reports[0] ?? null);
       })

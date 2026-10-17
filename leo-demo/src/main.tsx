@@ -41,6 +41,7 @@ import StudentFlashcards from "./Pages/StudentFlashcards";
 import StudentLearningHub from "./Pages/StudentLearningHub";
 import StudentLearningReport from "./Pages/StudentLearningReport";
 import StudentPractice from "./Pages/StudentPractice";
+import StudentReportPicker from "./Pages/StudentReportPicker";
 import StudentProfile from "./Pages/StudentProfile";
 
 // Teacher pages
@@ -83,7 +84,8 @@ const router = createBrowserRouter([
       { path: "/student/practice", element: <StudentPractice /> },
       { path: "/student/classrooms", element: <StudentClassrooms /> },
       { path: "/student/classrooms/:classroomId", element: <StudentClassroomDetail /> },
-      { path: "/student/report", element: <StudentLearningReport /> },
+      { path: "/student/report", element: <StudentReportPicker /> },
+      { path: "/student/report/:classroomId", element: <StudentLearningReport /> },
       { path: "/student/flashcards", element: <StudentFlashcards /> },
       { path: "/student/hub", element: <StudentLearningHub /> },
       { path: "/student/profile", element: <StudentProfile /> },

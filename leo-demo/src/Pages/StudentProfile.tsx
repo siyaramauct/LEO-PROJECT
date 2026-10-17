@@ -13,7 +13,8 @@ import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import ProfileContent from "../Components/ProfileContent";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { getStudentAccount } from "../data/profiles";
+import { deleteAccount } from "../services/accountService";
 
 type StudentProfileRow = { name: string | null; surname: string | null; username: string | null };
 
@@ -28,13 +29,16 @@ export default function StudentProfile() {
     if (!session?.user) return;
     let isCurrent = true;
 
+    // Best effort: until it loads, the page falls back to the sign-up name.
     const loadProfile = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("name, surname, username")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      if (isCurrent) setStudentProfile(data);
+      const account = await getStudentAccount(session.user.id).catch((profileError) => {
+        console.error("Could not load profile:", profileError);
+        return null;
+      });
+
+      if (isCurrent) {
+        setStudentProfile(account);
+      }
     };
 
     void loadProfile();
@@ -53,14 +57,12 @@ export default function StudentProfile() {
     }
   }
 
-  // Deletes the profile row, then signs out.
+  // accountService deletes the profile row, then signs out.
   async function handleDeleteAccount() {
     if (!session?.user) return;
     setDeletingAccount(true);
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", session.user.id);
-      if (error) throw error;
-      await logout();
+      await deleteAccount(session.user.id);
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Failed to delete account:", error);

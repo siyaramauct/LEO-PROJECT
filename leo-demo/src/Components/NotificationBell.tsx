@@ -20,22 +20,24 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
-
-type NotificationRow = {
-  notification_id: number;
-  type: string;
-  title: string;
-  body: string | null;
-  link_url: string | null;
-  is_read: boolean;
-  created_at: string;
-};
+import {
+  countUnreadNotifications,
+  getNotifications,
+  listenForNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationRow,
+} from "../data/notifications";
 
 const NOTIFICATION_LIMIT = 20;
 
 // Formats a timestamp as a short relative label, e.g. "5m ago", "3d ago".
-function formatRelativeTime(isoDate: string): string {
+// Returns "" when there is no timestamp.
+function formatRelativeTime(isoDate: string | null): string {
+  if (!isoDate) {
+    return "";
+  }
+
   const diffMs = Date.now() - new Date(isoDate).getTime();
   const diffMinutes = Math.round(diffMs / 60000);
   if (diffMinutes < 1) return "Just now";
@@ -60,38 +62,26 @@ export default function NotificationBell() {
   async function loadNotifications() {
     if (!userId) return;
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("notification_id, type, title, body, link_url, is_read, created_at")
-      .eq("recipient_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(NOTIFICATION_LIMIT);
 
-    if (error) {
-      console.error("Error loading notifications:", error);
+    try {
+      setNotifications(await getNotifications(userId, NOTIFICATION_LIMIT));
+    } catch (loadError) {
+      console.error("Error loading notifications:", loadError);
+    } finally {
       setIsLoading(false);
-      return;
     }
-    setNotifications((data ?? []) as NotificationRow[]);
-    setIsLoading(false);
   }
 
   useEffect(() => {
     if (!userId) return;
     let isCurrent = true;
 
-    supabase
-      .from("notifications")
-      .select("notification_id", { count: "exact", head: true })
-      .eq("recipient_id", userId)
-      .eq("is_read", false)
-      .then(({ count, error }) => {
-        if (!isCurrent) return;
-        if (error) {
-          console.error("Error loading unread notification count:", error);
-          return;
-        }
-        setUnreadCount(count ?? 0);
+    countUnreadNotifications(userId)
+      .then((count) => {
+        if (isCurrent) setUnreadCount(count);
+      })
+      .catch((countError) => {
+        console.error("Error loading unread notification count:", countError);
       });
 
     return () => {
@@ -99,31 +89,16 @@ export default function NotificationBell() {
     };
   }, [userId]);
 
-  // Bumps the unread badge instantly when a new notification is inserted for this user.
-  // Channel name includes a per-instance id: mobile/desktop headers both render a
-  // NotificationBell for the same user, and reusing one topic makes supabase-js hand
-  // back an already-subscribed channel, which throws when `.on()` is called again.
+  // Bumps the unread badge instantly when a new notification arrives for this
+  // user. The per-instance id keeps the phone and desktop bells on separate
+  // channels (see listenForNotifications).
   const instanceIdRef = useRef(crypto.randomUUID());
   useEffect(() => {
     if (!userId) return;
 
-    const channel = supabase
-      .channel(`notifications:${userId}:${instanceIdRef.current}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `recipient_id=eq.${userId}`,
-        },
-        () => setUnreadCount((count) => count + 1),
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    return listenForNotifications(userId, instanceIdRef.current, () =>
+      setUnreadCount((count) => count + 1),
+    );
   }, [userId]);
 
   // Closes the dropdown when clicking outside of it.
@@ -152,11 +127,7 @@ export default function NotificationBell() {
       );
       setUnreadCount((count) => Math.max(0, count - 1));
 
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("notification_id", notification.notification_id);
-      if (error) console.error("Error marking notification as read:", error);
+      await markNotificationRead(notification.notification_id);
     }
 
     setIsOpen(false);
@@ -168,12 +139,7 @@ export default function NotificationBell() {
     setNotifications((current) => current.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
 
-    const { error } = await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("recipient_id", userId)
-      .eq("is_read", false);
-    if (error) console.error("Error marking all notifications as read:", error);
+    await markAllNotificationsRead(userId);
   }
 
   return (

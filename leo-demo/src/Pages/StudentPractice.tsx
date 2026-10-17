@@ -14,7 +14,8 @@ import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { getReleasedLessons } from "../data/lessons";
+import { getEnrolledClassrooms } from "../services/classroomService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------
@@ -46,21 +47,15 @@ export default function StudentPractice() {
   // Loading until data has been fetched for the signed-in user.
   const isLoading = Boolean(session?.user && loadedUserId !== session.user.id);
 
-  // Enrolments, then classroom names, then released lessons.
+  // The student's classrooms (classroomService), then their released lessons.
 
   useEffect(() => {
     if (!session?.user) return;
 
     const loadLessons = async () => {
       try {
-        const { data: enrolments, error: enrolmentError } = await supabase
-          .from("classroom_students")
-          .select("classroom_id")
-          .eq("student_id", session.user.id);
-
-        if (enrolmentError) throw enrolmentError;
-
-        const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
+        const enrolledClassrooms = await getEnrolledClassrooms(session.user.id);
+        const classroomIds = enrolledClassrooms.map((classroom) => classroom.classroom_id);
 
         if (classroomIds.length === 0) {
           setLessons([]);
@@ -69,26 +64,9 @@ export default function StudentPractice() {
           return;
         }
 
-        const { data: classroomData, error: classroomError } = await supabase
-          .from("classrooms")
-          .select("classroom_id, classroom_name")
-          .in("classroom_id", classroomIds)
-          .order("classroom_name");
+        setClassrooms(enrolledClassrooms);
 
-        if (classroomError) throw classroomError;
-
-        setClassrooms(classroomData ?? []);
-
-        const { data: lessonData, error: lessonError } = await supabase
-          .from("lessons")
-          .select("lesson_id, classroom_id, title, description, lesson_image_path")
-          .in("classroom_id", classroomIds)
-          .lte("release_date", new Date().toISOString())
-          .order("title");
-
-        if (lessonError) throw lessonError;
-
-        setLessons(lessonData ?? []);
+        setLessons(await getReleasedLessons(classroomIds, { order: "title" }));
         setErrorMessage("");
       } catch (error) {
         console.error("Error loading student lessons:", error);

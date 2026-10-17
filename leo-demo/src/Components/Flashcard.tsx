@@ -25,7 +25,8 @@
 
 import { useState } from "react";
 import { LanguageIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
-import { supabase } from "../supabase-client";
+import type { Translation } from "../data/translations";
+import { translateFlashcard } from "../services/translationService";
 
 // -- Translation languages ----------------------------------------------------
 
@@ -37,21 +38,6 @@ const languageOptions: { code: LanguageCode; label: string; name: string }[] = [
   { code: "es", label: "ES", name: "Spanish" },
   { code: "pt", label: "PT", name: "Portuguese" },
 ];
-
-type Translation = { word: string; definition: string };
-
-// Gemini sometimes wraps its JSON in a code fence; strip that, then check both
-// fields came back before trusting the result.
-function parseTranslation(result: unknown): Translation {
-  const content = typeof result === "string" ? result : JSON.stringify(result);
-  const json = content.replace(/^```json\s*|^```|```$/g, "").trim();
-  const parsed = JSON.parse(json) as Translation;
-
-  if (!parsed.word?.trim() || !parsed.definition?.trim()) {
-    throw new Error("Gemini returned an incomplete translation.");
-  }
-  return parsed;
-}
 
 // -- Styles -------------------------------------------------------------------
 
@@ -100,54 +86,22 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
     }
 
     setIsTranslating(true);
+
     try {
-      // 1. Look for a translation another student already requested.
-      const { data: cached, error: cacheError } = await supabase
-        .from("flashcard_translations")
-        .select("translated_word, translated_definition")
-        .eq("flashcard_id", flashcardId)
-        .eq("language_code", language)
-        .maybeSingle();
-
-      if (cacheError) throw new Error(cacheError.message);
-
-      if (cached) {
-        const translation: Translation = {
-          word: cached.translated_word,
-          definition: cached.translated_definition,
-        };
-        setTranslations((current) => ({ ...current, [language]: translation }));
-        setActiveLanguage(language);
-        return;
-      }
-
-      // 2. Nothing cached: ask Gemini through the edge function.
+      // translationService uses a saved translation, or asks the AI and saves it.
       const languageName =
         languageOptions.find((option) => option.code === language)?.name ?? language;
-      const prompt = `Translate the following language-learning flashcard into ${languageName}. Return only valid JSON with no Markdown or code fences, using this exact schema: {"word":"string","definition":"string"}. Word: ${JSON.stringify(word)}. Definition: ${JSON.stringify(definition)}.`;
 
-      const { data, error: functionError } = await supabase.functions.invoke("gemini-API-Query", {
-        body: { prompt },
+      const translation = await translateFlashcard({
+        flashcardId,
+        word,
+        definition,
+        languageCode: language,
+        languageName,
       });
-      if (functionError) {
-        throw new Error(`Could not translate this flashcard: ${functionError.message}`);
-      }
 
-      const translation = parseTranslation(data?.result);
       setTranslations((current) => ({ ...current, [language]: translation }));
       setActiveLanguage(language);
-
-      // 3. Save it for everyone else. ignoreDuplicates keeps the first saved
-      //    translation if two students translate the same card at once.
-      await supabase.from("flashcard_translations").upsert(
-        {
-          flashcard_id: flashcardId,
-          language_code: language,
-          translated_word: translation.word,
-          translated_definition: translation.definition,
-        },
-        { onConflict: "flashcard_id,language_code", ignoreDuplicates: true },
-      );
     } catch (error) {
       setTranslationError(
         error instanceof Error ? error.message : "This flashcard could not be translated.",

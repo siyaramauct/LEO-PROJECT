@@ -31,19 +31,19 @@ import { MaterialSpine, MaterialTypeTag } from "../Components/MaterialTypeMarks"
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { getClassroom, type ClassroomSummary } from "../data/classrooms";
+import { isEnrolled } from "../data/enrolments";
+import { DataError, errorMessage } from "../data/errors";
+import { getReleasedLessons } from "../data/lessons";
+import { getClassroomMaterials, materialUrl, type Material } from "../data/materials";
+import { leaveClassroom, studentDisplayName } from "../services/classroomService";
+import { getLessonProgress } from "../services/lessonService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { materialTypeLabel } from "../utils/materialFileTypes";
-import { notifyUser } from "../utils/notifications";
 
 // -- Types --------------------------------------------------------------------
 
-type Classroom = {
-  classroom_id: string;
-  classroom_name: string;
-  description: string | null;
-  cover_image_path: string | null;
-};
+type Classroom = ClassroomSummary;
 type Lesson = {
   lesson_id: string;
   title: string;
@@ -55,23 +55,9 @@ type Lesson = {
   percentage: number | null;
   hasQuiz: boolean; // False for flashcards-only lessons, which have no score.
 };
-type Material = {
-  resource_id: string;
-  resource_type: "document" | "link";
-  resource_url: string;
-  uploaded_date: string | null;
-};
 
 // -- Material helpers ---------------------------------------------------------
 
-// resource_url holds the storage key, e.g. classroom_documents/<id>/<file>.pdf.
-// Older rows may hold a complete URL, which is used as it is.
-const documentUrl = (path: string | null) => {
-  if (!path) return "#";
-  if (/^https?:\/\//i.test(path)) return path;
-
-  return supabase.storage.from("documents").getPublicUrl(path, { download: false }).data.publicUrl;
-};
 // Uploaded files are stored as "<uuid>-<name>"; show just the name.
 const documentFileName = (path: string) => {
   const storedFileName = decodeURIComponent(path.split("/").pop() || path);
@@ -193,8 +179,7 @@ export default function StudentClassroomDetail() {
   //
   // 1. Confirm the student is enrolled.
   // 2. Load the classroom, its released lessons and its shared materials.
-  // 3. Load the student's attempts and each lesson's quiz size, then work out
-  //    the latest score per lesson.
+  // 3. Load the student's progress in each lesson (lessonService).
   useEffect(() => {
     if (!session?.user || !classroomId) return;
     let isCurrent = true;
@@ -202,113 +187,66 @@ export default function StudentClassroomDetail() {
     const loadClassroom = async () => {
       setIsLoading(true);
       setError(null);
-      const { data: enrolment, error: enrolmentError } = await supabase
-        .from("classroom_students")
-        .select("classroom_id")
-        .eq("classroom_id", classroomId)
-        .eq("student_id", session.user.id)
-        .maybeSingle();
 
-      if (enrolmentError) console.error("Failed to check classroom enrolment:", enrolmentError);
-      if (enrolmentError || !enrolment) {
-        if (isCurrent) setError("This classroom is unavailable.");
-        if (isCurrent) setIsLoading(false);
-        return;
-      }
-
-      const [classroomResult, lessonsResult, materialsResult] = await Promise.all([
-        supabase
-          .from("classrooms")
-          .select("classroom_id, classroom_name, description, cover_image_path")
-          .eq("classroom_id", classroomId)
-          .maybeSingle(),
-        supabase
-          .from("lessons")
-          .select("lesson_id, title, description, lesson_image_path, created_at")
-          .eq("classroom_id", classroomId)
-          .lte("release_date", new Date().toISOString())
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("learning_resources")
-          .select("resource_id, resource_type, resource_url, uploaded_date")
-          .eq("classroom_id", classroomId)
-          .is("lesson_id", null)
-          .order("uploaded_date", { ascending: false }),
-      ]);
-
-      if (classroomResult.error) console.error("Failed to load classroom:", classroomResult.error);
-      if (lessonsResult.error) console.error("Failed to load lessons:", lessonsResult.error);
-      // Materials are secondary: a failure there must not block the rest of the page.
-      if (materialsResult.error)
-        console.error("Failed to load classroom materials:", materialsResult.error);
-
-      if (classroomResult.error || lessonsResult.error || !classroomResult.data) {
-        if (isCurrent) setError("Classroom information could not be loaded right now.");
-        if (isCurrent) setIsLoading(false);
-        return;
-      }
-
-      const classroomLessons = (lessonsResult.data ?? []).map((lesson) => ({
-        ...(lesson as Omit<Lesson, "score" | "totalQuestions" | "percentage" | "hasQuiz">),
-        score: null,
-        totalQuestions: null,
-        percentage: null,
-        hasQuiz: true,
-      }));
-      const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
-      const [attemptsResult, mcqsResult] = lessonIds.length
-        ? await Promise.all([
-            supabase
-              .from("lesson_attempts")
-              .select("lesson_id, score, completed_at")
-              .eq("student_id", session.user.id)
-              .in("lesson_id", lessonIds)
-              .not("completed_at", "is", null)
-              .order("completed_at", { ascending: false }),
-            supabase.from("mcqs").select("lesson_id, score_ceiling").in("lesson_id", lessonIds),
-          ])
-        : [
-            { data: [], error: null },
-            { data: [], error: null },
-          ];
-      const attempts = attemptsResult.data ?? [];
-      const attemptsError = attemptsResult.error;
-
-      if (attemptsError) {
-        console.error("Failed to load lesson progress:", attemptsError);
-        if (isCurrent) setError("Lesson progress could not be loaded right now.");
-      } else if (isCurrent) {
-        // Attempts are newest first, so the first one per lesson is the latest.
-        const latestAttemptByLesson = new Map<string, { score: number | null }>();
-        attempts.forEach((attempt) => {
-          if (!latestAttemptByLesson.has(attempt.lesson_id)) {
-            latestAttemptByLesson.set(attempt.lesson_id, { score: attempt.score });
-          }
+      try {
+        // 1. A failed check counts as not enrolled.
+        const enrolled = await isEnrolled(session.user.id, classroomId).catch((enrolmentError) => {
+          console.error("Failed to check classroom enrolment:", enrolmentError);
+          return false;
         });
-        if (mcqsResult.error) console.error("Failed to load lesson quizzes:", mcqsResult.error);
-        const totalQuestionsByLesson = new Map(
-          (mcqsResult.data ?? []).map((mcq) => [mcq.lesson_id, mcq.score_ceiling]),
+
+        if (!enrolled) {
+          throw new DataError("This classroom is unavailable.");
+        }
+
+        // 2. The classroom, its lessons and its materials, together.
+        const [classroomDetails, classroomLessons, classroomMaterials] = await Promise.all([
+          getClassroom(classroomId),
+          getReleasedLessons([classroomId], { order: "created" }),
+          // Materials are secondary: a failure leaves the list empty.
+          getClassroomMaterials(classroomId).catch((materialsError) => {
+            console.error("Failed to load classroom materials:", materialsError);
+            return [];
+          }),
+        ]);
+
+        if (!classroomDetails) {
+          throw new DataError("Classroom information could not be loaded right now.");
+        }
+
+        // 3. Each lesson's latest score and whether it has a quiz.
+        const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
+        const progress = await getLessonProgress(session.user.id, lessonIds);
+
+        if (!isCurrent) return;
+
+        setClassroom(classroomDetails);
+        setMaterials(classroomMaterials);
+        setLessons(
+          classroomLessons.map((lesson) => {
+            const lessonProgress = progress.get(lesson.lesson_id);
+
+            return {
+              ...lesson,
+              hasQuiz: lessonProgress?.hasQuiz ?? true,
+              score: lessonProgress?.latestScore ?? null,
+              totalQuestions: lessonProgress?.scoreCeiling ?? null,
+              percentage: lessonProgress?.latestPercent ?? null,
+            };
+          }),
         );
-        const lessonsWithScores = classroomLessons.map((lesson) => {
-          const attempt = latestAttemptByLesson.get(lesson.lesson_id);
-          const totalQuestions = totalQuestionsByLesson.get(lesson.lesson_id) ?? null;
-          const score = attempt?.score ?? null;
-          return {
-            ...lesson,
-            // If the quiz lookup failed, assume a quiz rather than mislabel lessons.
-            hasQuiz: mcqsResult.error ? true : totalQuestionsByLesson.has(lesson.lesson_id),
-            score,
-            totalQuestions,
-            percentage:
-              score !== null && totalQuestions ? Math.round((score / totalQuestions) * 100) : null,
-          };
-        });
-        setClassroom(classroomResult.data as Classroom);
-        setLessons(lessonsWithScores);
-        setMaterials(materialsResult.error ? [] : ((materialsResult.data ?? []) as Material[]));
-        setCompletedLessonIds([...new Set(attempts.map((attempt) => attempt.lesson_id))]);
+        setCompletedLessonIds(lessonIds.filter((id) => progress.get(id)?.completed));
+      } catch (loadError) {
+        console.error("Failed to load classroom:", loadError);
+
+        if (isCurrent) {
+          setError(errorMessage(loadError, "Classroom information could not be loaded right now."));
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
       }
-      if (isCurrent) setIsLoading(false);
     };
 
     void loadClassroom();
@@ -330,48 +268,26 @@ export default function StudentClassroomDetail() {
   const coverUrl = bucketImageUrlOrBroken(classroom?.cover_image_path);
 
   // -- Leave the classroom --
-  // Runs after the student confirms. Deletes their enrolment, tells the
-  // teacher, then returns to the classroom list.
-  async function leaveClassroom() {
+  // Runs after the student confirms. classroomService removes the enrolment
+  // and tells the teacher; then the student returns to the classroom list.
+  async function handleLeave() {
     if (!classroomId || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
-    const teacher = await supabase
-      .from("classrooms")
-      .select("teacher_id")
-      .eq("classroom_id", classroomId)
-      .single();
-
-    if (teacher.error) {
-      console.error("Failed to fetch classroom teacher:", teacher.error);
-      setIsLeavingClassroom(false);
-      window.alert("Could not verify classroom teacher. Please try again.");
-      return;
-    }
-
-    const { error: leaveError } = await supabase
-      .from("classroom_students")
-      .delete()
-      .eq("classroom_id", classroomId)
-      .eq("student_id", session.user.id);
-
-    if (leaveError) {
+    try {
+      await leaveClassroom({
+        studentId: session.user.id,
+        studentName: studentDisplayName(profile, session.user.email),
+        classroomId,
+        classroomName: classroom?.classroom_name ?? "this classroom",
+      });
+    } catch (leaveError) {
       console.error("Failed to leave classroom:", leaveError);
       setIsLeavingClassroom(false);
-      window.alert("You could not be removed from this classroom. Please try again.");
+      window.alert(
+        errorMessage(leaveError, "You could not leave this classroom. Please try again."),
+      );
       return;
     }
-
-    const studentName =
-      [profile?.name, profile?.surname].filter(Boolean).join(" ") ||
-      session.user.email ||
-      "A student";
-    await notifyUser({
-      recipient_id: teacher.data.teacher_id,
-      type: "student_left_classroom",
-      title: "Student left classroom",
-      body: `${studentName} left "${classroom?.classroom_name ?? "this classroom"}".`,
-      link_url: `/teacher-classroom/${classroomId}`,
-    });
 
     setIsLeaveDialogOpen(false);
     setIsLeavingClassroom(false);
@@ -497,10 +413,7 @@ export default function StudentClassroomDetail() {
               ) : (
                 <div className="mt-4 divide-y divide-slate-100">
                   {materials.map((material) => {
-                    const href =
-                      material.resource_type === "link"
-                        ? material.resource_url
-                        : documentUrl(material.resource_url);
+                    const href = materialUrl(material);
                     const isLink = material.resource_type === "link";
                     const Icon = isLink ? LinkIcon : FileText;
                     return (
@@ -544,7 +457,7 @@ export default function StudentClassroomDetail() {
         open={isLeaveDialogOpen}
         isDeleting={isLeavingClassroom}
         onCancel={() => setIsLeaveDialogOpen(false)}
-        onConfirm={() => void leaveClassroom()}
+        onConfirm={() => void handleLeave()}
         title={`Leave ${classroom?.classroom_name ?? "this classroom"}?`}
         description="You will lose access to its lessons and materials. You can rejoin later with the classroom code."
         confirmLabel="Leave classroom"

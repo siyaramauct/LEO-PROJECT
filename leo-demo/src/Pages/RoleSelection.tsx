@@ -14,7 +14,7 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Role, type Role as RoleType } from "../context/roles";
-import { supabase } from "../supabase-client";
+import { chooseRole } from "../services/accountService";
 import { bucketImageUrl } from "../utils/images";
 
 // -- Role cards ---------------------------------------------------------------
@@ -44,23 +44,7 @@ const roles: {
   },
 ];
 
-// -- Usernames ----------------------------------------------------------------
-
-// First three letters of the surname plus the first letter of the name,
-// padded with "x" when a name is too short: Jane Smith becomes "smij".
-function usernamePrefix(name: string, surname: string) {
-  const surnamePart = surname
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .slice(0, 3)
-    .toLowerCase()
-    .padEnd(3, "x");
-  const namePart =
-    name
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .slice(0, 1)
-      .toLowerCase() || "x";
-  return `${surnamePart}${namePart}`;
-}
+// -- Page ---------------------------------------------------------------------
 
 export default function RoleSelection() {
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
@@ -98,42 +82,13 @@ export default function RoleSelection() {
     setSaving(true);
     setSaveError("");
     try {
-      // Keep an existing username; otherwise generate one.
-      const { data: existingProfile, error: profileError } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", user.id)
-        .single();
-      if (profileError) throw profileError;
-
-      let username = existingProfile.username;
-      if (!username) {
-        // Try up to 10 random three-digit suffixes until one is free.
-        const prefix = usernamePrefix(profile.name ?? "", profile.surname ?? "");
-        for (let attempt = 0; attempt < 10; attempt += 1) {
-          const randomDigits = (crypto.getRandomValues(new Uint32Array(1))[0] % 1000)
-            .toString()
-            .padStart(3, "0");
-          const candidate = `${prefix}${randomDigits}`;
-          const { data: matchingProfile, error: usernameError } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("username", candidate)
-            .maybeSingle();
-          if (usernameError) throw usernameError;
-          if (!matchingProfile) {
-            username = candidate;
-            break;
-          }
-        }
-        if (!username) throw new Error("Could not generate a unique username. Please try again.");
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ user_role: selectedRole, username })
-        .eq("id", user.id);
-      if (error) throw error;
+      // accountService keeps an existing username or generates a free one.
+      await chooseRole({
+        userId: user.id,
+        role: selectedRole,
+        name: profile.name ?? "",
+        surname: profile.surname ?? "",
+      });
 
       // Reload the profile so GuardRoute sees the new role, then go to the dashboard.
       await refreshProfile();

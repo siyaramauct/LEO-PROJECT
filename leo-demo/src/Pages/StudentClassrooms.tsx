@@ -1,15 +1,15 @@
 // -----------------------------------------------------------------------------
 // Student Classrooms
 //
-// Every classroom the student has joined, with overall counts, a form to join
-// a new classroom by code, and a search box. Each card shows the classroom's
+// Every classroom the student has joined, with a form to join a new
+// classroom by code, and a search box. Each card shows the classroom's
 // lessons and how many the student has completed, and has a leave button that
 // asks for confirmation first.
 //
 // Route: /student/classrooms || Access: students
 // -----------------------------------------------------------------------------
 
-import { BookOpen, Check, Search, Users, X } from "lucide-react";
+import { Search, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import ConfirmDialog from "../Components/ConfirmDialog";
@@ -19,19 +19,21 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import StudentClassroomCard, {
   type StudentClassroomCardData,
 } from "../Components/StudentClassroomCard";
-import { supabase } from "../supabase-client";
+import { type ClassroomSummary } from "../data/classrooms";
+import { errorMessage } from "../data/errors";
+import { getReleasedLessons } from "../data/lessons";
+import {
+  getEnrolledClassrooms,
+  leaveClassroom,
+  studentDisplayName,
+} from "../services/classroomService";
+import { getCompletedLessonIds } from "../services/lessonService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { matchesSearch } from "../utils/listControls";
-import { notifyUser } from "../utils/notifications";
 
 // -- Types --------------------------------------------------------------------
 
-type Classroom = {
-  classroom_id: string;
-  classroom_name: string;
-  description: string | null;
-  cover_image_path: string | null;
-};
+type Classroom = ClassroomSummary;
 type Lesson = {
   lesson_id: string;
   classroom_id: string;
@@ -54,111 +56,73 @@ export default function StudentClassrooms() {
   const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
 
   // -- Load classrooms, lessons and completions --
-  // 1. The student's enrolments.
-  // 2. Those classrooms and their released lessons, in parallel.
-  // 3. Which of those lessons the student has completed.
+  // classroomService and lessonService do the work, in the numbered steps below.
   useEffect(() => {
     if (!session?.user) return;
 
     const loadClassrooms = async () => {
       setIsLoading(true);
       setError("");
-      const { data: enrolments, error: enrolmentError } = await supabase
-        .from("classroom_students")
-        .select("classroom_id")
-        .eq("student_id", session.user.id);
-      if (enrolmentError) {
-        setError(enrolmentError.message);
-        setIsLoading(false);
-        return;
-      }
-      const classroomIds = (enrolments ?? []).map((enrolment) => enrolment.classroom_id);
-      if (!classroomIds.length) {
-        setClassrooms([]);
-        setLessons([]);
-        setIsLoading(false);
-        return;
-      }
-      const [classroomResult, lessonResult] = await Promise.all([
-        supabase
-          .from("classrooms")
-          .select("classroom_id, classroom_name, description, cover_image_path")
-          .in("classroom_id", classroomIds),
-        supabase
-          .from("lessons")
-          .select("lesson_id, classroom_id, title, description, lesson_image_path")
-          .in("classroom_id", classroomIds)
-          .lte("release_date", new Date().toISOString()),
-      ]);
-      if (classroomResult.error || lessonResult.error) {
-        setError(
-          classroomResult.error?.message ??
-            lessonResult.error?.message ??
-            "Could not load your classrooms.",
-        );
-      } else {
-        const enrolledLessons = (lessonResult.data ?? []) as Lesson[];
-        setClassrooms((classroomResult.data ?? []) as Classroom[]);
-        setLessons(enrolledLessons);
-        const lessonIds = enrolledLessons.map((lesson) => lesson.lesson_id);
-        if (lessonIds.length) {
-          const { data: attempts } = await supabase
-            .from("lesson_attempts")
-            .select("lesson_id")
-            .eq("student_id", session.user.id)
-            .in("lesson_id", lessonIds)
-            .not("completed_at", "is", null);
-          setCompletedLessonIds([...new Set((attempts ?? []).map((attempt) => attempt.lesson_id))]);
-        } else {
+
+      try {
+        // 1. The student's classrooms.
+        const enrolledClassrooms = await getEnrolledClassrooms(session.user.id);
+        const classroomIds = enrolledClassrooms.map((classroom) => classroom.classroom_id);
+
+        setClassrooms(enrolledClassrooms);
+
+        if (classroomIds.length === 0) {
+          setLessons([]);
           setCompletedLessonIds([]);
+          return;
         }
+
+        // 2. Their released lessons.
+        const enrolledLessons = await getReleasedLessons(classroomIds);
+        const lessonIds = enrolledLessons.map((lesson) => lesson.lesson_id);
+
+        setLessons(enrolledLessons);
+
+        if (lessonIds.length === 0) {
+          setCompletedLessonIds([]);
+          return;
+        }
+
+        // 3. Which of those lessons the student has completed.
+        setCompletedLessonIds(await getCompletedLessonIds(session.user.id, lessonIds));
+      } catch (loadError) {
+        console.error("Failed to load classrooms:", loadError);
+        setError(errorMessage(loadError, "Could not load your classrooms."));
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
+
     void loadClassrooms();
   }, [session?.user]);
 
   // -- Leave a classroom --
-  // Runs after the student confirms in the dialog. Deletes their enrolment,
-  // tells the teacher, then removes the classroom from the page without a reload.
-  async function leaveClassroom() {
+  // Runs after the student confirms in the dialog. classroomService removes
+  // the enrolment and tells the teacher; the classroom then leaves the page
+  // without a reload.
+  async function handleLeave() {
     if (!classroomToLeave || !session?.user || isLeavingClassroom) return;
     setIsLeavingClassroom(true);
-    const teacher = await supabase
-      .from("classrooms")
-      .select("teacher_id")
-      .eq("classroom_id", classroomToLeave.id)
-      .single();
-    if (teacher.error) {
-      console.error("Failed to fetch classroom teacher:", teacher.error);
-      setIsLeavingClassroom(false);
-      window.alert("Could not verify classroom teacher. Please try again.");
-      return;
-    }
-    const { error: leaveError } = await supabase
-      .from("classroom_students")
-      .delete()
-      .eq("classroom_id", classroomToLeave.id)
-      .eq("student_id", session.user.id);
-
-    if (leaveError) {
+    try {
+      await leaveClassroom({
+        studentId: session.user.id,
+        studentName: studentDisplayName(profile, session.user.email),
+        classroomId: classroomToLeave.id,
+        classroomName: classroomToLeave.name,
+      });
+    } catch (leaveError) {
       console.error("Failed to leave classroom:", leaveError);
       setIsLeavingClassroom(false);
-      window.alert("You could not be removed from this classroom. Please try again.");
+      window.alert(
+        errorMessage(leaveError, "You could not leave this classroom. Please try again."),
+      );
       return;
     }
-
-    const studentName =
-      [profile?.name, profile?.surname].filter(Boolean).join(" ") ||
-      session.user.email ||
-      "A student";
-    await notifyUser({
-      recipient_id: teacher.data.teacher_id,
-      type: "student_left_classroom",
-      title: "Student left classroom",
-      body: `${studentName} left "${classroomToLeave.name}".`,
-      link_url: `/teacher-classroom/${classroomToLeave.id}`,
-    });
 
     const remainingLessonIds = lessons
       .filter((lesson) => lesson.classroom_id !== classroomToLeave.id)
@@ -177,8 +141,6 @@ export default function StudentClassrooms() {
 
   // -- Derived values --
 
-  const lessonCount = lessons.length;
-  const completedLessons = completedLessonIds.length;
   const visibleClassrooms = classrooms.filter((classroom) =>
     matchesSearch(classroomSearch, classroom.classroom_name, classroom.description),
   );
@@ -225,27 +187,9 @@ export default function StudentClassrooms() {
         </header>
 
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-          <section className="grid grid-cols-3 gap-2 sm:gap-3">
-            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-              <Users size={19} className="text-violet-700" />
-              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{classrooms.length}</p>
-              <p className="mt-1 text-xs text-slate-500">Classrooms</p>
-            </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-              <BookOpen size={19} className="text-violet-700" />
-              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{lessonCount}</p>
-              <p className="mt-1 text-xs text-slate-500">Available lessons</p>
-            </article>
-            <article className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-              <Check size={19} className="text-violet-700" />
-              <p className="mt-3 text-xl font-bold sm:mt-4 sm:text-2xl">{completedLessons}</p>
-              <p className="mt-1 text-xs text-slate-500">Completed lessons</p>
-            </article>
-          </section>
-
           <JoinClassroomForm
             inputId="classroom-code"
-            className="mt-5 border-b border-slate-200 bg-white px-4 py-5 sm:px-6"
+            className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6"
           />
 
           {isLoading && (
@@ -329,7 +273,7 @@ export default function StudentClassrooms() {
         open={Boolean(classroomToLeave)}
         isDeleting={isLeavingClassroom}
         onCancel={() => setClassroomToLeave(null)}
-        onConfirm={() => void leaveClassroom()}
+        onConfirm={() => void handleLeave()}
         title={`Leave ${classroomToLeave?.name ?? "this classroom"}?`}
         description="You will lose access to this classroom's lessons and resources until you join again with its code."
         confirmLabel="Leave classroom"

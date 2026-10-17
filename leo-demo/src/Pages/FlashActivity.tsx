@@ -37,24 +37,39 @@ import { useNavigate, useParams } from "react-router-dom";
 import Flashcard from "../Components/Flashcard";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../supabase-client";
+import { logStudyDay } from "../data/activity";
+import { errorMessage } from "../data/errors";
+import { getFlashcards, type LessonFlashcard } from "../data/flashcards";
+import { getLessonDocuments, signDocumentUrl } from "../data/materials";
+import { getQuiz } from "../data/quizzes";
+import { finishLesson } from "../services/lessonService";
 import { bucketImageUrl } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------
-
-type FlashcardData = {
-  flashcard_id: string;
-  lesson_id: string;
-  word: string;
-  definition: string;
-  image_path: string | null;
-};
 
 type LessonDocument = { resource_id: string; resource_url: string; signedUrl: string };
 
 // Uploaded files are stored as "<uuid>-<name>"; show just the name.
 const documentName = (path: string) =>
   decodeURIComponent(path.split("/").pop() ?? path).replace(/^[0-9a-f-]{36}-/i, "");
+
+// The lesson's attached documents. They live in a private bucket, so each one
+// gets a signed link that works for an hour. Best effort: a failure is logged
+// and the lesson opens without them.
+async function loadLessonDocuments(lessonId: string): Promise<LessonDocument[]> {
+  const documents = await getLessonDocuments(lessonId).catch((documentsError) => {
+    console.error("Could not load lesson documents:", documentsError);
+    return [];
+  });
+
+  return Promise.all(
+    documents.map(async (document) => ({
+      resource_id: document.resource_id,
+      resource_url: document.resource_url,
+      signedUrl: await signDocumentUrl(document.resource_url, 60 * 60),
+    })),
+  );
+}
 
 // Shared look for the Previous, Next, Start quiz and Finish buttons.
 const NAV_BUTTON =
@@ -68,7 +83,7 @@ export default function FlashActivity() {
   const { session } = useAuth();
   const navigate = useNavigate();
 
-  const [flashcards, setFlashcards] = useState<FlashcardData[]>([]);
+  const [flashcards, setFlashcards] = useState<LessonFlashcard[]>([]);
   const [documents, setDocuments] = useState<LessonDocument[]>([]);
   const [index, setIndex] = useState(0); // Position of the card on screen.
   const [isLoading, setIsLoading] = useState(true);
@@ -79,94 +94,53 @@ export default function FlashActivity() {
 
   // -- Load the lesson --
   //
-  // Three queries run together: the flashcards, any attached documents, and
-  // whether the lesson has a quiz. Documents live in a private bucket, so each
-  // one gets a signed link that works for an hour.
+  // The flashcards, whether the lesson has a quiz, and any attached documents
+  // load together. Opening the lesson also counts today towards the streak.
   useEffect(() => {
     if (!lessonId) return;
 
-    const loadFlashcards = async () => {
-      const [flashcardsResult, documentsResult, quizResult] = await Promise.all([
-        supabase
-          .from("flashcards")
-          .select("flashcard_id, lesson_id, word, definition, image_path")
-          .eq("lesson_id", lessonId)
-          .order("created_at"),
-        supabase
-          .from("learning_resources")
-          .select("resource_id, resource_url")
-          .eq("lesson_id", lessonId)
-          .eq("resource_type", "document")
-          .order("uploaded_date", { ascending: false }),
-        // Flashcards-only lessons have no mcqs row.
-        supabase.from("mcqs").select("mcq_id").eq("lesson_id", lessonId).maybeSingle(),
-      ]);
+    const loadLesson = async () => {
+      try {
+        const [cards, quiz, lessonDocuments] = await Promise.all([
+          getFlashcards(lessonId),
+          // A failed quiz lookup counts as no quiz.
+          getQuiz(lessonId).catch(() => null),
+          loadLessonDocuments(lessonId),
+        ]);
 
-      if (flashcardsResult.error) setError(flashcardsResult.error.message);
-      else setFlashcards((flashcardsResult.data ?? []) as FlashcardData[]);
-      setHasQuiz(Boolean(quizResult.data));
-
-      if (documentsResult.error) {
-        console.error("Could not load lesson documents:", documentsResult.error);
-      } else {
-        const signedDocuments = await Promise.all(
-          (documentsResult.data ?? []).map(async (document) => {
-            const { data: signedData, error: signedError } = await supabase.storage
-              .from("documents")
-              .createSignedUrl(document.resource_url, 60 * 60);
-            if (signedError) console.error("Could not sign lesson document:", signedError);
-            return { ...document, signedUrl: signedData?.signedUrl ?? "" } as LessonDocument;
-          }),
-        );
-        setDocuments(signedDocuments);
+        setFlashcards(cards);
+        setHasQuiz(quiz !== null);
+        setDocuments(lessonDocuments);
+      } catch (loadError) {
+        console.error("Failed to load flashcards:", loadError);
+        setError(errorMessage(loadError, "The flashcards could not be loaded right now."));
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
 
-      // Count today towards the streak. ignoreDuplicates makes repeat visits
-      // on the same day harmless.
       if (session?.user) {
-        void supabase
-          .from("student_activity")
-          .upsert(
-            { student_id: session.user.id, source: "flashcard_practice" },
-            { onConflict: "student_id,activity_date", ignoreDuplicates: true },
-          );
+        void logStudyDay(session.user.id, "flashcard_practice");
       }
     };
 
-    void loadFlashcards();
+    void loadLesson();
   }, [lessonId, session?.user]);
 
   // -- Finish a flashcards-only lesson --
+  // lessonService saves an attempt with no score, which marks the lesson done.
 
-  async function finishLesson() {
+  async function handleFinish() {
     if (!session?.user || !lessonId) return;
     setIsFinishing(true);
 
-    // An attempt with no score marks the lesson as completed.
-    const { error: attemptError } = await supabase.from("lesson_attempts").insert({
-      student_id: session.user.id,
-      lesson_id: lessonId,
-      score: null,
-      started_at: startedAt,
-      completed_at: new Date().toISOString(),
-    });
-    if (attemptError) {
+    try {
+      await finishLesson({ studentId: session.user.id, lessonId, startedAt });
+      navigate("/student/classrooms");
+    } catch (finishError) {
+      console.error("Failed to finish lesson:", finishError);
+      setError(errorMessage(finishError, "The lesson could not be completed."));
       setIsFinishing(false);
-      setError(attemptError.message);
-      return;
     }
-
-    // Best effort: today's streak entry may already exist from opening the lesson.
-    const { error: activityError } = await supabase
-      .from("student_activity")
-      .upsert(
-        { student_id: session.user.id, source: "lesson_completed" },
-        { onConflict: "student_id,activity_date", ignoreDuplicates: true },
-      );
-    if (activityError) console.error("Could not record learning activity:", activityError);
-
-    navigate("/student/classrooms");
   }
 
   // -- Derived values --
@@ -292,7 +266,7 @@ export default function FlashActivity() {
       <button
         type="button"
         disabled={isFinishing}
-        onClick={() => void finishLesson()}
+        onClick={() => void handleFinish()}
         className={`${PRIMARY_BUTTON} disabled:cursor-not-allowed disabled:bg-slate-300`}
       >
         <Check size={17} />
