@@ -36,7 +36,7 @@ export async function translateFlashcard({
   // 2. Nothing saved yet: ask the AI.
   const prompt = `Translate the following language-learning flashcard into ${languageName}. Return only valid JSON with no Markdown or code fences, using this exact schema: {"word":"string","definition":"string"}. Word: ${JSON.stringify(word)}. Definition: ${JSON.stringify(definition)}.`;
 
-  const translation = parseTranslation(await askAi(prompt));
+  const translation = checkTranslation(await askAi(prompt));
 
   // 3. Save it for everyone else (best effort).
   await cacheTranslation(flashcardId, languageCode, translation);
@@ -44,16 +44,19 @@ export async function translateFlashcard({
   return translation;
 }
 
-// Checks the AI reply: strip a ```json code fence if the model added one, parse
-// the JSON, and require both a word and a definition.
-function parseTranslation(result: unknown): Translation {
-  const content = typeof result === "string" ? result : JSON.stringify(result);
-  const json = content.replace(/^```json\s*|^```|```$/g, "").trim();
-  const parsed = JSON.parse(json) as Translation;
+// Checks the AI's reply (already parsed by askAi): it must have both a
+// word and a definition.
+function checkTranslation(reply: unknown): Translation {
+  const translation = reply as Partial<Translation> | null;
 
-  if (!parsed.word?.trim() || !parsed.definition?.trim()) {
-    throw new Error("Gemini returned an incomplete translation.");
+  if (
+    typeof translation?.word !== "string" ||
+    typeof translation.definition !== "string" ||
+    !translation.word.trim() ||
+    !translation.definition.trim()
+  ) {
+    throw new Error("The AI returned an incomplete translation. Please try again.");
   }
 
-  return parsed;
+  return { word: translation.word, definition: translation.definition };
 }

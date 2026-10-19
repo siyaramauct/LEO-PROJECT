@@ -9,10 +9,10 @@
 //   4. Review       edit the AI-generated quiz before saving
 //
 // How the AI quiz is made:
-//   The flashcards are turned into a prompt and sent to the gemini-API-Query
-//   edge function. The reply must be JSON with exactly one question per
-//   flashcard; parseGeneratedMcq checks that before step 4 opens. If anything
-//   fails, a red notice offers to try again or save the lesson without a quiz.
+//   quizGenerationService turns the flashcards into a prompt for the AI and
+//   checks that the reply has exactly one complete question per flashcard
+//   before step 4 opens. If anything fails, a red notice offers to try again
+//   or save the lesson without a quiz.
 //
 // Nothing is saved until the final button, so leaving part way discards the
 // draft. A release date picked on the dashboard planner arrives as
@@ -39,10 +39,16 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON } from "../config/limits";
 import { useAuth } from "../context/AuthContext";
-import { askAi } from "../data/ai";
 import { getTeacherClassrooms } from "../data/classrooms";
 import { errorMessage } from "../data/errors";
+import {
+  ANSWER_OPTIONS,
+  isQuizComplete,
+  type DraftQuestion,
+  type QuizFormat,
+} from "../domain/quizDraft";
 import { checkLessonLimit, createLesson } from "../services/lessonAuthoringService";
+import { generateQuiz } from "../services/quizGenerationService";
 import { bucketImageUrl } from "../utils/images";
 import { formatDateKey, parseFutureDateKey, toDateKey } from "../utils/releaseDate";
 
@@ -58,23 +64,11 @@ type Flashcard = {
   imagePreview: string | null;
 };
 type ClassroomOption = { classroom_id: string; classroom_name: string };
-type McqFormat = "basic-mcq" | "fill-blank-mcq";
 type OptionKey = "option_a" | "option_b" | "option_c" | "option_d";
-type CorrectOption = "A" | "B" | "C" | "D";
-
-type GeneratedQuestion = {
-  question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_option: CorrectOption;
-};
-type GeneratedMcq = { title: string; questions: GeneratedQuestion[] };
 
 // An editable copy of a generated question. The id only exists in the browser
 // (for React keys and edits) and is never saved.
-type EditableQuestion = GeneratedQuestion & { id: number };
+type EditableQuestion = DraftQuestion & { id: number };
 
 // -- Options and styles -------------------------------------------------------
 
@@ -106,7 +100,7 @@ const lessonCoverOptions = [
 
 const stepLabels = ["Lesson details", "Flashcards", "MCQ activity", "Review & edit"];
 
-const mcqFormatOptions: { id: McqFormat; name: string; description: string }[] = [
+const mcqFormatOptions: { id: QuizFormat; name: string; description: string }[] = [
   {
     id: "basic-mcq",
     name: "Basic multiple choice",
@@ -120,7 +114,6 @@ const mcqFormatOptions: { id: McqFormat; name: string; description: string }[] =
 ];
 
 const optionKeys: OptionKey[] = ["option_a", "option_b", "option_c", "option_d"];
-const correctOptions: CorrectOption[] = ["A", "B", "C", "D"];
 
 const PRIMARY_BUTTON =
   "flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300";
@@ -134,59 +127,6 @@ const inputClassName =
 
 function emptyFlashcard(id: number): Flashcard {
   return { id, term: "", definition: "", imageFile: null, imagePreview: null };
-}
-
-// Checks the AI reply before the review step trusts it.
-//   1. Strip a ```json code fence if Gemini added one, then parse the JSON.
-//   2. Require a title and exactly one question per flashcard.
-//   3. Require every question to have text, four options and a valid answer.
-// Throws if any check fails, which shows the "something went wrong" notice.
-function parseGeneratedMcq(result: unknown, expectedQuestions: number): GeneratedMcq {
-  const content = typeof result === "string" ? result : JSON.stringify(result);
-  const json = content.replace(/^```json\s*|^```|```$/g, "").trim();
-  const generated = JSON.parse(json) as GeneratedMcq;
-  const validOptions = ["A", "B", "C", "D"];
-
-  if (
-    !generated.title?.trim() ||
-    !Array.isArray(generated.questions) ||
-    generated.questions.length !== expectedQuestions
-  ) {
-    throw new Error(`Gemini must return exactly ${expectedQuestions} questions.`);
-  }
-
-  const hasInvalidQuestion = generated.questions.some(
-    (question) =>
-      !question.question_text?.trim() ||
-      !question.option_a?.trim() ||
-      !question.option_b?.trim() ||
-      !question.option_c?.trim() ||
-      !question.option_d?.trim() ||
-      !validOptions.includes(question.correct_option),
-  );
-
-  if (hasInvalidQuestion) throw new Error("Gemini returned an incomplete question.");
-  return generated;
-}
-
-// The prompt sent to Gemini: the chosen format, the exact JSON shape to return,
-// and the flashcards themselves.
-function buildMcqPrompt(format: McqFormat, flashcards: Flashcard[]): string {
-  return `You are an experienced language educator and teacher. Create a strictly language learning  ${format === "basic-mcq" ? "multiple-choice" : "fill-in-the-blank multiple-choice"} activity from the ${flashcards.length} flashcards below. Create exactly one question per flashcard and use each flashcard once. Every question must have one correct answer and three plausible but clearly incorrect filler answers. Return only valid JSON with no Markdown or code fences, using this exact schema: {"title":"string","questions":[{"question_text":"string","option_a":"string","option_b":"string","option_c":"string","option_d":"string","correct_option":"A|B|C|D"}]}. The questions array must contain exactly ${flashcards.length} items. The value of correct_option must match the option that contains the correct answer. Flashcards: ${JSON.stringify(flashcards.map(({ term, definition }) => ({ term, definition })))} . Focus on the language learning aspect of the activity not the general concepts themselves.`;
-}
-
-// True when the teacher's edits left the title or any question incomplete.
-function findIncompleteQuestion(title: string, questions: EditableQuestion[]): boolean {
-  if (!title.trim() || !questions.length) return true;
-  return questions.some(
-    (question) =>
-      !question.question_text.trim() ||
-      !question.option_a.trim() ||
-      !question.option_b.trim() ||
-      !question.option_c.trim() ||
-      !question.option_d.trim() ||
-      !correctOptions.includes(question.correct_option),
-  );
 }
 
 // -- Small building blocks ----------------------------------------------------
@@ -255,7 +195,7 @@ export default function CreateLesson() {
   // -- State: step 3, activity --
   // With includeMcq off, the lesson is saved without a quiz.
   const [includeMcq, setIncludeMcq] = useState(true);
-  const [selectedMcqFormat, setSelectedMcqFormat] = useState<McqFormat | null>(null);
+  const [selectedMcqFormat, setSelectedMcqFormat] = useState<QuizFormat | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
 
@@ -417,23 +357,23 @@ export default function CreateLesson() {
 
   // -- Step 3 to 4: generate the quiz with AI --
 
-  // Asks Gemini for the quiz and, if the reply checks out, opens it in the
-  // review step. Nothing is saved yet.
+  // quizGenerationService asks the AI for the quiz and checks it; a good quiz
+  // opens in the review step. Nothing is saved yet.
   async function generateActivity() {
     if (!selectedMcqFormat) return;
     setIsGenerating(true);
     setGenerationFailed(false);
     setError("");
     try {
-      const reply = await askAi(buildMcqPrompt(selectedMcqFormat, flashcards));
-      const generatedMcq = parseGeneratedMcq(reply, flashcards.length);
+      const quiz = await generateQuiz({ format: selectedMcqFormat, flashcards });
 
-      setGeneratedTitle(generatedMcq.title.trim());
+      setGeneratedTitle(quiz.title);
       setGeneratedQuestions(
-        generatedMcq.questions.map((question, index) => ({ ...question, id: index + 1 })),
+        quiz.questions.map((question, index) => ({ ...question, id: index + 1 })),
       );
       setStep("review");
-    } catch {
+    } catch (generationError) {
+      console.error("Failed to generate the quiz:", generationError);
       setGenerationFailed(true);
     } finally {
       setIsGenerating(false);
@@ -450,7 +390,7 @@ export default function CreateLesson() {
   // -- Step 4: review --
 
   // Updates one field of one question: its text, an option, or the correct answer.
-  function updateGeneratedQuestion(id: number, field: keyof GeneratedQuestion, value: string) {
+  function updateGeneratedQuestion(id: number, field: keyof DraftQuestion, value: string) {
     setGeneratedQuestions((questions) =>
       questions.map((question) =>
         question.id === id ? { ...question, [field]: value } : question,
@@ -465,7 +405,7 @@ export default function CreateLesson() {
   async function handleCreateLesson() {
     if (!classroomId) return;
 
-    if (includeMcq && findIncompleteQuestion(generatedTitle, generatedQuestions)) {
+    if (includeMcq && !isQuizComplete(generatedTitle, generatedQuestions)) {
       setError("Give the activity a title and fill in every question and option before saving.");
       return;
     }
@@ -1032,7 +972,7 @@ export default function CreateLesson() {
                   </span>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {optionKeys.map((optionKey, optionIndex) => {
-                      const letter = correctOptions[optionIndex];
+                      const letter = ANSWER_OPTIONS[optionIndex];
                       const isCorrect = question.correct_option === letter;
                       return (
                         <label

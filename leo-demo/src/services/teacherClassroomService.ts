@@ -1,15 +1,19 @@
 // -----------------------------------------------------------------------------
 // Teacher Classroom Service
 //
-// What a teacher does to run a classroom, step by step: create it, share files
-// and links with the class, remove a material, and remove a student. Pages call these instead of querying Supabase (see src/data).
+// What a teacher does to run a classroom, step by step: create it, load its
+// lessons and students, share files and links with the class, remove a
+// material, and remove a student. Pages call these instead of querying
+// Supabase (see src/data).
 //
 // Functions throw a DataError whose message can be shown to the teacher.
 // -----------------------------------------------------------------------------
 
 import { insertClassroom } from "../data/classrooms";
-import { removeEnrolment } from "../data/enrolments";
+import { getClassroomRoster, removeEnrolment, type RosterEntry } from "../data/enrolments";
 import { DataError } from "../data/errors";
+import { getFlashcardCounts } from "../data/flashcards";
+import { getClassroomLessons, type LessonListing } from "../data/lessons";
 import {
   addMaterial,
   deleteMaterial,
@@ -18,6 +22,8 @@ import {
   type Material,
 } from "../data/materials";
 import { notifyClassroomStudents, notifyUser } from "../data/notifications";
+import { getStudentProfiles, type StudentProfile } from "../data/profiles";
+import { getQuizCeilings } from "../data/quizzes";
 
 // -- Classrooms ---------------------------------------------------------------------
 
@@ -64,6 +70,70 @@ function generateJoinCode(classroomName: string) {
     .padStart(4, "0");
 
   return `${namePrefix}-${randomSuffix}`;
+}
+
+// -- Reading a classroom ------------------------------------------------------------
+
+export type ClassroomLessonSummary = LessonListing & {
+  hasQuiz: boolean; // False for flashcards-only lessons.
+  wordCount: number; // One flashcard is one word.
+  isScheduled: boolean; // Released on a later day.
+};
+
+// Every lesson in the classroom, scheduled ones included, with whether it has
+// a quiz and how many words it teaches.
+export async function getClassroomLessonSummaries(
+  classroomId: string,
+): Promise<ClassroomLessonSummary[]> {
+  // 1. The lessons.
+  const lessons = await getClassroomLessons(classroomId);
+  const lessonIds = lessons.map((lesson) => lesson.lesson_id);
+
+  // 2. Together: which have a quiz, and how many flashcards each has. Both are
+  //    secondary: a failure is logged and the lessons still load.
+  const [ceilings, wordCounts] = await Promise.all([
+    getQuizCeilings(lessonIds).catch((quizError) => {
+      console.error("Failed to load lesson quizzes:", quizError);
+      return null;
+    }),
+    getFlashcardCounts(lessonIds).catch((countError) => {
+      console.error("Failed to load lesson word counts:", countError);
+      return new Map<string, number>();
+    }),
+  ]);
+
+  // 3. Lessons without a quiz are flashcards-only. If that lookup failed,
+  //    assume a quiz rather than mislabel them.
+  const now = new Date();
+
+  return lessons.map((lesson) => ({
+    ...lesson,
+    hasQuiz: ceilings === null || ceilings.has(lesson.lesson_id),
+    wordCount: wordCounts.get(lesson.lesson_id) ?? 0,
+    isScheduled: new Date(lesson.release_date) > now,
+  }));
+}
+
+type ClassroomStudents = {
+  roster: RosterEntry[]; // Who is enrolled, and when they joined.
+  profiles: StudentProfile[];
+};
+
+export async function getClassroomStudents(classroomId: string): Promise<ClassroomStudents> {
+  // 1. Who is enrolled.
+  const roster = await getClassroomRoster(classroomId);
+
+  // 2. Their profiles, for names and usernames.
+  try {
+    const profiles = await getStudentProfiles(roster.map((entry) => entry.student_id));
+
+    return { roster, profiles };
+  } catch (profilesError) {
+    throw new DataError(
+      "Students are enrolled, but their profiles could not be loaded. Please try again.",
+      profilesError,
+    );
+  }
 }
 
 // -- Materials ---------------------------------------------------------------------

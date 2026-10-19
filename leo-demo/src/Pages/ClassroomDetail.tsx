@@ -45,18 +45,17 @@ import {
   rotateInviteCode,
   type ClassroomSummary,
 } from "../data/classrooms";
-import { getClassroomRoster, type RosterEntry } from "../data/enrolments";
 import { errorMessage } from "../data/errors";
-import { getFlashcardCounts } from "../data/flashcards";
-import { deleteLesson, getClassroomLessons, type LessonListing } from "../data/lessons";
+import { deleteLesson } from "../data/lessons";
 import { getClassroomMaterials, materialUrl, type Material } from "../data/materials";
-import { getStudentProfiles } from "../data/profiles";
-import { getQuizCeilings } from "../data/quizzes";
 import {
+  getClassroomLessonSummaries,
+  getClassroomStudents,
   removeMaterial,
   removeStudent,
   shareDocument,
   shareLink,
+  type ClassroomLessonSummary,
 } from "../services/teacherClassroomService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { validateMaterialFile } from "../utils/materialFileTypes";
@@ -96,44 +95,17 @@ const toMaterialDisplay = (row: Material): ClassroomMaterial => ({
   uploadedDate: row.uploaded_date,
 });
 
-// One flashcard is one word. Lessons with a release date ahead are "Scheduled".
-const toLessonDisplay = (row: LessonListing, hasQuiz: boolean, words: number): ClassroomLesson => ({
-  id: row.lesson_id,
-  title: row.title,
-  image: bucketImageUrlOrBroken(row.lesson_image_path),
-  imageAlt: row.title,
-  status: new Date(row.release_date) > new Date() ? "Scheduled" : "Published",
-  words,
+// Turns a lesson from teacherClassroomService into a lesson row.
+const toLessonDisplay = (lesson: ClassroomLessonSummary): ClassroomLesson => ({
+  id: lesson.lesson_id,
+  title: lesson.title,
+  image: bucketImageUrlOrBroken(lesson.lesson_image_path),
+  imageAlt: lesson.title,
+  status: lesson.isScheduled ? "Scheduled" : "Published",
+  words: lesson.wordCount,
   completion: 0,
-  hasQuiz,
+  hasQuiz: lesson.hasQuiz,
 });
-
-// Adds each lesson's quiz flag and word count. Both lookups are secondary: a
-// failure is logged and the lessons still show.
-async function describeLessons(lessonRows: LessonListing[]): Promise<ClassroomLesson[]> {
-  const lessonIds = lessonRows.map((row) => row.lesson_id);
-
-  const [ceilings, wordCounts] = await Promise.all([
-    getQuizCeilings(lessonIds).catch((quizError) => {
-      console.error("Failed to load lesson quizzes:", quizError);
-      return null;
-    }),
-    getFlashcardCounts(lessonIds).catch((countError) => {
-      console.error("Failed to load lesson word counts:", countError);
-      return new Map<string, number>();
-    }),
-  ]);
-
-  // Lessons without a quiz are flashcards-only. If that lookup failed, assume a
-  // quiz rather than mislabel them.
-  return lessonRows.map((row) =>
-    toLessonDisplay(
-      row,
-      ceilings === null || ceilings.has(row.lesson_id),
-      wordCounts.get(row.lesson_id) ?? 0,
-    ),
-  );
-}
 
 // -- Page ---------------------------------------------------------------------
 
@@ -168,11 +140,10 @@ export default function ClassroomDetail() {
 
   // -- Load the classroom --
   //
-  // 1. Together: the classroom, its lessons, the roster, the shared materials
-  //    and the private invite code. Each part can fail on its own without
-  //    hiding the rest of the page.
-  // 2. For the lessons: which have a quiz, and how many flashcards each has.
-  // 3. For the roster: the students' profiles.
+  // Together: the classroom, its lessons (teacherClassroomService adds the
+  // quiz flag and word count), the students, the shared materials and the
+  // private invite code. Each part can fail on its own without hiding the
+  // rest of the page.
   useEffect(() => {
     if (!classroomId || !teacherId) return;
 
@@ -180,11 +151,11 @@ export default function ClassroomDetail() {
       setIsLoading(true);
       setLoadError(null);
 
-      const [classroomResult, lessonsResult, rosterResult, materialsResult, inviteResult] =
+      const [classroomResult, lessonsResult, studentsResult, materialsResult, inviteResult] =
         await Promise.allSettled([
           getClassroom(classroomId),
-          getClassroomLessons(classroomId),
-          getClassroomRoster(classroomId),
+          getClassroomLessonSummaries(classroomId),
+          getClassroomStudents(classroomId),
           getClassroomMaterials(classroomId),
           getInviteCode(classroomId),
         ]);
@@ -208,42 +179,32 @@ export default function ClassroomDetail() {
         setClassroom(classroomResult.value);
       }
 
-      // 2. Lessons and materials. A failure leaves that list empty.
+      // Lessons and materials. A failure leaves that list empty.
       if (lessonsResult.status === "fulfilled") {
-        setLessons(await describeLessons(lessonsResult.value));
+        setLessons(lessonsResult.value.map(toLessonDisplay));
       }
 
       if (materialsResult.status === "fulfilled") {
         setMaterials(materialsResult.value.map(toMaterialDisplay));
       }
 
-      // 3. The roster and the students' profiles.
-      if (rosterResult.status === "rejected") {
-        console.error("Failed to load enrolled students:", rosterResult.reason);
-        setEnrollmentError(errorMessage(rosterResult.reason, "Could not load enrolled students."));
+      // The students and when each one joined.
+      if (studentsResult.status === "rejected") {
+        console.error("Failed to load enrolled students:", studentsResult.reason);
+        setEnrollmentError(
+          errorMessage(studentsResult.reason, "Could not load enrolled students."),
+        );
       } else {
-        await showRoster(rosterResult.value);
+        const { roster, profiles } = studentsResult.value;
+
+        setEnrolledStudentIds(roster.map((entry) => entry.student_id));
+        setEnrolledAt(
+          Object.fromEntries(roster.map((entry) => [entry.student_id, entry.enrolled_at])),
+        );
+        setStudentProfiles(profiles);
       }
 
       setIsLoading(false);
-    };
-
-    const showRoster = async (roster: RosterEntry[]) => {
-      const studentIds = roster.map((entry) => entry.student_id);
-
-      setEnrolledStudentIds(studentIds);
-      setEnrolledAt(
-        Object.fromEntries(roster.map((entry) => [entry.student_id, entry.enrolled_at])),
-      );
-
-      try {
-        setStudentProfiles(await getStudentProfiles(studentIds));
-      } catch (profilesError) {
-        console.error("Failed to load enrolled student profiles:", profilesError);
-        setEnrollmentError(
-          `Students are enrolled, but their profiles could not be loaded: ${errorMessage(profilesError, "please try again.")}`,
-        );
-      }
     };
 
     void load();

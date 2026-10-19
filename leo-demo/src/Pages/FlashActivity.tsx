@@ -37,39 +37,17 @@ import { useNavigate, useParams } from "react-router-dom";
 import Flashcard from "../Components/Flashcard";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { logStudyDay } from "../data/activity";
 import { errorMessage } from "../data/errors";
-import { getFlashcards, type LessonFlashcard } from "../data/flashcards";
-import { getLessonDocuments, signDocumentUrl } from "../data/materials";
-import { getQuiz } from "../data/quizzes";
-import { finishLesson } from "../services/lessonService";
+import type { LessonFlashcard } from "../data/flashcards";
+import type { LessonDocument } from "../services/lessonAuthoringService";
+import { finishLesson, openLesson } from "../services/lessonService";
 import { bucketImageUrl } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------
 
-type LessonDocument = { resource_id: string; resource_url: string; signedUrl: string };
-
 // Uploaded files are stored as "<uuid>-<name>"; show just the name.
 const documentName = (path: string) =>
   decodeURIComponent(path.split("/").pop() ?? path).replace(/^[0-9a-f-]{36}-/i, "");
-
-// The lesson's attached documents. They live in a private bucket, so each one
-// gets a signed link that works for an hour. Best effort: a failure is logged
-// and the lesson opens without them.
-async function loadLessonDocuments(lessonId: string): Promise<LessonDocument[]> {
-  const documents = await getLessonDocuments(lessonId).catch((documentsError) => {
-    console.error("Could not load lesson documents:", documentsError);
-    return [];
-  });
-
-  return Promise.all(
-    documents.map(async (document) => ({
-      resource_id: document.resource_id,
-      resource_url: document.resource_url,
-      signedUrl: await signDocumentUrl(document.resource_url, 60 * 60),
-    })),
-  );
-}
 
 // Shared look for the Previous, Next, Start quiz and Finish buttons.
 const NAV_BUTTON =
@@ -93,33 +71,24 @@ export default function FlashActivity() {
   const [isFinishing, setIsFinishing] = useState(false);
 
   // -- Load the lesson --
-  //
-  // The flashcards, whether the lesson has a quiz, and any attached documents
-  // load together. Opening the lesson also counts today towards the streak.
+  // lessonService loads the flashcards, whether the lesson has a quiz and any
+  // attached documents, and counts today towards the streak.
   useEffect(() => {
-    if (!lessonId) return;
+    if (!lessonId || !session?.user) return;
+    const studentId = session.user.id;
 
     const loadLesson = async () => {
       try {
-        const [cards, quiz, lessonDocuments] = await Promise.all([
-          getFlashcards(lessonId),
-          // A failed quiz lookup counts as no quiz.
-          getQuiz(lessonId).catch(() => null),
-          loadLessonDocuments(lessonId),
-        ]);
+        const lesson = await openLesson(studentId, lessonId);
 
-        setFlashcards(cards);
-        setHasQuiz(quiz !== null);
-        setDocuments(lessonDocuments);
+        setFlashcards(lesson.flashcards);
+        setHasQuiz(lesson.hasQuiz);
+        setDocuments(lesson.documents);
       } catch (loadError) {
         console.error("Failed to load flashcards:", loadError);
         setError(errorMessage(loadError, "The flashcards could not be loaded right now."));
       } finally {
         setIsLoading(false);
-      }
-
-      if (session?.user) {
-        void logStudyDay(session.user.id, "flashcard_practice");
       }
     };
 

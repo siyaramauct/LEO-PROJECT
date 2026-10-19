@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // Lesson Service
 //
-// What a student does while taking lessons, step by step: submit a quiz,
-// finish a flashcards-only lesson, and look up which lessons are done. Pages
+// What a student does while taking lessons, step by step: open a lesson,
+// submit a quiz, finish a flashcards-only lesson, and look up which lessons
+// are done. Pages
 // call these instead of querying Supabase (see src/data for the queries and
 // src/domain/scoring.ts for how a quiz is marked).
 //
@@ -15,9 +16,11 @@ import {
   getLatestScoredAttempt,
   saveCompletedAttempt,
 } from "../data/attempts";
+import { getFlashcards, type LessonFlashcard } from "../data/flashcards";
 import { getLessonWithClassroom } from "../data/lessons";
+import { getLessonDocuments } from "../data/materials";
 import { notifyUser } from "../data/notifications";
-import { getQuizCeilings, type Quiz } from "../data/quizzes";
+import { getQuiz, getQuizCeilings, type Quiz } from "../data/quizzes";
 import {
   correctAnswerText,
   scorePercent,
@@ -25,6 +28,7 @@ import {
   type QuizAnswers,
   type QuizQuestion,
 } from "../domain/scoring";
+import { signLessonDocuments, type LessonDocument } from "./lessonAuthoringService";
 
 // The result the summary page shows. QuickQuiz hands it over in sessionStorage.
 export type QuizResult = {
@@ -40,6 +44,42 @@ export type QuizResult = {
     isCorrect: boolean;
   }>;
 };
+
+// -- Opening a lesson ---------------------------------------------------------------
+
+type OpenedLesson = {
+  flashcards: LessonFlashcard[];
+  hasQuiz: boolean;
+  documents: LessonDocument[]; // Each with a link that works for an hour.
+};
+
+// Everything the flashcard step needs. Opening a lesson also counts today
+// towards the student's streak.
+export async function openLesson(studentId: string, lessonId: string): Promise<OpenedLesson> {
+  // 1. Log today as an active day (best effort; never holds up the lesson).
+  void logStudyDay(studentId, "flashcard_practice");
+
+  // 2. Together: the flashcards, the quiz and any attached documents.
+  const [flashcards, quiz, documents] = await Promise.all([
+    getFlashcards(lessonId),
+    // A failed quiz lookup counts as no quiz.
+    getQuiz(lessonId).catch(() => null),
+    // Documents are secondary: a failure leaves the list empty.
+    getLessonDocuments(lessonId).catch((documentsError) => {
+      console.error("Could not load lesson documents:", documentsError);
+      return [];
+    }),
+  ]);
+
+  // 3. The documents live in a private bucket, so each one gets a signed link.
+  return {
+    flashcards,
+    hasQuiz: quiz !== null,
+    documents: await signLessonDocuments(documents),
+  };
+}
+
+// -- Progress -----------------------------------------------------------------------
 
 export type LessonProgress = {
   completed: boolean;

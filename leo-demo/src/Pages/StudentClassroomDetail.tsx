@@ -31,30 +31,22 @@ import { MaterialSpine, MaterialTypeTag } from "../Components/MaterialTypeMarks"
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { getClassroom, type ClassroomSummary } from "../data/classrooms";
-import { isEnrolled } from "../data/enrolments";
-import { DataError, errorMessage } from "../data/errors";
-import { getReleasedLessons } from "../data/lessons";
-import { getClassroomMaterials, materialUrl, type Material } from "../data/materials";
-import { leaveClassroom, studentDisplayName } from "../services/classroomService";
-import { getLessonProgress } from "../services/lessonService";
+import { type ClassroomSummary } from "../data/classrooms";
+import { errorMessage } from "../data/errors";
+import { materialUrl, type Material } from "../data/materials";
+import {
+  getStudentClassroom,
+  leaveClassroom,
+  studentDisplayName,
+  type StudentClassroomLesson,
+} from "../services/classroomService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { materialTypeLabel } from "../utils/materialFileTypes";
 
 // -- Types --------------------------------------------------------------------
 
 type Classroom = ClassroomSummary;
-type Lesson = {
-  lesson_id: string;
-  title: string;
-  description: string | null;
-  lesson_image_path: string | null;
-  created_at: string | null;
-  score: number | null;
-  totalQuestions: number | null;
-  percentage: number | null;
-  hasQuiz: boolean; // False for flashcards-only lessons, which have no score.
-};
+type Lesson = StudentClassroomLesson;
 
 // -- Material helpers ---------------------------------------------------------
 
@@ -176,10 +168,8 @@ export default function StudentClassroomDetail() {
   const [isLeavingClassroom, setIsLeavingClassroom] = useState(false);
 
   // -- Load the classroom --
-  //
-  // 1. Confirm the student is enrolled.
-  // 2. Load the classroom, its released lessons and its shared materials.
-  // 3. Load the student's progress in each lesson (lessonService).
+  // classroomService checks the student is enrolled, then loads the classroom,
+  // its released lessons with the student's progress, and its materials.
   useEffect(() => {
     if (!session?.user || !classroomId) return;
     let isCurrent = true;
@@ -189,53 +179,16 @@ export default function StudentClassroomDetail() {
       setError(null);
 
       try {
-        // 1. A failed check counts as not enrolled.
-        const enrolled = await isEnrolled(session.user.id, classroomId).catch((enrolmentError) => {
-          console.error("Failed to check classroom enrolment:", enrolmentError);
-          return false;
-        });
-
-        if (!enrolled) {
-          throw new DataError("This classroom is unavailable.");
-        }
-
-        // 2. The classroom, its lessons and its materials, together.
-        const [classroomDetails, classroomLessons, classroomMaterials] = await Promise.all([
-          getClassroom(classroomId),
-          getReleasedLessons([classroomId], { order: "created" }),
-          // Materials are secondary: a failure leaves the list empty.
-          getClassroomMaterials(classroomId).catch((materialsError) => {
-            console.error("Failed to load classroom materials:", materialsError);
-            return [];
-          }),
-        ]);
-
-        if (!classroomDetails) {
-          throw new DataError("Classroom information could not be loaded right now.");
-        }
-
-        // 3. Each lesson's latest score and whether it has a quiz.
-        const lessonIds = classroomLessons.map((lesson) => lesson.lesson_id);
-        const progress = await getLessonProgress(session.user.id, lessonIds);
+        const result = await getStudentClassroom(session.user.id, classroomId);
 
         if (!isCurrent) return;
 
-        setClassroom(classroomDetails);
-        setMaterials(classroomMaterials);
-        setLessons(
-          classroomLessons.map((lesson) => {
-            const lessonProgress = progress.get(lesson.lesson_id);
-
-            return {
-              ...lesson,
-              hasQuiz: lessonProgress?.hasQuiz ?? true,
-              score: lessonProgress?.latestScore ?? null,
-              totalQuestions: lessonProgress?.scoreCeiling ?? null,
-              percentage: lessonProgress?.latestPercent ?? null,
-            };
-          }),
+        setClassroom(result.classroom);
+        setMaterials(result.materials);
+        setLessons(result.lessons);
+        setCompletedLessonIds(
+          result.lessons.filter((lesson) => lesson.completed).map((lesson) => lesson.lesson_id),
         );
-        setCompletedLessonIds(lessonIds.filter((id) => progress.get(id)?.completed));
       } catch (loadError) {
         console.error("Failed to load classroom:", loadError);
 
