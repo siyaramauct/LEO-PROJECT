@@ -27,7 +27,7 @@ import {
   leaveClassroom,
   studentDisplayName,
 } from "../services/classroomService";
-import { getCompletedLessonIds } from "../services/lessonService";
+import { getCompletedLessonIds } from "../services/studentLessonService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { matchesSearch } from "../utils/listControls";
 

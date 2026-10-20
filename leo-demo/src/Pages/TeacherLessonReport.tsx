@@ -46,7 +46,7 @@ import {
   removeLessonDocument,
   saveFlashcardEdit,
   type LessonDocument,
-} from "../services/lessonAuthoringService";
+} from "../services/lessonCreationService";
 import { getTeacherLessonReport, type LessonStudentResult } from "../services/reportService";
 import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
 

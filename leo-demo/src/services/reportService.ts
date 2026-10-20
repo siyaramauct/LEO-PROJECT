@@ -53,7 +53,7 @@ import { average, bestOf, median, scoredOnly } from "../domain/statistics";
 import { buildActivityWeeks, daysBetween } from "../utils/activityCalendar";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { toDateKey } from "../utils/releaseDate";
-import { signLessonDocuments, type LessonDocument } from "./lessonAuthoringService";
+import { signLessonDocuments, type LessonDocument } from "./lessonCreationService";
 
 // =============================================================================
 // Teacher: class reports

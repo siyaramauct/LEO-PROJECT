@@ -39,8 +39,8 @@ import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
 import { errorMessage } from "../data/errors";
 import type { LessonFlashcard } from "../data/flashcards";
-import type { LessonDocument } from "../services/lessonAuthoringService";
-import { finishLesson, openLesson } from "../services/lessonService";
+import type { LessonDocument } from "../services/lessonCreationService";
+import { finishLesson, openLesson } from "../services/studentLessonService";
 import { bucketImageUrl } from "../utils/images";
 
 // -- Types --------------------------------------------------------------------

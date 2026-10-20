@@ -20,7 +20,7 @@ import { errorMessage } from "../data/errors";
 import { getQuiz, getQuizQuestions, type Quiz } from "../data/quizzes";
 import type { AnswerOption, QuizAnswers, QuizQuestion } from "../domain/scoring";
 import { studentDisplayName } from "../services/classroomService";
-import { submitQuiz } from "../services/lessonService";
+import { submitQuiz } from "../services/studentLessonService";
 
 // -- Page ---------------------------------------------------------------------
 

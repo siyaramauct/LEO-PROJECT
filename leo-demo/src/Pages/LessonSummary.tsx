@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentBottomNav from "../Components/StudentBottomNav";
 import { useAuth } from "../context/AuthContext";
-import { getLatestQuizResult, type QuizResult } from "../services/lessonService";
+import { getLatestQuizResult, type QuizResult } from "../services/studentLessonService";
 import { projectImageUrl } from "../utils/images";
 
 export default function LessonSummary() {

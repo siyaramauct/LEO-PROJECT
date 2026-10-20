@@ -28,7 +28,7 @@ import {
   type QuizAnswers,
   type QuizQuestion,
 } from "../domain/scoring";
-import { signLessonDocuments, type LessonDocument } from "./lessonAuthoringService";
+import { signLessonDocuments, type LessonDocument } from "./lessonCreationService";
 
 // The result the summary page shows. QuickQuiz hands it over in sessionStorage.
 export type QuizResult = {

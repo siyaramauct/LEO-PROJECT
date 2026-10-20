@@ -21,7 +21,7 @@ import { DataError } from "../data/errors";
 import { getReleasedLessons, type Lesson } from "../data/lessons";
 import { getClassroomMaterials, type Material } from "../data/materials";
 import { notifyUser } from "../data/notifications";
-import { getLessonProgress } from "./lessonService";
+import { getLessonProgress } from "./studentLessonService";
 
 type EnrolledClassroomsOptions = {
   order?: "name" | "newest"; // Alphabetical, or most recently joined first.

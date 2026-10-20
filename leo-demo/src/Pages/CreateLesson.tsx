@@ -47,7 +47,7 @@ import {
   type DraftQuestion,
   type QuizFormat,
 } from "../domain/quizDraft";
-import { checkLessonLimit, createLesson } from "../services/lessonAuthoringService";
+import { checkLessonLimit, createLesson } from "../services/lessonCreationService";
 import { generateQuiz } from "../services/quizGenerationService";
 import { bucketImageUrl } from "../utils/images";
 import { formatDateKey, parseFutureDateKey, toDateKey } from "../utils/releaseDate";
