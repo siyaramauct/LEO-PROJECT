@@ -20,14 +20,16 @@ name: Tests
 # -- When it runs --------------------------------------------------------------
 
 on:
-  # Every push, to any branch, so problems show up before a pull request.
+  # Pushes to main, including the commit a merged pull request creates.
   push:
-  # Every pull request into main, so main only receives code that passes.
+    branches: [main]
+  # Pull requests into main, and every new commit pushed to them, so code is
+  # tested before it can be merged. Pushes to other branches don't run this.
   pull_request:
     branches: [main]
 
-# Only the newest run per branch matters: a new push cancels a run still going
-# on the same branch, so nobody waits on results for outdated code.
+# Only the newest run matters: a new push to main, or to a pull request,
+# cancels a run still going for it, so nobody waits on outdated results.
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
