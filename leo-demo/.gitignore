@@ -13,10 +13,11 @@ dist-ssr
 *.local
 
 # Environment files hold project keys: keep them out of git, but share the
-# template so others know which variables to set.
+# templates so others know which variables to set.
 .env
 .env.*
 !.env.example
+!.env.test.example
 
 # Vitest reports and artifacts
 .vitest/

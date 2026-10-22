@@ -45,7 +45,6 @@ beforeAll(async () => {
   student = await seedUser("student");
   classmate = await seedUser("student");
 
-
   classroomId = await seedClassroom(teacher, "Business English");
   await seedEnrolment(student, classroomId);
   await seedEnrolment(classmate, classroomId);
@@ -243,5 +242,4 @@ describe("Fetching and saving translations", () => {
 
     expect((await cachedRow(card.flashcard_id, "fr"))?.translated_word).toBe("facture");
   });
-
 });

@@ -25,15 +25,21 @@ export type ScoreBand = "mastered" | "developing" | "support";
 export type StudentFlag = "low-scores" | "inactive" | "behind";
 
 export function scoreBand(percent: number): ScoreBand {
+  let studentScoreBand: ScoreBand;
+
   if (percent >= MASTERY_PERCENT) {
-    return "mastered";
+    studentScoreBand = "mastered";
+  } else if (percent >= SUPPORT_PERCENT) {
+    studentScoreBand = "developing";
+  } else {
+    studentScoreBand = "support";
   }
 
-  if (percent >= SUPPORT_PERCENT) {
-    return "developing";
+  if (percent > 100 || percent < 0) {
+    throw new Error(`Invalid percent: ${percent}`);
   }
 
-  return "support";
+  return studentScoreBand;
 }
 
 type FlagInput = {
