@@ -1,0 +1,154 @@
+# -----------------------------------------------------------------------------
+# Tests
+#
+# Runs the project's checks and tests on GitHub's servers.
+#
+# Where things are:
+#   This file must live in .github/workflows/ at the repository root (leo/),
+#   the only place GitHub looks for workflows.
+#   The app lives in leo-demo/, so every command below runs there (see
+#   `defaults`). The root also has a package.json with wrapper scripts; running
+#   there would install the wrong dependencies.
+#
+# Credentials: the integration tests use a throwaway local Supabase that the
+# workflow starts itself, so no GitHub Secrets are needed (see
+# leo-demo/.env.test.example).
+# -----------------------------------------------------------------------------
+
+name: Tests
+
+# -- When it runs --------------------------------------------------------------
+
+on:
+  # Every push, to any branch, so problems show up before a pull request.
+  push:
+  # Every pull request into main, so main only receives code that passes.
+  pull_request:
+    branches: [main]
+
+# Only the newest run per branch matters: a new push cancels a run still going
+# on the same branch, so nobody waits on results for outdated code.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+# -- Where commands run --------------------------------------------------------
+
+# Every `run:` step starts in the app folder instead of the repository root.
+defaults:
+  run:
+    working-directory: leo-demo
+
+# -- Jobs ----------------------------------------------------------------------
+
+jobs:
+  # Fast checks that need no database: formatting, lint, types, build and the
+  # unit tests. Usually done in a minute or two.
+  checks:
+    name: Lint, types, build and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # 1. Download the repository onto the runner.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # 2. Install the Node version from .nvmrc and reuse downloaded npm
+      #    packages between runs. `uses:` steps ignore `defaults`, so the
+      #    paths include leo-demo/.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: leo-demo/.nvmrc
+          cache: npm
+          cache-dependency-path: leo-demo/package-lock.json
+
+      # 3. A clean install of exactly the versions in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Every file matches Prettier's style.
+      - name: Check formatting
+        run: npm run format:check
+
+      # 5. ESLint finds no problems.
+      - name: Lint
+        run: npm run lint
+
+      # 6. tsc -b type-checks the app, the config files and the tests (see
+      #    tsconfig.json), then Vite builds the app.
+      - name: Type-check and build
+        run: npm run build
+
+      # 7. The unit tests (tests/unit). `--run` runs them once instead of
+      #    watching for changes.
+      - name: Unit tests
+        run: npm test -- --run
+
+  # The integration tests, against a fresh local Supabase in Docker built from
+  # supabase/migrations and supabase/config.toml. Runs alongside `checks`.
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Study days and streaks use South African dates (Africa/Johannesburg in
+      # the database), so the runner's clock must agree. GitHub defaults to UTC.
+      TZ: Africa/Johannesburg
+
+    steps:
+      # 1. Download the repository onto the runner.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # 2. Node from .nvmrc, with npm downloads cached between runs.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: leo-demo/.nvmrc
+          cache: npm
+          cache-dependency-path: leo-demo/package-lock.json
+
+      # 3. The Supabase CLI, the same version used locally to pull the schema.
+      - name: Set up the Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      # 4. A clean install of exactly the versions in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # 5. Start Supabase in Docker (already installed on the runner). Builds the
+      #    database from the migrations and the buckets from config.toml. Only
+      #    what the tests use is started: the database, auth (gotrue), the REST
+      #    API (postgrest), storage and the gateway (kong).
+      - name: Start local Supabase
+        run: >-
+          supabase start
+          -x studio,postgres-meta,imgproxy,mailpit,realtime,edge-runtime,logflare,vector,supavisor
+
+      # 6. Hand this run's local URL and keys to the tests. `supabase status`
+      #    prints them; writing to $GITHUB_ENV makes them environment variables
+      #    for every later step, and the integration config reads those ahead
+      #    of .env.test. The secret key is masked so it never shows in the logs.
+      - name: Pass the local Supabase credentials to the tests
+        run: |
+          supabase status -o env | grep -E '^[A-Z_]+=' > "$RUNNER_TEMP/supabase.env"
+          set -a
+          source "$RUNNER_TEMP/supabase.env"
+          set +a
+
+          echo "::add-mask::$SECRET_KEY"
+
+          {
+            echo "VITE_SUPABASE_URL=$API_URL"
+            echo "VITE_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+            echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+          } >> "$GITHUB_ENV"
+
+      # 7. The integration tests (tests/integration), one file at a time.
+      - name: Integration tests
+        run: npm run test:integration
