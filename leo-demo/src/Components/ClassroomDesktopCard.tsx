@@ -55,7 +55,9 @@ export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomD
             event.stopPropagation();
             onDelete(classroom);
           }}
-          className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50"
+          // Grey bin at rest; on hover (or keyboard focus) the button turns red
+          // and the bin white. The icon takes the button's text colour.
+          className="rounded-lg p-2 text-slate-600 transition-colors duration-200 ease-out hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:outline-none"
         >
           <Trash2 size={15} />
         </button>

@@ -10,16 +10,18 @@
 //
 // Scores are each lesson's best attempt, so a retake never lowers them.
 //
-// It opens from the Reports picker (StudentReportPicker) with the chosen
-// classroom already selected; picking another classroom here updates the URL.
+// The Report tab opens it directly. With no classroom in the URL it shows the
+// first one in the list; picking another classroom here updates the URL, so a
+// link to /student/report/:classroomId opens that classroom.
 //
 // On phones, the chosen classroom's details sit below the list rather than
-// beside it, so they are scrolled into view on arrival and on each pick.
+// beside it, so they are scrolled into view when a classroom is picked, or on
+// arrival when the link named one.
 //
-// Route: /student/report/:classroomId || Access: students
+// Route: /student/report/:classroomId? || Access: students
 // -----------------------------------------------------------------------------
 
-import { ArrowLeft, CheckCircle2, ChevronRight, Layers } from "lucide-react";
+import { CheckCircle2, ChevronRight, Layers } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ActivityCalendar from "../Components/ActivityCalendar";
@@ -186,15 +188,24 @@ export default function StudentLearningReport() {
   const imagesReady = usePreloadImages(coverUrls);
 
   // -- On arrival --
-  // Once the report is drawn: a classroom the student is not in sends them back
-  // to the picker; otherwise phones scroll straight to the chosen classroom.
+  // Once the report is drawn: a link to a classroom the student is not in falls
+  // back to the plain report (first classroom). A link that named one of their
+  // classrooms scrolls phones straight to it; opening the Report tab doesn't.
   useEffect(() => {
     if (!classrooms || !imagesReady || hasScrolledOnArrival.current) return;
     hasScrolledOnArrival.current = true;
-    if (classroomId && !classrooms.some((classroom) => classroom.classroomId === classroomId)) {
+
+    if (!classroomId) {
+      return;
+    }
+
+    // The unknown id matches nothing, so the first classroom is shown anyway;
+    // this just tidies the URL.
+    if (!classrooms.some((classroom) => classroom.classroomId === classroomId)) {
       navigate("/student/report", { replace: true });
       return;
     }
+
     scrollToDetailsOnPhones();
   }, [classrooms, imagesReady, classroomId, navigate]);
 
@@ -277,21 +288,12 @@ export default function StudentLearningReport() {
       <StudentBottomNav />
       <main className="min-h-dvh bg-slate-50 pb-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-7xl items-center gap-3">
-            <Link
-              to="/student/report"
-              aria-label="Back to class reports"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
-            >
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-violet-700">Student portal</p>
-              <h1 className="mt-1 text-xl font-bold">Learning report</h1>
-              <p className="mt-1 text-xs text-slate-500">
-                Your activity, progress and scores across every classroom you belong to.
-              </p>
-            </div>
+          <div className="mx-auto max-w-7xl">
+            <p className="text-xs font-medium text-violet-700">Student portal</p>
+            <h1 className="mt-1 text-xl font-bold">Learning report</h1>
+            <p className="mt-1 text-xs text-slate-500">
+              Your activity, progress and scores across every classroom you belong to.
+            </p>
           </div>
         </header>
 

@@ -8,7 +8,8 @@
 //
 // The page loads the classrooms and decides where a card leads.
 //
-// Used by: ClassProgress (teachers) || StudentReportPicker (students)
+// Used by: ClassProgress (teachers). Students go straight to their report
+// (StudentLearningReport), which has its own classroom list.
 // -----------------------------------------------------------------------------
 
 import { ChevronRight } from "lucide-react";
