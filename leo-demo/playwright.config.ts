@@ -17,7 +17,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Playwright runs in Node rather than Vite, so .env.test is loaded here. The
 // tests need the secret key to seed users and data; the app gets the same file
-// through `vite --mode test` below. In CI the workflow writes this file.
+// through `vite --mode test` below.
 if (!existsSync(".env.test")) {
   throw new Error(
     "E2E tests need .env.test with the local Supabase values (see .env.test.example).",

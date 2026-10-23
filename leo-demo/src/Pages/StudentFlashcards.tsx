@@ -89,7 +89,7 @@ export default function StudentFlashcards() {
               />
             </div>
           </section>
-          <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
             <button
               type="button"
               onClick={() => setShowDefinition((visible) => !visible)}

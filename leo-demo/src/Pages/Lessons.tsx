@@ -8,7 +8,7 @@
 // Route: /lessons || Access: students
 // -----------------------------------------------------------------------------
 
-import { BookOpen, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
@@ -92,14 +92,13 @@ export default function Lessons() {
               </div>
               {lessons.length === 0 ? (
                 <div className="rounded-xl border border-slate-100 bg-white px-4 py-12 text-center">
-                  <BookOpen size={24} className="mx-auto text-slate-300" />
-                  <p className="mt-3 text-sm font-semibold">No lessons are available yet</p>
+                  <p className="text-sm font-semibold">No lessons are available yet</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Your teacher’s lessons will appear here when they are ready.
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {lessons.map((lesson) => (
                     <button
                       key={lesson.lesson_id}

@@ -39,7 +39,7 @@ export default function LoadingScreen({
           </span>
         </header>
 
-        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 lg:py-8">
+        <section className="grid grid-cols-1 flex-1 items-center gap-8 py-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 lg:py-8">
           <div className="order-2 max-w-md lg:order-1">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">
               Learn English Online

@@ -378,7 +378,7 @@ export default function TeacherLessonReport() {
           // Statistics. Flashcards-only lessons have no quiz, so nothing is scored.
         }
         {isFlashcardsOnly ? (
-          <section className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
+          <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
             <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
             <NoScoresNotice />
           </section>
@@ -499,7 +499,7 @@ export default function TeacherLessonReport() {
                   <div key={card.flashcard_id} className="py-3">
                     {isEditing ? (
                       <div className="space-y-2">
-                        <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <label className="block">
                             <span className="mb-1 block text-xs font-semibold text-slate-600">
                               Word

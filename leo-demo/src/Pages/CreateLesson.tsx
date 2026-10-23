@@ -499,7 +499,7 @@ export default function CreateLesson() {
           // Step 1: lesson details
         }
         {step === "details" && (
-          <section className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="mb-6">
                 <h3 className="text-lg font-bold">Lesson details</h3>
@@ -715,7 +715,7 @@ export default function CreateLesson() {
                       </button>
                     )}
                   </div>
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
                     <label>
                       <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                         Term
@@ -849,7 +849,7 @@ export default function CreateLesson() {
               </button>
             </div>
             {includeMcq && (
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {mcqFormatOptions.map((format) => {
                   const selected = selectedMcqFormat === format.id;
                   return (
@@ -970,7 +970,7 @@ export default function CreateLesson() {
                   <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Options: mark the correct answer
                   </span>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {optionKeys.map((optionKey, optionIndex) => {
                       const letter = ANSWER_OPTIONS[optionIndex];
                       const isCorrect = question.correct_option === letter;

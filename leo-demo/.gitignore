@@ -39,3 +39,6 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Cloudflare (Wrangler cache and local state)
+.wrangler/

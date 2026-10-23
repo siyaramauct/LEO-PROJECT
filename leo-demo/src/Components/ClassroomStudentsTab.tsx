@@ -280,8 +280,7 @@ export default function ClassroomStudentsTab({
 
         {students.length === 0 ? (
           <div className="flex flex-col items-center px-4 py-10 text-center">
-            <Users size={24} className="text-slate-300" />
-            <p className="mt-2 text-sm font-semibold text-slate-600">No students have joined yet</p>
+            <p className="text-sm font-semibold text-slate-600">No students have joined yet</p>
             <p className="mt-1 text-xs text-slate-400">
               Use “Invite students” in the banner to share the classroom code.
             </p>

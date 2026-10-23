@@ -39,6 +39,9 @@ type LessonPlannerProps = {
   onSaveLesson: (lesson: ScheduledLesson, edits: ScheduledLessonEdits) => Promise<string | null>;
   // Asks the parent to confirm and delete a lesson.
   onDeleteLesson: (lesson: ScheduledLesson) => void;
+  // Lessons belong to a classroom; without one, the button leads to creating
+  // a classroom instead of to a lesson form that couldn't be finished.
+  hasClassrooms?: boolean;
 };
 
 // -- Calendar grid ------------------------------------------------------------
@@ -82,6 +85,7 @@ export default function LessonPlanner({
   error,
   onSaveLesson,
   onDeleteLesson,
+  hasClassrooms = true,
 }: LessonPlannerProps) {
   // The picked day. Today means "create now"; a later day means "schedule".
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey(new Date()));
@@ -212,13 +216,28 @@ export default function LessonPlanner({
       )}
 
       <div className="mt-auto pt-5">
-        <Link
-          to={isScheduling ? `/create-lesson?releaseDate=${activeDateKey}` : "/create-lesson"}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
-        >
-          {isScheduling ? "Schedule lesson" : "Create lesson"}
-          <ChevronRight size={17} />
-        </Link>
+        {hasClassrooms ? (
+          <Link
+            to={isScheduling ? `/create-lesson?releaseDate=${activeDateKey}` : "/create-lesson"}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
+          >
+            {isScheduling ? "Schedule lesson" : "Create lesson"}
+            <ChevronRight size={17} />
+          </Link>
+        ) : (
+          <>
+            <p className="mb-3 text-xs text-slate-500">
+              Lessons belong to a classroom, so create your first classroom before adding lessons.
+            </p>
+            <Link
+              to="/create-classroom"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
+            >
+              Create a classroom first
+              <ChevronRight size={17} />
+            </Link>
+          </>
+        )}
       </div>
     </section>
   );

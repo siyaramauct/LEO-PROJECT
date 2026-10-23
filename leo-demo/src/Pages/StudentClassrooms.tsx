@@ -9,7 +9,7 @@
 // Route: /student/classrooms || Access: students
 // -----------------------------------------------------------------------------
 
-import { Search, Users, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import ConfirmDialog from "../Components/ConfirmDialog";
@@ -189,7 +189,7 @@ export default function StudentClassrooms() {
         <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
           <JoinClassroomForm
             inputId="classroom-code"
-            className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6"
+            className="mb-4 rounded-xl border border-slate-100 bg-white px-4 py-5 sm:px-6"
           />
 
           {isLoading && (
@@ -205,8 +205,7 @@ export default function StudentClassrooms() {
             !error &&
             (classrooms.length === 0 ? (
               <section className="rounded-xl border border-slate-100 bg-white px-5 py-12 text-center">
-                <Users size={26} className="mx-auto text-slate-300" />
-                <h2 className="mt-3 text-sm font-semibold">No classrooms yet</h2>
+                <h2 className="text-sm font-semibold">No classrooms yet</h2>
                 <p className="mt-1 text-xs text-slate-500">
                   Ask your teacher for an invitation code, then enter it above.
                 </p>
@@ -247,8 +246,7 @@ export default function StudentClassrooms() {
 
                 {visibleClassrooms.length === 0 ? (
                   <section className="mt-4 rounded-xl border border-violet-100 bg-white px-5 py-10 text-center">
-                    <Search size={22} className="mx-auto text-violet-300" />
-                    <h2 className="mt-3 text-sm font-semibold">No classrooms match that search</h2>
+                    <h2 className="text-sm font-semibold">No classrooms match that search</h2>
                     <p className="mt-1 text-xs text-slate-500">
                       Try a class name, subject, or a broader keyword.
                     </p>

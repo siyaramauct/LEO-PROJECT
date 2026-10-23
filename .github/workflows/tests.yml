@@ -1,7 +1,17 @@
 # -----------------------------------------------------------------------------
 # Tests
 #
-# Runs the project's checks and tests on GitHub's servers.
+# Runs the project's checks and tests on GitHub's servers, then deploys, in
+# three stages. Each starts only if the one before it passed:
+#
+#   1. checks       formatting, lint, type-check, build and the unit tests
+#   2. integration  services and RLS against a fresh local Supabase
+#   3. deploy       builds the app with the hosted Supabase values and uploads
+#                   it to Cloudflare. Pushes to main only: pull requests are
+#                   tested but never deployed.
+#
+# The end-to-end tests (Playwright, tests/e2e) aren't run here; run them
+# locally with `npm run test:e2e`.
 #
 # Where things are:
 #   This file must live in .github/workflows/ at the repository root (leo/),
@@ -10,9 +20,14 @@
 #   `defaults`). The root also has a package.json with wrapper scripts; running
 #   there would install the wrong dependencies.
 #
-# Credentials: the integration tests use a throwaway local Supabase that the
-# workflow starts itself, so no GitHub Secrets are needed (see
-# leo-demo/.env.test.example).
+# Credentials:
+#   integration  a throwaway local Supabase that the job starts itself, so no
+#                GitHub Secrets (see leo-demo/.env.test.example)
+#   deploy       repository Secrets CLOUDFLARE_API_TOKEN and
+#                CLOUDFLARE_ACCOUNT_ID (the sponsor's Cloudflare account), and
+#                repository Variables VITE_SUPABASE_URL and
+#                VITE_SUPABASE_PUBLISHABLE_KEY (the hosted project; public by
+#                design, so Variables rather than Secrets)
 # -----------------------------------------------------------------------------
 
 name: Tests
@@ -92,6 +107,8 @@ jobs:
   # supabase/migrations and supabase/config.toml. Runs alongside `checks`.
   integration:
     name: Integration tests
+    # Stage 2: only once the checks and unit tests have passed.
+    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -155,18 +172,16 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
-  # End-to-end tests: whole user journeys in a real browser (Playwright),
-  # against the app running on its own fresh local Supabase. Runs only after
-  # the integration tests pass, since a broken service would fail these too,
-  # with less useful errors.
-  e2e:
-    name: End-to-end tests
+  # Puts the tested code live: builds the app and uploads dist/ to the
+  # sponsor's Cloudflare account (see leo-demo/wrangler.jsonc).
+  deploy:
+    name: Deploy to Cloudflare
+    # Stage 3: only once the integration tests have passed, and only for
+    # pushes to main (pull requests are tested but never deployed).
     needs: integration
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      TZ: Africa/Johannesburg
+    timeout-minutes: 10
 
     steps:
       - name: Check out the code
@@ -179,54 +194,23 @@ jobs:
           cache: npm
           cache-dependency-path: leo-demo/package-lock.json
 
-      - name: Set up the Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.121.0
-
       - name: Install dependencies
         run: npm ci
 
-      # Each job runs on its own machine, so this job starts its own Supabase.
-      - name: Start local Supabase
-        run: >-
-          supabase start
-          -x studio,postgres-meta,imgproxy,mailpit,realtime,edge-runtime,logflare,vector,supavisor
+      # Vite writes these values into the built files, so they must be set
+      # when it builds. They're the hosted project's, and public by design.
+      - name: Build with the hosted Supabase values
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
-      # Unlike the integration job, this writes a .env.test FILE: the app's dev
-      # server (vite --mode test) reads its Supabase URL and key from that
-      # file, as well as the tests reading the secret key for seeding.
-      - name: Write the local Supabase credentials to .env.test
-        run: |
-          supabase status -o env | grep -E '^[A-Z_]+=' > "$RUNNER_TEMP/supabase.env"
-          set -a
-          source "$RUNNER_TEMP/supabase.env"
-          set +a
-
-          echo "::add-mask::$SECRET_KEY"
-
-          {
-            echo "VITE_SUPABASE_URL=$API_URL"
-            echo "VITE_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
-            echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
-          } > .env.test
-
-      # Chromium, the only browser playwright.config.ts uses (for both the
-      # desktop and phone projects), plus the system libraries it needs.
-      - name: Install the Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      # Playwright starts the app itself (see webServer in playwright.config.ts).
-      # A run that finds no tests fails, so an empty folder can't pass.
-      - name: End-to-end tests
-        run: npm run test:e2e
-
-      # On failure, keep the HTML report (traces, screenshots, videos) as a
-      # downloadable artifact on the run's page.
-      - name: Upload the Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
+      # Cloudflare's official action runs `wrangler deploy` with the Wrangler
+      # version from package.json, uploading dist/ as wrangler.jsonc says.
+      - name: Upload to Cloudflare
+        uses: cloudflare/wrangler-action@v3
         with:
-          name: playwright-report
-          path: leo-demo/playwright-report/
-          retention-days: 14
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: leo-demo
+          command: deploy

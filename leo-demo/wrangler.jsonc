@@ -1,0 +1,29 @@
+// -----------------------------------------------------------------------------
+// Cloudflare deployment (Workers static assets)
+//
+// The app is a static site: `npm run build` puts it in dist/, and Cloudflare
+// serves those files. There's no server code, so there's no `main` entry.
+//
+// Deploy by hand with `npm run build` then `npx wrangler deploy` (after
+// `npx wrangler login` with the sponsor's Cloudflare account). The build reads
+// the hosted Supabase values from .env; it never uses .env.test.
+// -----------------------------------------------------------------------------
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // The Worker's name; the site is served at leo.<subdomain>.workers.dev.
+  "name": "leo",
+
+  // Which version of Cloudflare's runtime behaviour to use. Keep it fixed and
+  // move it forward deliberately.
+  "compatibility_date": "2026-10-23",
+
+  "assets": {
+    // Vite's build output.
+    "directory": "./dist",
+
+    // React Router handles pages in the browser, so any path that isn't a real
+    // file (e.g. a refresh on /student/classrooms) gets index.html, not a 404.
+    "not_found_handling": "single-page-application",
+  },
+}

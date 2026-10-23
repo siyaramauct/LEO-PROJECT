@@ -7,14 +7,13 @@
 // Used by: ClassroomDetail || TeacherClassroom
 // -----------------------------------------------------------------------------
 
-import { BookOpen, Plus, Users } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function EmptyLessons() {
   return (
     <div className="flex flex-col items-center px-4 py-7 text-center sm:py-8">
-      <BookOpen size={26} className="text-slate-300" />
-      <p className="mt-2 text-sm font-semibold text-violet-700">No lessons yet</p>
+      <p className="text-sm font-semibold text-slate-800">No lessons yet</p>
       <p className="mt-1 text-xs leading-5 text-slate-400">
         Use the create lesson button above to add the first lesson for this classroom.
       </p>
@@ -35,10 +34,7 @@ export function EmptyClassrooms({ compact = false }: { compact?: boolean }) {
     <div
       className={`flex flex-col items-center justify-center text-center ${compact ? "px-5 py-9" : "px-6 py-14"}`}
     >
-      <div className="flex h-11 w-11 items-center justify-center text-slate-400">
-        <Users size={21} className="text-violet-500" />
-      </div>
-      <h3 className="mt-3 text-sm font-bold text-slate-800">Start your first classroom</h3>
+      <h3 className="text-sm font-bold text-slate-800">Start your first classroom</h3>
       <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
         Create a dedicated space to organise lessons and invite your learners.
       </p>

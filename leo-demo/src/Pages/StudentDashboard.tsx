@@ -252,23 +252,20 @@ export default function StudentDashboard() {
         </header>
 
         <div className="mx-auto max-w-7xl space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
-          <section className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+          <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
             <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6">
-              <div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />
-              {studentClassroom ? (
-                <img
-                  src={studentClassroom.cover_image_path ?? undefined}
-                  alt="Student learning"
-                  className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52"
-                />
-              ) : (
-                <div aria-hidden="true" className="absolute inset-y-0 right-0 w-44 sm:w-56">
-                  <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full border-[18px] border-violet-300/40" />
-                  <div className="absolute bottom-[-3rem] right-10 h-32 w-32 rotate-12 rounded-3xl bg-fuchsia-300/30" />
-                  <div className="absolute right-28 top-16 h-12 w-20 -rotate-12 rounded-full bg-white/20" />
-                </div>
+              {studentClassroom && (
+                <>
+                  <div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />
+                  <img
+                    src={studentClassroom.cover_image_path ?? undefined}
+                    alt="Student learning"
+                    className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52"
+                  />
+                </>
               )}
-              <div className="relative max-w-md pr-24 sm:pr-32">
+              {/* Text leaves room for the cover picture only when there is one. */}
+              <div className={`relative max-w-md ${studentClassroom ? "pr-24 sm:pr-32" : ""}`}>
                 {studentClassroom ? (
                   <>
                     <p className="text-xs font-medium text-violet-100">Continue learning</p>
@@ -341,19 +338,19 @@ export default function StudentDashboard() {
             </button>
           </section>
 
-          <section className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <section className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
             <article className="rounded-xl border border-slate-100 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <h2 className="text-base font-bold">My classrooms</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Your {DASHBOARD_CLASSROOM_LIMIT} most recent enrolments.
+                    Your most recently joined classrooms.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => navigate("/student/classrooms")}
-                  className="text-sm font-semibold text-violet-700"
+                  className="shrink-0 whitespace-nowrap py-1 text-sm font-semibold text-violet-700"
                 >
                   View all
                 </button>
@@ -399,8 +396,8 @@ export default function StudentDashboard() {
               )}
             </article>
             <article className="rounded-xl border border-slate-100 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <h2 className="text-base font-bold">Recently added</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     Newest lessons added to your classrooms.
@@ -409,7 +406,7 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => navigate("/lessons")}
-                  className="text-sm font-semibold text-violet-700"
+                  className="shrink-0 whitespace-nowrap py-1 text-sm font-semibold text-violet-700"
                 >
                   View all
                 </button>

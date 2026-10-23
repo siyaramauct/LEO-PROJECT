@@ -20,7 +20,7 @@ import {
   BookOpenIcon,
   ChartBarIcon,
   HomeIcon,
-  PlusIcon,
+  PlayCircleIcon,
   SparklesIcon,
   UserGroupIcon,
   UserIcon,
@@ -35,6 +35,7 @@ const navItems = {
   home: { label: "Home", path: "/student/dashboard", icon: HomeIcon },
   classrooms: { label: "Classrooms", path: "/student/classrooms", icon: UserGroupIcon },
   lessons: { label: "Lessons", path: "/lessons", icon: BookOpenIcon },
+  practice: { label: "Practice", path: "/student/practice", icon: PlayCircleIcon },
   report: { label: "Report", path: "/student/report", icon: ChartBarIcon },
   hub: { label: "Hub", path: "/student/hub", icon: SparklesIcon },
   profile: { label: "Profile", path: "/student/profile", icon: UserIcon },
@@ -51,14 +52,13 @@ const desktopItems = [
   navItems.profile,
 ];
 
-// The bottom bar has a Practice button in the middle. Items marked tabletOnly
-// are hidden on phones, where there is only room for four links.
-const barStartItems = [
+// The bottom bar's tabs, all the same size, with Practice in the middle. Items
+// marked tabletOnly are hidden on phones, where there is room for five.
+const barItems = [
   { ...navItems.home, tabletOnly: false },
   { ...navItems.classrooms, tabletOnly: false },
   { ...navItems.lessons, tabletOnly: true },
-];
-const barEndItems = [
+  { ...navItems.practice, tabletOnly: false },
   { ...navItems.report, tabletOnly: false },
   { ...navItems.hub, tabletOnly: true },
   { ...navItems.profile, tabletOnly: false },
@@ -71,7 +71,7 @@ function BarLink({ item, tabletOnly }: { item: NavEntry; tabletOnly: boolean }) 
     <NavLink
       to={item.path}
       className={({ isActive }) =>
-        `w-full min-w-0 flex-col items-center gap-1 text-[10px] font-semibold ${
+        `min-h-11 w-full min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
           tabletOnly ? "hidden md:flex" : "flex"
         } ${isActive ? "text-violet-700" : "text-slate-500"}`
       }
@@ -130,7 +130,7 @@ export default function StudentBottomNav() {
             }`
           }
         >
-          <PlusIcon className="h-5 w-5" />
+          <PlayCircleIcon className="h-5 w-5" />
           Practice
         </NavLink>
 
@@ -148,27 +148,10 @@ export default function StudentBottomNav() {
 
   // -- Bottom bar, phones and tablets --
 
-  // Raised Practice button that sits in the centre slot of the bar.
-  const practiceButton = (
-    <NavLink
-      to="/student/practice"
-      className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-violet-700 text-white shadow-lg shadow-violet-200 transition active:scale-95"
-      aria-label="Start practice"
-    >
-      <PlusIcon className="h-6 w-6" />
-    </NavLink>
-  );
-
   const bottomBar = (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white shadow-[0_-12px_30px_rgba(15,23,42,0.08)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_30px_rgba(15,23,42,0.08)] lg:hidden">
       <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-2 md:max-w-2xl md:grid-cols-7">
-        {barStartItems.map((item) => (
-          <BarLink key={item.label} item={item} tabletOnly={item.tabletOnly} />
-        ))}
-
-        {practiceButton}
-
-        {barEndItems.map((item) => (
+        {barItems.map((item) => (
           <BarLink key={item.label} item={item} tabletOnly={item.tabletOnly} />
         ))}
       </div>

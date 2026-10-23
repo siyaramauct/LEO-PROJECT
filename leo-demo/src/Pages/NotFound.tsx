@@ -24,7 +24,7 @@ export default function NotFound() {
           </span>
         </header>
 
-        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.98fr] lg:gap-14 lg:py-8">
+        <section className="grid grid-cols-1 flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.98fr] lg:gap-14 lg:py-8">
           <div className="max-w-md">
             <p className="text-xs font-bold uppercase tracking-[0.05em] text-violet-600">
               Lost in translation

@@ -167,7 +167,7 @@ export default function FlashActivity() {
     <section className="mt-4 rounded-xl border border-slate-100 bg-white p-4">
       <h2 className="text-sm font-bold">Lesson documents</h2>
       <p className="mt-1 text-xs text-slate-500">Resources your teacher attached to this lesson.</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {documents.map((document) => (
           <a
             key={document.resource_id}

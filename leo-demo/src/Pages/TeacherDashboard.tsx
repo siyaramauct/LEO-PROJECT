@@ -14,7 +14,7 @@
 // Route: /teacher-dashboard || Access: teachers
 // -----------------------------------------------------------------------------
 
-import { ChevronRight, LogOut, MoreHorizontal, Plus, Users } from "lucide-react";
+import { ChevronRight, LogOut, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
@@ -292,6 +292,7 @@ export default function TeacherDashboard() {
       error={scheduledLessonsError}
       onSaveLesson={saveScheduledLesson}
       onDeleteLesson={setScheduledLessonToDelete}
+      hasClassrooms={classrooms.length > 0}
     />
   );
 
@@ -319,16 +320,13 @@ export default function TeacherDashboard() {
           <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
 
           <div className="relative">
-            <div className="flex items-center justify-between">
-              <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-medium uppercase tracking-wide">
-                Active Classroom
-              </span>
-              <MoreHorizontal size={18} className="opacity-80" />
-            </div>
+            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium uppercase tracking-wide">
+              {newestClassroom ? "Newest classroom" : "Get started"}
+            </span>
 
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-bold">
+                <h2 className="line-clamp-2 text-lg font-bold">
                   {newestClassroom?.name ?? "Create your first classroom"}
                 </h2>
                 <p className="mt-1 text-xs text-violet-100">
@@ -338,22 +336,13 @@ export default function TeacherDashboard() {
                 </p>
               </div>
 
-              {newestClassroom ? (
+              {newestClassroom && (
                 <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
                   <img
                     src={newestClassroom.image}
                     alt={newestClassroom.imageAlt}
                     className="h-full w-full object-contain"
                   />
-                </div>
-              ) : (
-                <div
-                  aria-hidden="true"
-                  className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-violet-600/50"
-                >
-                  <div className="absolute -right-4 -top-5 h-16 w-16 rounded-full border-[10px] border-violet-200/50" />
-                  <div className="absolute -bottom-5 left-3 h-16 w-16 rotate-45 rounded-2xl bg-fuchsia-300/30" />
-                  <div className="absolute bottom-4 right-4 h-3 w-10 -rotate-12 rounded-full bg-white/25" />
                 </div>
               )}
             </div>
@@ -377,16 +366,21 @@ export default function TeacherDashboard() {
       <section className="mt-3 shrink-0 px-4 sm:px-6">
         <h2 className="mb-3 text-sm font-bold">Quick Actions</h2>
         <div className="grid grid-cols-2 gap-2">
+          {/* Lessons need a classroom; until there is one, this starts a classroom. */}
           <Link
-            to="/create-lesson"
+            to={classrooms.length > 0 ? "/create-lesson" : "/create-classroom"}
             className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
               <Plus size={19} />
             </div>
-            <div>
-              <p className="text-xs font-bold">Create Lesson</p>
-              <p className="mt-0.5 text-[10px] text-slate-500">Add vocabulary</p>
+            <div className="min-w-0">
+              <p className="text-xs font-bold">
+                {classrooms.length > 0 ? "Create Lesson" : "Create Classroom"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {classrooms.length > 0 ? "Add vocabulary" : "Needed before lessons"}
+              </p>
             </div>
           </Link>
           <Link
@@ -436,8 +430,8 @@ export default function TeacherDashboard() {
                   />
                 </div>
                 <div className="mt-2 min-w-0 shrink-0 px-2 pb-2">
-                  <p className="truncate text-[10px] font-bold">{item.name}</p>
-                  <p className="mt-0.5 truncate text-[9px] text-slate-500">
+                  <p className="truncate text-xs font-bold">{item.name}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500">
                     {item.studentCount} students · {item.lessonCount} lessons
                   </p>
                 </div>
@@ -471,8 +465,8 @@ export default function TeacherDashboard() {
                   />
                 </div>
                 <div className="ml-2 min-w-0 flex-1">
-                  <p className="truncate text-[10px] font-bold">{lesson.title}</p>
-                  <p className="mt-0.5 truncate text-[9px] text-slate-500">
+                  <p className="truncate text-xs font-bold">{lesson.title}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500">
                     {lesson.classroomName} · {lesson.wordCount} words
                   </p>
                 </div>
@@ -553,9 +547,8 @@ export default function TeacherDashboard() {
                     {classroomsError}
                   </p>
                 ) : classrooms.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/60 px-4 py-6 text-center">
-                    <Users className="mx-auto text-violet-700" size={22} />
-                    <p className="mt-2 text-sm font-semibold text-slate-800">
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm font-semibold text-slate-800">
                       Your first classroom starts here
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">

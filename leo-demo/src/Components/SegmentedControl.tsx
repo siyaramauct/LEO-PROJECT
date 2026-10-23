@@ -2,7 +2,8 @@
 // Segmented Control
 //
 // A row of small toggle buttons for choosing one option, such as a sort order.
-// On narrow screens the row scrolls sideways instead of wrapping.
+// When the options don't fit (on phones, or with long labels), they wrap onto
+// another line, so no option is ever cut off or hidden off-screen.
 //
 // Used by: ClassroomReport || StudentLearningReport
 // -----------------------------------------------------------------------------
@@ -24,7 +25,7 @@ export default function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="inline-flex max-w-full shrink-0 overflow-x-auto rounded-lg bg-slate-100 p-0.5"
+      className="inline-flex max-w-full flex-wrap gap-0.5 rounded-lg bg-slate-100 p-0.5"
     >
       {options.map((option) => (
         <button

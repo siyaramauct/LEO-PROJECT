@@ -116,7 +116,7 @@ export default function LessonSummary() {
               />
             </div>
           </section>
-          <section className="mt-4 grid gap-3 sm:grid-cols-3">
+          <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <article className="rounded-xl border border-slate-100 bg-white p-4">
               <p className="text-2xl font-bold">{result.score}</p>
               <p className="mt-1 text-xs text-slate-500">Score out of {result.totalQuestions}</p>

@@ -265,7 +265,7 @@ export default function ClassroomReport() {
   return (
     <TeacherShell active="reports" header={header}>
       <div className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.1fr)_repeat(4,minmax(0,1fr))]">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.1fr)_repeat(4,minmax(0,1fr))]">
           <div className="relative min-h-28 overflow-hidden rounded-xl sm:col-span-2 xl:col-span-1">
             <img
               src={report.coverUrl}
@@ -311,7 +311,7 @@ export default function ClassroomReport() {
           />
         </section>
 
-        <section className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <article className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
             <h2 className="text-sm font-bold">Students to check in with</h2>
             <p className="mt-1 text-xs text-slate-500">

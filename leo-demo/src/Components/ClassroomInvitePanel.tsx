@@ -9,7 +9,7 @@
 // Used by: ClassroomDetail
 // -----------------------------------------------------------------------------
 
-import { Copy, Mail, RefreshCw, Share2, Users } from "lucide-react";
+import { Copy, Mail, RefreshCw, Share2 } from "lucide-react";
 import { useState } from "react";
 import { MAX_CLASSROOM_STUDENTS } from "../config/limits";
 import SearchSortBar from "./SearchSortBar";
@@ -126,7 +126,7 @@ export default function ClassroomInvitePanel({
       </div>
       {code ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <code className="min-w-0 select-all rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold tracking-wider text-slate-900">
+          <code className="w-full min-w-0 select-all break-all rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold tracking-wider text-slate-900 sm:w-auto">
             {code}
           </code>
           <button
@@ -195,9 +195,7 @@ export default function ClassroomInvitePanel({
             </p>
           )}
           {students.length === 0 ? (
-            <div className="flex items-center gap-2 py-5 text-sm text-slate-500">
-              <Users size={18} /> No students have joined yet.
-            </div>
+            <p className="py-5 text-sm text-slate-500">No students have joined yet.</p>
           ) : (
             <>
               <SearchSortBar

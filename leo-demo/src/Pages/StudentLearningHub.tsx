@@ -147,7 +147,7 @@ export default function StudentLearningHub() {
                 Choose one small thing to practise today. Consistency matters more than cramming.
               </p>
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {resources.map((resource) => {
                 const Icon = resource.icon;
                 return (

@@ -304,7 +304,7 @@ export default function StudentLearningReport() {
             </p>
           )}
 
-          <section className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <article className="rounded-xl border border-slate-100 bg-white p-5">
               <h2 className="text-sm font-bold">Overview</h2>
               <div className="mt-4 flex items-end justify-between gap-4">
@@ -388,7 +388,7 @@ export default function StudentLearningReport() {
               </button>
             </section>
           ) : (
-            <section className="grid items-start gap-4 sm:gap-6 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+            <section className="grid grid-cols-1 items-start gap-4 sm:gap-6 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
               <article className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-sm font-bold">Classrooms</h2>
@@ -506,9 +506,9 @@ export default function StudentLearningReport() {
                         value={effectiveLessonSort}
                         onChange={setLessonSort}
                         options={[
-                          { value: "order", label: "Course order" },
-                          { value: "highest", label: "Best scores", disabled: !selectedHasScores },
-                          { value: "lowest", label: "Lowest scores", disabled: !selectedHasScores },
+                          { value: "order", label: "Order" },
+                          { value: "highest", label: "Best", disabled: !selectedHasScores },
+                          { value: "lowest", label: "Lowest", disabled: !selectedHasScores },
                         ]}
                       />
                     </div>

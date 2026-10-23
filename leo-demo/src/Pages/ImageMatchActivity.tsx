@@ -181,10 +181,10 @@ export default function ImageMatchActivity() {
                   </div>
                 </section>
               ) : (
-                <section className="mt-5 grid gap-4 md:grid-cols-2">
+                <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="rounded-xl border border-slate-100 bg-white p-4">
                     <h2 className="text-sm font-bold">Words</h2>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
                       {words.map((card) => {
                         const matched = matchedIds.includes(card.flashcard_id);
                         const selected = selectedWordId === card.flashcard_id;

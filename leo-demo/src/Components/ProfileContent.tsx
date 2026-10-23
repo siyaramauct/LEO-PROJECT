@@ -73,7 +73,7 @@ export default function ProfileContent({
             <p className="mt-1 text-sm text-slate-500">Your account details are shown below.</p>
           </div>
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ProfileField
             label="First name"
             value={firstName || (isStudent ? "Student" : "Teacher")}

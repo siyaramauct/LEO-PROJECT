@@ -70,7 +70,7 @@ export default function ClassroomReportPicker({
         <p className="mt-1 text-xs text-slate-500">Select a classroom to view its report.</p>
       </div>
 
-      <div className="grid gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
         {classrooms.map((classroom) => (
           <button
             key={classroom.classroom_id}

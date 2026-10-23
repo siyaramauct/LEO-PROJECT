@@ -174,7 +174,7 @@ export default function ClassroomMaterialsTimeline({
       </section>
 
       {materials.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+        <p className="rounded-xl border border-slate-100 bg-white px-4 py-10 text-center text-sm text-slate-500">
           Nothing shared yet. Upload a document or add a link above.
         </p>
       ) : (

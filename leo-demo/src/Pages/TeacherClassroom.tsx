@@ -117,7 +117,7 @@ export default function TeacherClassrooms() {
     [classrooms, classroomQuery, classroomSort],
   );
   const noMatches = (
-    <p className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+    <p className="rounded-lg border border-slate-100 bg-white px-4 py-8 text-center text-sm text-slate-500">
       No classrooms match "{classroomQuery.trim()}".
     </p>
   );
@@ -190,19 +190,21 @@ export default function TeacherClassrooms() {
         </header>
 
         {
-          // Search + sort
+          // Search + sort, once there are classrooms to search
         }
-        <section className="mt-4 shrink-0 px-4 sm:px-6">
-          <SearchSortBar
-            size="sm"
-            query={classroomQuery}
-            onQueryChange={setClassroomQuery}
-            searchPlaceholder="Search classrooms..."
-            sort={classroomSort}
-            onSortChange={setClassroomSort}
-            sortOptions={classroomSortOptions}
-          />
-        </section>
+        {classrooms.length > 0 && (
+          <section className="mt-4 shrink-0 px-4 sm:px-6">
+            <SearchSortBar
+              size="sm"
+              query={classroomQuery}
+              onQueryChange={setClassroomQuery}
+              searchPlaceholder="Search classrooms..."
+              sort={classroomSort}
+              onSortChange={setClassroomSort}
+              sortOptions={classroomSortOptions}
+            />
+          </section>
+        )}
 
         {
           // Create Classroom
@@ -308,25 +310,27 @@ export default function TeacherClassrooms() {
             </div>
 
             {
-              // Search + Filters
+              // Search + Filters, once there are classrooms to search
             }
-            <div className="mt-3 flex items-center justify-between gap-4">
-              <SearchSortBar
-                className="w-full max-w-xl"
-                query={classroomQuery}
-                onQueryChange={setClassroomQuery}
-                searchPlaceholder="Search classrooms..."
-                sort={classroomSort}
-                onSortChange={setClassroomSort}
-                sortOptions={classroomSortOptions}
-              />
+            {classrooms.length > 0 && (
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <SearchSortBar
+                  className="w-full max-w-xl"
+                  query={classroomQuery}
+                  onQueryChange={setClassroomQuery}
+                  searchPlaceholder="Search classrooms..."
+                  sort={classroomSort}
+                  onSortChange={setClassroomSort}
+                  sortOptions={classroomSortOptions}
+                />
 
-              <p className="shrink-0 text-xs text-slate-400">
-                {visibleClassrooms.length === classrooms.length
-                  ? "Showing all classrooms"
-                  : `Showing ${visibleClassrooms.length} of ${classrooms.length}`}
-              </p>
-            </div>
+                <p className="shrink-0 text-xs text-slate-400">
+                  {visibleClassrooms.length === classrooms.length
+                    ? "Showing all classrooms"
+                    : `Showing ${visibleClassrooms.length} of ${classrooms.length}`}
+                </p>
+              </div>
+            )}
 
             {
               // Classroom Grid
