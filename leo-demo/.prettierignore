@@ -1,4 +1,5 @@
 dist
+.pwa-test-dist
 node_modules
 public
 supabase

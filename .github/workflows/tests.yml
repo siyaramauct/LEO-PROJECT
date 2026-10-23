@@ -4,7 +4,7 @@
 # Runs the project's checks and tests on GitHub's servers, then deploys, in
 # three stages. Each starts only if the one before it passed:
 #
-#   1. checks       formatting, lint, type-check, build and the unit tests
+#   1. checks       formatting, lint, type-check, build, unit and PWA tests
 #   2. integration  services and RLS against a fresh local Supabase
 #   3. deploy       builds the app with the hosted Supabase values and uploads
 #                   it to Cloudflare. Pushes to main only: pull requests are
@@ -102,6 +102,13 @@ jobs:
       #    watching for changes.
       - name: Unit tests
         run: npm test -- --run
+
+      # Test the real production service worker; no hosted Supabase access.
+      - name: Install Chromium for PWA checks
+        run: npx playwright install --with-deps chromium
+
+      - name: PWA browser tests
+        run: npm run test:pwa
 
   # The integration tests, against a fresh local Supabase in Docker built from
   # supabase/migrations and supabase/config.toml. Runs alongside `checks`.

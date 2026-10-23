@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#6d28d9" />
+    <title>Offline | LEO Vocabulary App</title>
+    <link rel="icon" href="/logo-mark.svg" type="image/svg+xml" />
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px; background: #f8fafc; color: #111827; font-family: system-ui, sans-serif; }
+      main { width: 100%; max-width: 440px; text-align: center; }
+      img { width: 212px; height: 104px; max-width: 100%; object-fit: contain; }
+      h1 { margin: 32px 0 12px; font-size: 28px; }
+      p { color: #475569; line-height: 1.6; }
+      button { margin-top: 16px; border: 0; border-radius: 6px; padding: 14px 24px; background: #6d28d9; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+      button:hover { background: #5b21b6; }
+      button:focus-visible { outline: 3px solid #6d28d9; outline-offset: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo-wordmark.svg" alt="LEO - Learn English Online" width="265" height="130" />
+      <h1>You're offline</h1>
+      <p>Connect to the internet to open your classrooms and continue learning. Lessons and submissions need a connection.</p>
+      <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

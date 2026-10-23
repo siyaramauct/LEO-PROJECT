@@ -17,6 +17,7 @@ import "./index.css";
 import { AuthContextProvider } from "./context/AuthContext";
 import { GuardRoute } from "./Components/GuardRoute";
 import LoadingScreen from "./Components/LoadingScreen";
+import PwaStatus from "./Components/PwaStatus";
 import { installBrokenImageFallback } from "./utils/images";
 
 // Public pages
@@ -126,6 +127,7 @@ installBrokenImageFallback();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <PwaStatus />
     <AuthContextProvider>
       <RouterProvider router={router} />
     </AuthContextProvider>

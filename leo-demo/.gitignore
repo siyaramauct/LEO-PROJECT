@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.pwa-test-dist/
 *.local
 
 # Environment files hold project keys: keep them out of git, but share the
