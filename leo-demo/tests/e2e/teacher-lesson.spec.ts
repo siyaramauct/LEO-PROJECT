@@ -141,3 +141,59 @@ test("Test B - When the AI fails, the teacher can still save a flashcards-only l
   expect(lesson?.flashcards[0].count).toBe(3);
   expect(lesson?.mcqs).toEqual([]);
 });
+
+test("Test C - A teacher who tries to add 20 flashcards is stopped at the limit of 15", async ({
+  page,
+}) => {
+  const { teacher } = signedInUsers();
+  const classroomId = await seedClassroom(teacher, uniqueName("Business English"));
+  const title = uniqueName("Big Vocabulary List");
+  const addFlashcard = page.getByRole("button", { name: "Add flashcard" });
+
+  // 1. Lesson details.
+  await page.goto(`/create-lesson?classroomId=${classroomId}`);
+  await page.getByLabel("Lesson title").fill(title);
+  await page.getByLabel("Description").fill("As many business words as the lesson allows.");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // 2. Try to add 20 flashcards. The first card is already there; after each
+  //    one, look for "Add flashcard" and stop when it's gone.
+  let cardsAdded = 0;
+
+  for (let card = 1; card <= 20; card += 1) {
+    if (card > 1) {
+      if (!(await addFlashcard.isVisible())) {
+        break;
+      }
+
+      await addFlashcard.click();
+    }
+
+    await page
+      .getByLabel("Term", { exact: true })
+      .nth(card - 1)
+      .fill(`word${card}`);
+    await page
+      .getByLabel("Definition", { exact: true })
+      .nth(card - 1)
+      .fill(`Meaning ${card}`);
+    cardsAdded = card;
+  }
+
+  // 3. The app stopped at 15: the button is gone and the counter is full.
+  expect(cardsAdded).toBe(15);
+  await expect(addFlashcard).toBeHidden();
+  await expect(page.getByText("15 of 15")).toBeVisible();
+  await expect(page.getByLabel("Term", { exact: true })).toHaveCount(15);
+
+  // 4. The full lesson still saves (without a quiz), with exactly 15 cards.
+  await page.getByRole("button", { name: "Choose activity" }).click();
+  await page.getByRole("switch", { name: "Include an MCQ activity" }).click();
+  await page.getByRole("button", { name: "Create lesson" }).click();
+  await expect(page).toHaveURL(new RegExp(`/teacher-classroom/${classroomId}$`));
+
+  const lesson = await savedLesson(classroomId, title);
+
+  expect(lesson?.flashcards[0].count).toBe(15);
+  expect(lesson?.mcqs).toEqual([]);
+});
