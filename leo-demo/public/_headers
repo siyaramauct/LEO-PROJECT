@@ -1,3 +1,8 @@
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
 /sw.js
   Cache-Control: no-cache
 /manifest.webmanifest

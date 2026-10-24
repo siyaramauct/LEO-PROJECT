@@ -1,5 +1,7 @@
 # LEO Progressive Web App
 
+For the Samsung Internet "Unsafe app blocked" warning and the privacy-hardening review, see [Android installation troubleshooting](./ANDROID-INSTALLATION.md).
+
 LEO can be installed from a supported browser without an app store. This does not change Supabase authentication, classroom permissions or the Cloudflare deployment target.
 
 ## What is included
