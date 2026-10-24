@@ -45,14 +45,17 @@ async function fillDetailsAndFlashcards(page: Page, classroomId: string, title: 
   await page.getByLabel("Description").fill("Words for invoices, deadlines and profit.");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // 3. One flashcard per word; the first empty card is already there.
-  for (const [index, card] of flashcards.entries()) {
-    if (index > 0) {
-      await page.getByRole("button", { name: "Add flashcard" }).click();
-    }
+  // 3. The flashcards, typed as a list ("word - definition" per line), become
+  //    one editable card each.
+  const list = flashcards.map((card) => `${card.term} - ${card.definition}`).join("\n");
+  await page.getByLabel("Words and definitions").fill(list);
+  await page.getByRole("button", { name: `Add ${flashcards.length} flashcards` }).click();
 
-    await page.getByLabel("Term", { exact: true }).nth(index).fill(card.term);
-    await page.getByLabel("Definition", { exact: true }).nth(index).fill(card.definition);
+  for (const [index, card] of flashcards.entries()) {
+    await expect(page.getByLabel("Term", { exact: true }).nth(index)).toHaveValue(card.term);
+    await expect(page.getByLabel("Definition", { exact: true }).nth(index)).toHaveValue(
+      card.definition,
+    );
   }
 
   await page.getByRole("button", { name: "Choose activity" }).click();
@@ -90,7 +93,7 @@ test("Test A - A teacher creates a lesson with flashcards and an AI quiz", async
   await fillDetailsAndFlashcards(page, classroomId, title);
 
   // 2. Pick a quiz format and let "the AI" write the quiz.
-  await page.getByRole("button", { name: /Basic multiple choice/ }).click();
+  await page.getByRole("button", { name: /Match the definition/ }).click();
   await page.getByRole("button", { name: "Generate activity" }).click();
 
   // 3. The review step shows the generated quiz, ready to edit.
@@ -123,7 +126,7 @@ test("Test B - When the AI fails, the teacher can still save a flashcards-only l
 
   // 1. Details and flashcards, then ask for a quiz.
   await fillDetailsAndFlashcards(page, classroomId, title);
-  await page.getByRole("button", { name: /Basic multiple choice/ }).click();
+  await page.getByRole("button", { name: /Match the definition/ }).click();
   await page.getByRole("button", { name: "Generate activity" }).click();
 
   // 2. The failure is explained, with a way to carry on without a quiz.
@@ -148,7 +151,6 @@ test("Test C - A teacher who tries to add 20 flashcards is stopped at the limit 
   const { teacher } = signedInUsers();
   const classroomId = await seedClassroom(teacher, uniqueName("Business English"));
   const title = uniqueName("Big Vocabulary List");
-  const addFlashcard = page.getByRole("button", { name: "Add flashcard" });
 
   // 1. Lesson details.
   await page.goto(`/create-lesson?classroomId=${classroomId}`);
@@ -156,35 +158,18 @@ test("Test C - A teacher who tries to add 20 flashcards is stopped at the limit 
   await page.getByLabel("Description").fill("As many business words as the lesson allows.");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // 2. Try to add 20 flashcards. The first card is already there; after each
-  //    one, look for "Add flashcard" and stop when it's gone.
-  let cardsAdded = 0;
+  // 2. Paste 20 flashcards. The summary warns that only the first 15 fit.
+  const list = Array.from({ length: 20 }, (_, index) => `word${index + 1} - Meaning ${index + 1}`);
+  await page.getByLabel("Words and definitions").fill(list.join("\n"));
+  await expect(page.getByText("so the last 5 words won't be added")).toBeVisible();
+  await page.getByRole("button", { name: "Add 15 flashcards" }).click();
 
-  for (let card = 1; card <= 20; card += 1) {
-    if (card > 1) {
-      if (!(await addFlashcard.isVisible())) {
-        break;
-      }
-
-      await addFlashcard.click();
-    }
-
-    await page
-      .getByLabel("Term", { exact: true })
-      .nth(card - 1)
-      .fill(`word${card}`);
-    await page
-      .getByLabel("Definition", { exact: true })
-      .nth(card - 1)
-      .fill(`Meaning ${card}`);
-    cardsAdded = card;
-  }
-
-  // 3. The app stopped at 15: the button is gone and the counter is full.
-  expect(cardsAdded).toBe(15);
-  await expect(addFlashcard).toBeHidden();
+  // 3. The app stopped at 15: the counter is full, and nothing more can be added.
   await expect(page.getByText("15 of 15")).toBeVisible();
   await expect(page.getByLabel("Term", { exact: true })).toHaveCount(15);
+  await expect(page.getByLabel("Term", { exact: true }).last()).toHaveValue("word15");
+  await expect(page.getByRole("button", { name: "Add a blank card" })).toBeHidden();
+  await expect(page.getByText("This lesson already has 15 flashcards")).toBeVisible();
 
   // 4. The full lesson still saves (without a quiz), with exactly 15 cards.
   await page.getByRole("button", { name: "Choose activity" }).click();

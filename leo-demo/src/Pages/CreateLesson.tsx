@@ -3,7 +3,9 @@
 //
 // A four-step form for building a lesson:
 //   1. Details      classroom, title, description, release date, PDFs, cover
-//   2. Flashcards   up to 15 words with definitions and optional images
+//   2. Flashcards   up to 15 words with definitions and optional images, typed
+//                   or pasted as a list (FlashcardListInput), then edited as
+//                   cards; a blank card can also be added by hand
 //   3. Activity     pick a quiz format, or turn the quiz off for a
 //                   flashcards-only lesson
 //   4. Review       edit the AI-generated quiz before saving
@@ -32,11 +34,14 @@ import {
   ImagePlus,
   Paperclip,
   Plus,
+  RotateCcw,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import ConfirmDialog from "../Components/ConfirmDialog";
+import FlashcardListInput from "../Components/FlashcardListInput";
 import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON } from "../config/limits";
 import { useAuth } from "../context/AuthContext";
 import { getTeacherClassrooms } from "../data/classrooms";
@@ -47,9 +52,11 @@ import {
   type DraftQuestion,
   type QuizFormat,
 } from "../domain/quizDraft";
+import { type WordEntry } from "../domain/wordList";
 import { checkLessonLimit, createLesson } from "../services/lessonCreationService";
 import { generateQuiz } from "../services/quizGenerationService";
 import { bucketImageUrl } from "../utils/images";
+import { clearLessonDraft, loadLessonDraft, saveLessonDraft } from "../utils/lessonDraft";
 import { formatDateKey, parseFutureDateKey, toDateKey } from "../utils/releaseDate";
 
 // -- Types --------------------------------------------------------------------
@@ -112,14 +119,19 @@ const stepLabels = ["Lesson details", "Flashcards", "MCQ activity", "Review & ed
 
 const mcqFormatOptions: { id: QuizFormat; name: string; description: string }[] = [
   {
-    id: "basic-mcq",
-    name: "Basic multiple choice",
-    description: "Learners choose the correct term or definition from the answers.",
+    id: "match-definition-mcq",
+    name: "Match the definition",
+    description: "Learners read a definition and choose the word it describes.",
   },
   {
     id: "fill-blank-mcq",
     name: "Fill in the blank",
     description: "Learners complete a sentence by choosing the missing word.",
+  },
+  {
+    id: "mixed-mcq",
+    name: "Mixed",
+    description: "Both question types, taking turns, for more varied practice.",
   },
 ];
 
@@ -133,10 +145,19 @@ const BACK_BUTTON =
 const inputClassName =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-600";
 
+// The flashcard Term and Definition boxes focus in grey, like the word list box above them.
+const flashcardInputClassName =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-500";
+
 // -- Helpers ------------------------------------------------------------------
 
 function emptyFlashcard(id: number): Flashcard {
   return { id, term: "", definition: "", imageFile: null, imagePreview: null };
+}
+
+// A card the teacher has started: anything typed, or an image added.
+function isStartedFlashcard(card: Flashcard) {
+  return Boolean(card.term.trim() || card.definition.trim() || card.imageFile);
 }
 
 // -- Small building blocks ----------------------------------------------------
@@ -183,35 +204,51 @@ export default function CreateLesson() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const requestedClassroomId = searchParams.get("classroomId") ?? "";
+  const userId = session?.user.id ?? "";
+
+  // An unfinished lesson kept from before the page was reloaded or left, if
+  // any (see utils/lessonDraft.ts). Read once; the state below starts from it,
+  // so the teacher just carries on where they were.
+  const [draft] = useState(() => loadLessonDraft(userId, requestedClassroomId));
+  const [showDraftNotice, setShowDraftNotice] = useState(draft !== null);
+  const [confirmingStartOver, setConfirmingStartOver] = useState(false);
 
   // -- State: which step is showing --
-  const [step, setStep] = useState<Step>("details");
+  const [step, setStep] = useState<Step>(draft?.step ?? "details");
 
   // -- State: step 1, details --
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [classroomId, setClassroomId] = useState(requestedClassroomId);
+  const [title, setTitle] = useState(draft?.title ?? "");
+  const [description, setDescription] = useState(draft?.description ?? "");
+  const [classroomId, setClassroomId] = useState(draft?.classroomId || requestedClassroomId);
   const [classrooms, setClassrooms] = useState<ClassroomOption[]>([]);
-  const [coverId, setCoverId] = useState(lessonCoverOptions[0].id);
+  const [coverId, setCoverId] = useState(draft?.coverId ?? lessonCoverOptions[0].id);
   const [lessonDocuments, setLessonDocuments] = useState<File[]>([]);
-  // "" means today (release immediately); a day picked on the dashboard arrives in the URL.
+  // "" means today (release immediately); a day picked on the dashboard arrives
+  // in the URL. A kept date that has since passed becomes today.
   const [releaseDate, setReleaseDate] = useState(() =>
-    parseFutureDateKey(searchParams.get("releaseDate")),
+    parseFutureDateKey(searchParams.get("releaseDate") ?? draft?.releaseDate ?? null),
   );
 
   // -- State: step 2, flashcards --
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([emptyFlashcard(1)]);
+  // Starts empty: the teacher fills it from the word list box.
+  const [flashcards, setFlashcards] = useState<Flashcard[]>(() =>
+    (draft?.flashcards ?? []).map((card) => ({ ...emptyFlashcard(card.id), ...card })),
+  );
 
   // -- State: step 3, activity --
   // With includeMcq off, the lesson is saved without a quiz.
-  const [includeMcq, setIncludeMcq] = useState(true);
-  const [selectedMcqFormat, setSelectedMcqFormat] = useState<QuizFormat | null>(null);
+  const [includeMcq, setIncludeMcq] = useState(draft?.includeMcq ?? true);
+  const [selectedMcqFormat, setSelectedMcqFormat] = useState<QuizFormat | null>(
+    draft?.mcqFormat ?? null,
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
 
   // -- State: step 4, review --
-  const [generatedTitle, setGeneratedTitle] = useState("");
-  const [generatedQuestions, setGeneratedQuestions] = useState<EditableQuestion[]>([]);
+  const [generatedTitle, setGeneratedTitle] = useState(draft?.quizTitle ?? "");
+  const [generatedQuestions, setGeneratedQuestions] = useState<EditableQuestion[]>(
+    draft?.questions ?? [],
+  );
 
   // -- State: shared --
   const [error, setError] = useState("");
@@ -238,13 +275,14 @@ export default function CreateLesson() {
       ? "Creating..."
       : "Create lesson";
 
-  // The teacher's classrooms, for the classroom picker.
+  // The teacher's classrooms, for the classroom picker. Keyed on the user's id,
+  // so a refreshed session for the same teacher doesn't load them again.
   useEffect(() => {
-    if (!session?.user) return;
+    if (!userId) return;
 
     const loadClassrooms = async () => {
       try {
-        setClassrooms(await getTeacherClassrooms(session.user.id));
+        setClassrooms(await getTeacherClassrooms(userId));
       } catch (loadError) {
         console.error("Failed to load classrooms:", loadError);
         setError("Your classrooms could not be loaded. Please try again.");
@@ -252,7 +290,73 @@ export default function CreateLesson() {
     };
 
     void loadClassrooms();
-  }, [session?.user]);
+  }, [userId]);
+
+  // Keeps the form as a draft whenever it changes, once there's something
+  // worth keeping. Pictures and PDFs are files, so they aren't kept.
+  useEffect(() => {
+    const hasContent = title.trim() || description.trim() || flashcards.some(isStartedFlashcard);
+    if (!userId || !hasContent) {
+      return;
+    }
+
+    saveLessonDraft(userId, {
+      step,
+      title,
+      description,
+      classroomId,
+      coverId,
+      releaseDate,
+      flashcards: flashcards.map(({ id, term, definition }) => ({ id, term, definition })),
+      includeMcq,
+      mcqFormat: selectedMcqFormat,
+      quizTitle: generatedTitle,
+      questions: generatedQuestions,
+    });
+  }, [
+    userId,
+    step,
+    title,
+    description,
+    classroomId,
+    coverId,
+    releaseDate,
+    flashcards,
+    includeMcq,
+    selectedMcqFormat,
+    generatedTitle,
+    generatedQuestions,
+  ]);
+
+  // Throws the kept draft away and empties the form, back on the first step.
+  function startOver() {
+    clearLessonDraft(userId);
+
+    // Image previews are temporary browser URLs, so release them.
+    flashcards.forEach((card) => {
+      if (card.imagePreview) {
+        URL.revokeObjectURL(card.imagePreview);
+      }
+    });
+
+    setStep("details");
+    setTitle("");
+    setDescription("");
+    setClassroomId(requestedClassroomId);
+    setCoverId(lessonCoverOptions[0].id);
+    setLessonDocuments([]);
+    setReleaseDate(parseFutureDateKey(searchParams.get("releaseDate")));
+    setFlashcards([]);
+    setIncludeMcq(true);
+    setSelectedMcqFormat(null);
+    setGeneratedTitle("");
+    setGeneratedQuestions([]);
+    setGenerationFailed(false);
+    setError("");
+    setShowDraftNotice(false);
+    setConfirmingStartOver(false);
+    window.scrollTo({ top: 0 });
+  }
 
   // -- Step 2: flashcards --
 
@@ -262,20 +366,35 @@ export default function CreateLesson() {
     );
   }
 
+  // Cards from the word list box. They replace any blank cards added by hand
+  // and go after the cards the teacher has started.
+  function addWordListFlashcards(entries: WordEntry[]) {
+    setError("");
+    setFlashcards((cards) => {
+      const startedCards = cards.filter(isStartedFlashcard);
+      const addedCards = entries.map((entry, index) => ({
+        ...emptyFlashcard(Date.now() + index),
+        term: entry.word,
+        definition: entry.definition,
+      }));
+
+      return [...startedCards, ...addedCards].slice(0, MAX_FLASHCARDS_PER_LESSON);
+    });
+  }
+
   function addFlashcard() {
     if (flashcards.length < MAX_FLASHCARDS_PER_LESSON) {
       setFlashcards((cards) => [...cards, emptyFlashcard(Date.now())]);
     }
   }
 
+  // Any card can go, even the last: the word list box is always there to refill.
   function removeFlashcard(id: number) {
-    if (flashcards.length > 1) {
-      setFlashcards((cards) => {
-        const removedCard = cards.find((card) => card.id === id);
-        if (removedCard?.imagePreview) URL.revokeObjectURL(removedCard.imagePreview);
-        return cards.filter((card) => card.id !== id);
-      });
-    }
+    setFlashcards((cards) => {
+      const removedCard = cards.find((card) => card.id === id);
+      if (removedCard?.imagePreview) URL.revokeObjectURL(removedCard.imagePreview);
+      return cards.filter((card) => card.id !== id);
+    });
   }
 
   // Sets or clears a card's image. Previews are temporary browser URLs, so
@@ -375,7 +494,12 @@ export default function CreateLesson() {
     setGenerationFailed(false);
     setError("");
     try {
-      const quiz = await generateQuiz({ format: selectedMcqFormat, flashcards });
+      const quiz = await generateQuiz({
+        format: selectedMcqFormat,
+        flashcards,
+        lessonTitle: title,
+        lessonDescription: description,
+      });
 
       setGeneratedTitle(quiz.title);
       setGeneratedQuestions(
@@ -435,6 +559,7 @@ export default function CreateLesson() {
         quiz: includeMcq ? { title: generatedTitle, questions: generatedQuestions } : null,
       });
 
+      clearLessonDraft(userId);
       navigate(`/teacher-classroom/${classroomId}`);
     } catch (creationError) {
       console.error("Failed to create lesson:", creationError);
@@ -470,6 +595,26 @@ export default function CreateLesson() {
             Set the lesson details, then add its flashcards and activity format.
           </p>
         </div>
+
+        {/* Shown when an unfinished lesson was restored, with a way to discard it. */}
+        {showDraftNotice && (
+          <div
+            role="status"
+            className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+          >
+            <p className="min-w-0 text-sm leading-5 text-slate-500">
+              <span className="font-semibold text-slate-800">Draft restored.</span> Re-add any
+              images or PDFs.
+            </p>
+            <button
+              type="button"
+              onClick={() => setConfirmingStartOver(true)}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <RotateCcw size={14} /> Start over
+            </button>
+          </div>
+        )}
 
         {
           // Step indicator: four steps, or three when the lesson has no quiz.
@@ -701,29 +846,42 @@ export default function CreateLesson() {
               <div>
                 <h3 className="text-lg font-bold">Flashcards</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Add up to {MAX_FLASHCARDS_PER_LESSON} term and definition pairs. Images are
-                  optional and enable the matching activity.
+                  Add up to {MAX_FLASHCARDS_PER_LESSON} term and definition pairs. They're used to
+                  make the lesson's activity. Images are optional and enable the matching activity.
                 </p>
               </div>
-              <span className="text-sm font-semibold text-slate-500">
+              <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-slate-500">
                 {flashcards.length} of {MAX_FLASHCARDS_PER_LESSON}
               </span>
             </div>
-            <div className="mt-5 space-y-3">
+
+            <div className="mt-5">
+              <FlashcardListInput
+                existingTerms={flashcards.map((card) => card.term)}
+                freeSlots={MAX_FLASHCARDS_PER_LESSON - flashcards.filter(isStartedFlashcard).length}
+                onAdd={addWordListFlashcards}
+              />
+            </div>
+
+            <h4 className="mt-6 text-sm font-bold text-slate-700">Your flashcards</h4>
+            {flashcards.length === 0 && (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                Your flashcards will appear here once you add them above.
+              </p>
+            )}
+            <div className="mt-3 space-y-3">
               {flashcards.map((card, index) => (
                 <div key={card.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-700">Flashcard {index + 1}</span>
-                    {flashcards.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeFlashcard(card.id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
-                        aria-label={`Remove flashcard ${index + 1}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeFlashcard(card.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+                      aria-label={`Remove flashcard ${index + 1}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
                     <label>
@@ -734,7 +892,7 @@ export default function CreateLesson() {
                         value={card.term}
                         onChange={(event) => updateFlashcard(card.id, "term", event.target.value)}
                         placeholder="e.g. Itinerary"
-                        className={inputClassName}
+                        className={flashcardInputClassName}
                       />
                     </label>
                     <label>
@@ -747,7 +905,7 @@ export default function CreateLesson() {
                           updateFlashcard(card.id, "definition", event.target.value)
                         }
                         placeholder="A planned route or journey"
-                        className={inputClassName}
+                        className={flashcardInputClassName}
                       />
                     </label>
                     <div>
@@ -795,7 +953,7 @@ export default function CreateLesson() {
                 onClick={addFlashcard}
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                <Plus size={17} /> Add flashcard
+                <Plus size={17} /> Add a blank card
               </button>
             )}
             {error && <FormError message={error} className="mt-4" />}
@@ -859,7 +1017,7 @@ export default function CreateLesson() {
               </button>
             </div>
             {includeMcq && (
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                 {mcqFormatOptions.map((format) => {
                   const selected = selectedMcqFormat === format.id;
                   return (
@@ -867,16 +1025,11 @@ export default function CreateLesson() {
                       key={format.id}
                       type="button"
                       onClick={() => setSelectedMcqFormat(format.id)}
-                      className={`min-h-36 rounded-lg border p-5 text-left transition ${selected ? "border-slate-800 bg-slate-50 ring-2 ring-slate-100" : "border-slate-200 hover:border-slate-400"}`}
+                      className={`flex flex-col rounded-lg border p-4 text-left transition sm:p-5 ${selected ? "border-slate-800 bg-slate-50 ring-2 ring-slate-100" : "border-slate-200 hover:border-slate-400"}`}
                       aria-pressed={selected}
                     >
                       <h4 className="font-bold">{format.name}</h4>
                       <p className="mt-2 text-sm leading-5 text-slate-500">{format.description}</p>
-                      {selected && (
-                        <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
-                          <Check size={15} /> Selected
-                        </span>
-                      )}
                     </button>
                   );
                 })}
@@ -1046,6 +1199,17 @@ export default function CreateLesson() {
           </section>
         )}
       </main>
+
+      <ConfirmDialog
+        open={confirmingStartOver}
+        isDeleting={false}
+        onCancel={() => setConfirmingStartOver(false)}
+        onConfirm={startOver}
+        title="Start a new lesson?"
+        description="This clears everything in this draft and takes you back to the first step. It can't be undone."
+        confirmLabel="Start over"
+        deletingLabel="Clearing..."
+      />
     </div>
   );
 }

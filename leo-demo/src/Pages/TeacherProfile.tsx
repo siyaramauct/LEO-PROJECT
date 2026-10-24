@@ -55,7 +55,7 @@ export default function TeacherProfile() {
       {
         // -- Phone and tablet layout (under 1024px) --
       }
-      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
+      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-nav-16 lg:hidden">
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
           <div>
             <p className="text-xs font-semibold text-violet-700">Teacher Portal</p>

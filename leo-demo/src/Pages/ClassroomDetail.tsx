@@ -426,7 +426,7 @@ export default function ClassroomDetail() {
       {
         // -- Phone and tablet layout (under 1024px) --
       }
-      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-16 lg:hidden">
+      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-nav-16 lg:hidden">
         <header className="flex items-center justify-between px-4 pb-3 pt-4 sm:px-6">
           <Link
             to="/TeacherClassroom"

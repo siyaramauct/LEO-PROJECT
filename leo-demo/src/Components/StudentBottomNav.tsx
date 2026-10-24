@@ -8,9 +8,10 @@
 //   Tablet  (768 to 1023px)  full-width bottom bar that adds Lessons and Hub
 //   Desktop (1024px and up)  fixed violet sidebar with every link and Log out
 //
-// Student pages leave room for it with "pb-20 lg:pb-0 lg:ml-56" on their main
-// element: bottom padding for the bar below 1024px, a left margin for the
-// sidebar from 1024px.
+// Student pages leave room for it with "pb-nav-20 lg:pb-0 lg:ml-56" on their
+// main element: bottom padding for the bar below 1024px (pb-nav-20, see
+// index.css), a left margin for the sidebar from 1024px. The bar hides while
+// the on-screen keyboard is up, so it doesn't cover the field.
 //
 // Used by: every student page
 // -----------------------------------------------------------------------------
@@ -27,6 +28,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import useTypingOnTouchScreen from "../hooks/useTypingOnTouchScreen";
 import { projectImageUrl } from "../utils/images";
 
 // -- Links --------------------------------------------------------------------
@@ -87,6 +89,7 @@ function BarLink({ item, tabletOnly }: { item: NavEntry; tabletOnly: boolean }) 
 export default function StudentBottomNav() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const isTyping = useTypingOnTouchScreen();
 
   const handleLogout = async () => {
     await logout();
@@ -147,8 +150,9 @@ export default function StudentBottomNav() {
   );
 
   // -- Bottom bar, phones and tablets --
+  // Hidden while the on-screen keyboard is up, so it doesn't cover the field.
 
-  const bottomBar = (
+  const bottomBar = isTyping ? null : (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_30px_rgba(15,23,42,0.08)] lg:hidden">
       <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-2 md:max-w-2xl md:grid-cols-7">
         {barItems.map((item) => (

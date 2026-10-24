@@ -67,15 +67,9 @@ function buildPlannerWeeks(today: Date) {
   }));
 }
 
-// "October 2026", or "October to November 2026" style when the fortnight spans two months.
-function plannerMonthLabel(today: Date, lastDayKey: string) {
-  const lastDay = new Date(`${lastDayKey}T00:00:00`);
-  if (lastDay.getMonth() === today.getMonth()) {
-    return today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  }
-  const firstMonth = today.toLocaleDateString("en-US", { month: "long" });
-  const lastMonth = lastDay.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  return `${firstMonth} – ${lastMonth}`;
+// Today's month, e.g. "October 2026", even when the fortnight runs into the next month.
+function plannerMonthLabel(today: Date) {
+  return today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 // -- Component ----------------------------------------------------------------
@@ -93,7 +87,7 @@ export default function LessonPlanner({
   const today = new Date();
   const todayKey = toDateKey(today);
   const plannerWeeks = buildPlannerWeeks(today);
-  const monthLabel = plannerMonthLabel(today, plannerWeeks[1].days[6].dateKey);
+  const monthLabel = plannerMonthLabel(today);
 
   // A page left open past midnight can hold a day that is now in the past;
   // treat that as today.

@@ -17,7 +17,15 @@
 // pages a user may open.
 // -----------------------------------------------------------------------------
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import {
   getSavedSession,
@@ -63,6 +71,12 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
+  // Whose profile is loaded. Supabase repeats auth events for the same user:
+  // SIGNED_IN whenever a tab is shown again, and TOKEN_REFRESHED about hourly.
+  // Reloading the profile for those would show GuardRoute's loading screen,
+  // which throws away the open page and anything typed into it.
+  const profileUserId = useRef<string | null>(null);
+
   const loadProfile = useCallback(async (user: User) => {
     setProfileLoading(true);
     setProfileError(null);
@@ -70,6 +84,8 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
       const result = await loadOrCreateProfile(user);
       setProfile(result.profile);
       setProfileError(result.error);
+      // Only a loaded profile counts, so a failed load is tried again next time.
+      profileUserId.current = result.profile ? user.id : null;
     } finally {
       setProfileLoading(false);
     }
@@ -101,6 +117,14 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
     void restoreSession();
 
     const stopListening = onSessionChange((session) => {
+      // The same user as before (tab shown again, token refreshed): nothing the
+      // app shows depends on it, and the Supabase client keeps the new tokens
+      // itself. Leaving the session alone stops pages that reload their data
+      // when it changes from doing so every time the tab is shown.
+      if (session?.user && session.user.id === profileUserId.current) {
+        return;
+      }
+
       setSession(session);
       setLoading(false);
 
@@ -113,6 +137,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
           void loadProfile(session.user);
         }, 0);
       } else {
+        profileUserId.current = null;
         setProfile(null);
         setProfileLoading(false);
         setProfileError(null);

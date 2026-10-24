@@ -29,7 +29,7 @@ export default function TeacherShell({ active, header, children }: TeacherShellP
         <TeacherSidebar active={active} />
       </div>
 
-      <main className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">
+      <main className="flex min-w-0 flex-1 flex-col pb-nav-16 lg:pb-0">
         <header className="shrink-0 border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           {header}
         </header>

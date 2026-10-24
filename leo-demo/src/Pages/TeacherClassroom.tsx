@@ -176,7 +176,7 @@ export default function TeacherClassrooms() {
       {
         // -- Phone and tablet layout (under 1024px) --
       }
-      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col overflow-y-auto bg-white pb-16 lg:hidden">
+      <div className="mx-auto flex min-h-dvh max-w-4xl flex-col overflow-y-auto bg-white pb-nav-16 lg:hidden">
         <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 sm:px-6">
           <div>
             <p className="text-sm text-slate-500">Teacher Portal</p>

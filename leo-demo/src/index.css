@@ -16,6 +16,26 @@
   }
 }
 
+/* index.html sets viewport-fit=cover, so pages reach the edges of iPhone
+   screens, and env(safe-area-inset-*) gives the space taken by the notch and
+   the home indicator. The side insets only matter in landscape, where the notch
+   would otherwise sit over the content. */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Room at the bottom of a page for the phone and tablet bottom bar
+   (StudentBottomNav, TeacherBottomNav). The bars grow by the home-indicator
+   area, so the room does too. pb-nav-20 replaces pb-20, pb-nav-16 replaces pb-16. */
+@utility pb-nav-20 {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+
+@utility pb-nav-16 {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+
 @keyframes loading-orbit {
   to {
     transform: rotate(360deg);

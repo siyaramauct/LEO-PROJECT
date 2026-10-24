@@ -30,7 +30,7 @@ import { errorMessage } from "../data/errors";
 import { getFlashcardCounts } from "../data/flashcards";
 import { deleteLesson, getRecentLessons, getScheduledLessons, updateLesson } from "../data/lessons";
 import usePreloadImages from "../hooks/usePreloadImages";
-import { bucketImageUrlOrBroken } from "../utils/images";
+import { bucketImageUrlOrBroken, markPortraitImage } from "../utils/images";
 import { releaseDateToIso, toDateKey } from "../utils/releaseDate";
 
 // -- Types --------------------------------------------------------------------
@@ -300,7 +300,7 @@ export default function TeacherDashboard() {
   // A single scrolling column, with the bottom navigation fixed underneath.
 
   const mobileLayout = (
-    <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-20 lg:hidden">
+    <div className="mx-auto flex min-h-dvh max-w-4xl flex-col bg-white pb-nav-20 lg:hidden">
       <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 sm:px-6">
         <div>
           <p className="text-sm text-slate-500">Welcome back</p>
@@ -341,7 +341,8 @@ export default function TeacherDashboard() {
                   <img
                     src={newestClassroom.image}
                     alt={newestClassroom.imageAlt}
-                    className="h-full w-full object-contain"
+                    onLoad={markPortraitImage}
+                    className="h-full w-full object-contain data-portrait:object-cover"
                   />
                 </div>
               )}
@@ -572,7 +573,8 @@ export default function TeacherDashboard() {
                         <img
                           src={item.image}
                           alt={item.imageAlt}
-                          className="h-full w-full object-contain"
+                          onLoad={markPortraitImage}
+                          className="h-full w-full object-contain data-portrait:object-cover"
                         />
                       </div>
                       <div className="ml-2 flex-1">

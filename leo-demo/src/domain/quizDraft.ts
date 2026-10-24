@@ -9,8 +9,13 @@
 
 import type { AnswerOption } from "./scoring";
 
-// Plain multiple choice, or choosing the missing word in a sentence.
-export type QuizFormat = "basic-mcq" | "fill-blank-mcq";
+// The kinds of quiz a teacher can pick. Every question is multiple choice:
+//   match-definition-mcq   read a definition, choose the word it describes
+//   fill-blank-mcq         choose the missing word in a sentence
+//   mixed-mcq              both kinds, taking turns
+export type QuizFormat = "match-definition-mcq" | "fill-blank-mcq" | "mixed-mcq";
+
+export const QUIZ_FORMATS: QuizFormat[] = ["match-definition-mcq", "fill-blank-mcq", "mixed-mcq"];
 
 export type DraftQuestion = {
   question_text: string;

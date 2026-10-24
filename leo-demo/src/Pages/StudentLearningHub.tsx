@@ -89,7 +89,7 @@ export default function StudentLearningHub() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
-      <main className="min-h-dvh bg-[#faf9fc] pb-20 lg:ml-56 lg:pb-0">
+      <main className="min-h-dvh bg-[#faf9fc] pb-nav-20 lg:ml-56 lg:pb-0">
         <header className="border-b border-violet-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
             <div>
