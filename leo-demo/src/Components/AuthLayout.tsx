@@ -50,9 +50,12 @@ export default function AuthLayout({ heading, subheading, children }: AuthLayout
 
       <div className="hidden w-full flex-1 items-center justify-center lg:flex">
         <div className="h-[70%] w-[88%] overflow-hidden rounded-3xl shadow-2xl shadow-violet-900/40">
+          {/* Lazy, so phones and tablets, where this panel is hidden, never
+              download the picture. Desktop still loads it straight away. */}
           <img
             src={projectImageUrl("stockPhotoHandCards.png")}
             alt="Language learning illustration"
+            loading="lazy"
             className="h-full w-full object-cover"
           />
         </div>

@@ -391,8 +391,8 @@ export default function TeacherDashboard() {
               <Users size={19} />
             </div>
             <div>
-              <p className="text-xs font-bold">Students</p>
-              <p className="mt-0.5 text-[10px] text-slate-500">View your students</p>
+              <p className="text-xs font-bold">Classrooms</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">View your classrooms</p>
             </div>
           </Link>
         </div>
