@@ -24,6 +24,7 @@
 import { ArrowLeft, BookOpen, FolderOpen, Plus, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import BannerDescription from "../Components/BannerDescription";
 import ClassroomInvitePanel, { type StudentProfile } from "../Components/ClassroomInvitePanel";
 import ClassroomLessonRow, { type ClassroomLesson } from "../Components/ClassroomLessonRow";
 import ClassroomMaterialsPanel, {
@@ -451,7 +452,11 @@ export default function ClassroomDetail() {
             <p className="relative z-10 pr-28 text-xs font-medium text-white">Classroom</p>
             <div className="relative z-10 mt-3 pr-28">
               <h1 className="text-xl font-bold">{classroomName}</h1>
-              {description && <p className="mt-1 text-xs text-white/80">{description}</p>}
+              {/* The cover picture leaves a narrow column, so long descriptions
+                  stop at three lines, with Read more. */}
+              {description && (
+                <BannerDescription text={description} className="mt-1 text-xs text-white/80" />
+              )}
             </div>
           </section>
 

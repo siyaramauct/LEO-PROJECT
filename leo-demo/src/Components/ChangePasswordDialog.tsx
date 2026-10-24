@@ -139,7 +139,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
                 autoComplete="current-password"
                 required
                 autoFocus
-                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-700 focus:ring-2 focus:ring-violet-100"
+                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
               />
             </div>
             <div>
@@ -154,7 +154,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
                 autoComplete="new-password"
                 minLength={8}
                 required
-                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-700 focus:ring-2 focus:ring-violet-100"
+                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
               />
             </div>
             <div>
@@ -172,7 +172,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
                 autoComplete="new-password"
                 minLength={8}
                 required
-                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-700 focus:ring-2 focus:ring-violet-100"
+                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
               />
             </div>
             {error && (

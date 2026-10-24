@@ -43,10 +43,25 @@ const coverOptions = [
     alt: "Guy patched into a classroom",
     path: "classroomImgs/guypatchclassroom.avif",
   },
+  {
+    id: "english-book",
+    alt: "Hands holding an English book with letters around it",
+    path: "classroomImgs/englishHoldingBack.jpg",
+  },
+  {
+    id: "beach",
+    alt: "Seaside view from a balcony with a beach umbrella",
+    path: "classroomImgs/whitetopaz-beach-illustration.jpg",
+  },
+  {
+    id: "jungle-reading",
+    alt: "Girl reading a book among jungle leaves",
+    path: "classroomImgs/whitetopaz-girlreadingjungle.jpg",
+  },
 ].map((cover) => ({ ...cover, image: bucketImageUrl(cover.path) }));
 
 const inputClassName =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-600";
 
 // -- Form ---------------------------------------------------------------------
 

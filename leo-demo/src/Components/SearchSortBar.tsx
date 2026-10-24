@@ -51,7 +51,7 @@ export default function SearchSortBar<T extends string>({
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={searchPlaceholder}
           aria-label={searchPlaceholder}
-          className={`h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 ${text} outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-100 [&::-webkit-search-cancel-button]:hidden`}
+          className={`h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 ${text} outline-none transition placeholder:text-slate-400 focus:border-violet-600 [&::-webkit-search-cancel-button]:hidden`}
         />
         {query && (
           <button
@@ -77,7 +77,7 @@ export default function SearchSortBar<T extends string>({
           id={sortId}
           value={sort}
           onChange={(event) => onSortChange(event.target.value as T)}
-          className={`h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white pl-9 pr-8 ${text} text-slate-700 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:w-auto`}
+          className={`h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white pl-9 pr-8 ${text} text-slate-700 outline-none transition focus:border-violet-600 sm:w-auto`}
         >
           {sortOptions.map((option) => (
             <option key={option.value} value={option.value}>

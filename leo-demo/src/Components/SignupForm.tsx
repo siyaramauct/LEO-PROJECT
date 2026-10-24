@@ -21,7 +21,7 @@ type Inputs = {
 
 // Shared input and label styles.
 const field =
-  "w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100";
+  "w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-violet-600 focus:bg-white";
 
 const label = "block text-sm font-bold text-gray-700 mb-1.5";
 

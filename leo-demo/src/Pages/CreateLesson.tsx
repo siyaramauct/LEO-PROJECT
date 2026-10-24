@@ -96,6 +96,16 @@ const lessonCoverOptions = [
     path: "lessonImgs/corporateStyleLessonIlustration.avif",
   },
   { id: "cute-brain", alt: "Cute brain illustration", path: "lessonImgs/cuteBrain.png" },
+  {
+    id: "friends-eating",
+    alt: "Two friends eating burgers at a cafe table",
+    path: "lessonImgs/hand-drawn-friends-eating-illustration.png",
+  },
+  {
+    id: "man-reading",
+    alt: "Man reading a book on a rug beside a cat",
+    path: "lessonImgs/haninabz-man-reading.png",
+  },
 ].map((cover) => ({ ...cover, image: bucketImageUrl(cover.path) }));
 
 const stepLabels = ["Lesson details", "Flashcards", "MCQ activity", "Review & edit"];
@@ -121,7 +131,7 @@ const BACK_BUTTON =
   "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100";
 
 const inputClassName =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-700 focus:ring-2 focus:ring-slate-100";
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-600";
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -977,7 +987,7 @@ export default function CreateLesson() {
                       return (
                         <label
                           key={optionKey}
-                          className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition ${isCorrect ? "border-slate-800" : "border-slate-200"}`}
+                          className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition focus-within:border-violet-600 ${isCorrect ? "border-slate-800" : "border-slate-200"}`}
                         >
                           <input
                             type="radio"

@@ -4,6 +4,18 @@
   font-family: "Merriweather Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* iPhone Safari and Chrome zoom in on any form field with text under 16px when
+   it's tapped, and stay zoomed after the keyboard closes. 16px on touch screens
+   stops that; mouse users keep the smaller sizes. This rule sits outside
+   Tailwind's layers, so it wins over text-sm and text-xs on the fields. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 @keyframes loading-orbit {
   to {
     transform: rotate(360deg);

@@ -3,7 +3,8 @@
 //
 // The shared frame around the login and signup forms.
 //
-//   Phone and tablet (under 1024px)   a photo across the top, the form below
+//   Phone and tablet (under 1024px)   a photo across the top, the form below,
+//                                     scrolling together as one page
 //   Desktop (1024px and up)           a violet branding panel on the left,
 //                                     the form centred on the right
 //
@@ -64,10 +65,11 @@ export default function AuthLayout({ heading, subheading, children }: AuthLayout
   );
 
   // -- Form column --
-  // Scrolls on short phone screens; centred vertically on desktop.
+  // Centred vertically on desktop. On phones it doesn't scroll by itself: the
+  // whole page does, so the browser can lift a field above the keyboard.
 
   const formColumn = (
-    <div className="flex flex-1 flex-col justify-start overflow-y-auto px-6 pb-8 pt-6 lg:justify-center lg:overflow-hidden lg:px-0 lg:py-0">
+    <div className="flex flex-1 flex-col justify-start px-6 pb-8 pt-6 lg:justify-center lg:overflow-hidden lg:px-0 lg:py-0">
       <div className="mx-auto w-full max-w-xs md:max-w-sm">
         <div className="mb-4 text-center">
           <h2 className="text-xl font-bold tracking-tight text-gray-900 lg:text-2xl">{heading}</h2>
@@ -78,8 +80,10 @@ export default function AuthLayout({ heading, subheading, children }: AuthLayout
     </div>
   );
 
+  // Only desktop locks the page to the screen height. Locking it on phones
+  // stops Chrome on iPhone from scrolling a field out from under the keyboard.
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-white lg:flex-row">
+    <div className="flex min-h-dvh w-full flex-col bg-white lg:h-screen lg:flex-row lg:overflow-hidden">
       {mobileHeader}
       {desktopPanel}
       {formColumn}

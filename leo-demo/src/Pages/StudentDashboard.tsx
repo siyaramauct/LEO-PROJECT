@@ -270,7 +270,11 @@ export default function StudentDashboard() {
                   <>
                     <p className="text-xs font-medium text-violet-100">Continue learning</p>
                     <h2 className="mt-2 text-xl font-bold">{studentClassroom.classroom_name}</h2>
-                    <p className="mt-2 text-sm text-violet-100">{studentClassroom.description}</p>
+                    {/* The cover picture leaves a narrow column on phones and tablets,
+                        so long descriptions stop at three lines there. */}
+                    <p className="mt-2 line-clamp-3 text-sm text-violet-100 lg:line-clamp-none">
+                      {studentClassroom.description}
+                    </p>
                     <button
                       type="button"
                       onClick={() =>

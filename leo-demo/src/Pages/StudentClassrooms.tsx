@@ -228,7 +228,7 @@ export default function StudentClassrooms() {
                       value={classroomSearch}
                       onChange={(event) => setClassroomSearch(event.target.value)}
                       placeholder="Search classrooms"
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm outline-none transition focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-100"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm outline-none transition focus:border-violet-600 focus:bg-white"
                       aria-label="Search your classrooms"
                     />
                     {classroomSearch && (

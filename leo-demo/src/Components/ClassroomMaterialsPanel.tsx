@@ -116,7 +116,7 @@ export default function ClassroomMaterialsPanel({
               }
             }}
             placeholder="Paste a URL"
-            className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none transition placeholder:text-slate-400 focus:border-violet-700 focus:ring-2 focus:ring-violet-100"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none transition placeholder:text-slate-400 focus:border-violet-600"
           />
           <button
             type="button"

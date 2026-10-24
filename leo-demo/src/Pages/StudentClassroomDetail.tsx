@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import BannerDescription from "../Components/BannerDescription";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import { MaterialSpine, MaterialTypeTag } from "../Components/MaterialTypeMarks";
 import NotificationBell from "../Components/NotificationBell";
@@ -310,8 +311,13 @@ export default function StudentClassroomDetail() {
             <div className="relative max-w-2xl pr-28 sm:pr-44">
               <p className="text-xs font-medium text-violet-100">Your classroom</p>
               <h2 className="mt-2 text-2xl font-bold">{classroom?.classroom_name}</h2>
+              {/* The cover picture leaves a narrow column on phones and tablets,
+                  so long descriptions stop at three lines there, with Read more. */}
               {classroom?.description && (
-                <p className="mt-2 text-sm text-violet-100">{classroom.description}</p>
+                <BannerDescription
+                  text={classroom.description}
+                  className="mt-2 text-sm text-violet-100"
+                />
               )}
               <div className="mt-5 flex flex-wrap gap-4 text-xs font-semibold text-violet-100">
                 <span className="inline-flex items-center gap-1.5">

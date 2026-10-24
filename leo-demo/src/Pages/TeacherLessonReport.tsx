@@ -507,7 +507,7 @@ export default function TeacherLessonReport() {
                             <input
                               value={editWord}
                               onChange={(event) => setEditWord(event.target.value)}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-600"
                             />
                           </label>
                           <label className="block">
@@ -517,7 +517,7 @@ export default function TeacherLessonReport() {
                             <input
                               value={editDefinition}
                               onChange={(event) => setEditDefinition(event.target.value)}
-                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-600"
                             />
                           </label>
                         </div>
