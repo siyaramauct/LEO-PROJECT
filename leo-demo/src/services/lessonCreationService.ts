@@ -3,8 +3,8 @@
 //
 // What a teacher does to build lessons, step by step: check the classroom's
 // lesson limit, create a lesson with its documents, flashcards and quiz, edit
-// or delete a flashcard, and add or remove a lesson PDF. Pages call these
-// instead of querying Supabase (see src/data).
+// or delete a flashcard (scheduled lessons only), and add or remove a lesson
+// PDF. Pages call these instead of querying Supabase (see src/data).
 //
 // Functions throw a DataError whose message can be shown to the teacher.
 // -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import {
   type LessonFlashcard,
 } from "../data/flashcards";
 import { removeImageFiles, uploadImage } from "../data/imageFiles";
-import { countClassroomLessons, insertLesson } from "../data/lessons";
+import { countClassroomLessons, getLessonReleaseDate, insertLesson } from "../data/lessons";
 import {
   addLessonDocuments,
   addMaterial,
@@ -29,7 +29,7 @@ import {
 } from "../data/materials";
 import { notifyClassroomStudents } from "../data/notifications";
 import { insertQuestions, insertQuiz, type NewQuestion } from "../data/quizzes";
-import { releaseDateToIso } from "../utils/releaseDate";
+import { isScheduledRelease, releaseDateToIso } from "../utils/releaseDate";
 
 // Lesson document links work for an hour.
 const SIGNED_LINK_SECONDS = 60 * 60;
@@ -181,6 +181,19 @@ async function uploadFlashcardImage(lessonId: string, prefix: string, flashcard:
 
 // -- Editing flashcards -------------------------------------------------------------------
 
+// Flashcards can only change while their lesson is scheduled. Once it's
+// released, students may already have studied the cards or taken the quiz made
+// from them, so they stay as released. The lesson itself can still be deleted.
+async function requireScheduledLesson(lessonId: string) {
+  const releaseDate = await getLessonReleaseDate(lessonId);
+
+  if (!isScheduledRelease(releaseDate)) {
+    throw new DataError(
+      "This lesson has been released, so its flashcards can no longer be edited or deleted.",
+    );
+  }
+}
+
 type FlashcardEdit = {
   lessonId: string;
   card: LessonFlashcard;
@@ -199,7 +212,11 @@ export async function saveFlashcardEdit({
   newImage,
   removeImage,
 }: FlashcardEdit): Promise<string | null> {
-  // 1. Upload the new picture, if one was chosen.
+  // 1. Only a scheduled lesson's flashcards can change. The card's own lesson
+  //    is checked, so a mismatched lessonId can't get round it.
+  await requireScheduledLesson(card.lesson_id);
+
+  // 2. Upload the new picture, if one was chosen.
   let imagePath = removeImage ? null : card.image_path;
 
   if (newImage) {
@@ -210,10 +227,10 @@ export async function saveFlashcardEdit({
     });
   }
 
-  // 2. Update the flashcard row.
+  // 3. Update the flashcard row.
   await updateFlashcard(card.flashcard_id, { word, definition, image_path: imagePath });
 
-  // 3. Remove the old picture once nothing points to it (best effort).
+  // 4. Remove the old picture once nothing points to it (best effort).
   if (card.image_path && card.image_path !== imagePath) {
     await removeImageFiles([card.image_path]);
   }
@@ -221,8 +238,10 @@ export async function saveFlashcardEdit({
   return imagePath;
 }
 
-// Deletes the card, then its picture.
+// Deletes the card, then its picture. Only while its lesson is scheduled.
 export async function removeFlashcard(card: LessonFlashcard): Promise<void> {
+  await requireScheduledLesson(card.lesson_id);
+
   await deleteFlashcard(card.flashcard_id);
 
   if (card.image_path) {

@@ -304,7 +304,7 @@ export default function TeacherDashboard() {
       <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 sm:px-6">
         <div>
           <p className="text-sm text-slate-500">Welcome back</p>
-          <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hi, {profile?.name} 👋</h1>
+          <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hi, {profile?.name} </h1>
           <p className="mt-0.5 text-[11px] text-slate-400">
             Here's what's happening in your classrooms.
           </p>

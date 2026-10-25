@@ -222,6 +222,7 @@ export type TeacherLesson = {
   title: string;
   description: string | null;
   lesson_image_path: string | null;
+  release_date: string; // When students can open it (ISO timestamp); never empty.
 };
 
 // One lesson, checked to belong to the classroom. Null if it does not.
@@ -231,7 +232,7 @@ export async function getTeacherLesson(
 ): Promise<TeacherLesson | null> {
   const { data, error } = await supabase
     .from("lessons")
-    .select("lesson_id, title, description, lesson_image_path")
+    .select("lesson_id, title, description, lesson_image_path, release_date")
     .eq("lesson_id", lessonId)
     .eq("classroom_id", classroomId)
     .maybeSingle();
@@ -241,6 +242,22 @@ export async function getTeacherLesson(
   }
 
   return data as TeacherLesson | null;
+}
+
+// When a lesson opens to students (ISO timestamp). Null if the lesson can't be
+// seen, e.g. it doesn't exist or belongs to another teacher's classroom.
+export async function getLessonReleaseDate(lessonId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("release_date")
+    .eq("lesson_id", lessonId)
+    .maybeSingle();
+
+  if (error) {
+    throw new DataError("This lesson could not be found.", error);
+  }
+
+  return (data?.release_date as string | undefined) ?? null;
 }
 
 // The newest lessons across these classrooms, by creation date.

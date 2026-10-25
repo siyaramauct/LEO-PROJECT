@@ -6,7 +6,8 @@
 //   Statistics  enrolled students, quiz completion, average and highest score
 //               (flashcards-only lessons show a note instead, as nothing is scored)
 //   Documents   PDFs attached to this lesson, with upload and delete
-//   Flashcards  every card, editable in place (word, definition, image)
+//   Flashcards  every card, editable in place (word, definition, image) while
+//               the lesson is scheduled; locked once it's released
 //   Results     each enrolled student's latest quiz score
 //
 // One layout for all screens: a centred column that stacks on phones.
@@ -49,6 +50,7 @@ import {
 } from "../services/lessonCreationService";
 import { getTeacherLessonReport, type LessonStudentResult } from "../services/reportService";
 import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
+import { isScheduledRelease } from "../utils/releaseDate";
 
 // -- Types --------------------------------------------------------------------
 
@@ -307,6 +309,9 @@ export default function TeacherLessonReport() {
   }
 
   const coverUrl = bucketImageUrlOrBroken(lesson?.lesson_image_path);
+  // Only a scheduled lesson's flashcards can be edited or deleted; the service
+  // enforces the same rule (lessonCreationService).
+  const canEditFlashcards = isScheduledRelease(lesson?.release_date ?? null);
 
   // -- Loading and error screens --
 
@@ -487,6 +492,12 @@ export default function TeacherLessonReport() {
             </p>
           )}
 
+          {!canEditFlashcards && flashcards.length > 0 && (
+            <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              This lesson has been released, so its flashcards can no longer be edited or deleted.
+            </p>
+          )}
+
           {flashcards.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">
               No flashcards have been added to this lesson yet.
@@ -494,7 +505,7 @@ export default function TeacherLessonReport() {
           ) : (
             <div className="mt-4 divide-y divide-slate-100">
               {flashcards.map((card) => {
-                const isEditing = editingCardId === card.flashcard_id;
+                const isEditing = canEditFlashcards && editingCardId === card.flashcard_id;
                 return (
                   <div key={card.flashcard_id} className="py-3">
                     {isEditing ? (
@@ -604,24 +615,26 @@ export default function TeacherLessonReport() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            aria-label={`Edit ${card.word}`}
-                            onClick={() => startEditingCard(card)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Delete ${card.word}`}
-                            onClick={() => setCardToDelete(card)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors duration-1000 ease-out hover:bg-violet-700 hover:text-white"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
+                        {canEditFlashcards && (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label={`Edit ${card.word}`}
+                              onClick={() => startEditingCard(card)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${card.word}`}
+                              onClick={() => setCardToDelete(card)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors duration-1000 ease-out hover:bg-violet-700 hover:text-white"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

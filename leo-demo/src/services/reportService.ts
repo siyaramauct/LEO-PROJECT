@@ -73,6 +73,7 @@ export type StudentReport = {
   averagePercent: number | null;
   lastActiveKey: string | null;
   daysSinceActive: number | null; // Null when there is no activity in the 12-week window.
+  activeDays: number; // Days studied in the 12-week window.
   activeDaysLast7: number;
   results: Map<string, StudentLessonResult>; // Completed lessons only, keyed by lesson id.
   flags: StudentFlag[];
@@ -411,6 +412,7 @@ function buildStudentReport({
     averagePercent,
     lastActiveKey,
     daysSinceActive,
+    activeDays: days.length, // One row per student per day, so this counts distinct days.
     activeDaysLast7: days.filter((day) => daysBetween(day, todayKey) < 7).length,
     results,
     flags: studentFlags({

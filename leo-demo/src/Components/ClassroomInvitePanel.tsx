@@ -3,13 +3,14 @@
 //
 // Shows a classroom's invite code with buttons to copy, email, share and
 // replace it. When given the student list it also shows a searchable roster
-// underneath. Once the classroom reaches its 30-student limit, the email and
-// share buttons are hidden.
+// underneath, with a remove button on each student when onRemoveStudent is
+// passed (phones and tablets; desktop uses ClassroomStudentsTab). Once the
+// classroom reaches its 30-student limit, the email and share buttons are hidden.
 //
 // Used by: ClassroomDetail
 // -----------------------------------------------------------------------------
 
-import { Copy, Mail, RefreshCw, Share2 } from "lucide-react";
+import { Copy, Mail, RefreshCw, Share2, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { MAX_CLASSROOM_STUDENTS } from "../config/limits";
 import SearchSortBar from "./SearchSortBar";
@@ -38,6 +39,7 @@ type Props = {
   rosterError?: string | null;
   isRotating: boolean;
   onRotate: () => void;
+  onRemoveStudent?: (student: StudentProfile) => void; // Asks the page to confirm and remove.
 };
 
 type StudentSort = "name-asc" | "name-desc" | "recently-joined";
@@ -60,6 +62,7 @@ export default function ClassroomInvitePanel({
   rosterError,
   isRotating,
   onRotate,
+  onRemoveStudent,
 }: Props) {
   const [shareMessage, setShareMessage] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
@@ -216,15 +219,31 @@ export default function ClassroomInvitePanel({
                 <div className="mt-2 divide-y divide-slate-100">
                   {visibleStudents.map((student) => (
                     <div key={student.id} className="flex items-center gap-3 py-3">
-                      <span className="flex h-9 w-9 items-center justify-center text-sm font-bold text-violet-700">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center text-sm font-bold text-violet-700">
                         {`${student.name?.[0] ?? ""}${student.surname?.[0] ?? ""}` || "S"}
                       </span>
-                      <span>
-                        <span className="block text-sm font-semibold">{studentName(student)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {studentName(student)}
+                        </span>
                         {student.username && (
-                          <span className="text-xs text-slate-500">@{student.username}</span>
+                          <span className="block truncate text-xs text-slate-500">
+                            @{student.username}
+                          </span>
                         )}
                       </span>
+                      {/* A full-size tap target for phones; the page asks to confirm first. */}
+                      {onRemoveStudent && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveStudent(student)}
+                          title="Remove from classroom"
+                          aria-label={`Remove ${studentName(student)} from this classroom`}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <UserMinus size={17} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

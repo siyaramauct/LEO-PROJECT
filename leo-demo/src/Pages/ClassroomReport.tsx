@@ -7,8 +7,11 @@
 //   Check-ins    students flagged for low scores, inactivity or falling behind
 //   Activity     a 12-week calendar shaded by the share of the class that
 //                studied each day
-//   Lessons      each lesson's mastery bar, average and first-try score
-//   Gradebook    every student's best score per lesson
+//   Lessons      each lesson's mastery bar, average and first-try score; each
+//                opens the lesson's report, with every student's score
+//   Students     each student's overall average, or how many days they were
+//                active when sorted by "Least active". One value per student,
+//                so the list fits any screen however many lessons there are
 //
 // Uses TeacherShell, so phones and tablets get the bottom navigation and
 // desktop the sidebar. Wide sections scroll sideways on small screens.
@@ -16,7 +19,7 @@
 // Route: /class-progress/:classroomId || Access: teachers
 // -----------------------------------------------------------------------------
 
-import { ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ActivityCalendar from "../Components/ActivityCalendar";
@@ -33,7 +36,6 @@ import {
   MASTERY_PERCENT,
   SUPPORT_PERCENT,
   inactiveLabel,
-  scoreBand,
 } from "../domain/progress";
 import {
   getClassReports,
@@ -51,34 +53,16 @@ type StudentSort = "attention" | "lowest" | "highest" | "inactive" | "name";
 // One colour scale for score bands everywhere on the page: dark violet is
 // secure, dark slate needs reteaching.
 const BAND_STYLES = {
-  mastered: {
-    bar: "bg-violet-700",
-    cell: "bg-violet-700 text-white",
-    label: `Mastered (${MASTERY_PERCENT}%+)`,
-  },
+  mastered: { bar: "bg-violet-700", label: `Mastered (${MASTERY_PERCENT}%+)` },
   developing: {
     bar: "bg-violet-300",
-    cell: "bg-violet-100 text-violet-900",
     label: `Developing (${SUPPORT_PERCENT}–${MASTERY_PERCENT - 1}%)`,
   },
-  support: {
-    bar: "bg-slate-700",
-    cell: "bg-slate-700 text-white",
-    label: `Needs support (<${SUPPORT_PERCENT}%)`,
-  },
-  notAttempted: { bar: "bg-slate-100", cell: "", label: "Not attempted" },
+  support: { bar: "bg-slate-700", label: `Needs support (<${SUPPORT_PERCENT}%)` },
+  notAttempted: { bar: "bg-slate-100", label: "Not attempted" },
 } as const;
 
 const formatPercent = (value: number | null) => (value === null ? "—" : `${value}%`);
-
-const lastActiveText = (student: StudentReport) =>
-  student.daysSinceActive === null
-    ? "Not in 12 weeks"
-    : student.daysSinceActive === 0
-      ? "Today"
-      : student.daysSinceActive === 1
-        ? "Yesterday"
-        : `${student.daysSinceActive} days ago`;
 
 // Lessons: course order, hardest or easiest by average, or least completed.
 function sortLessons(lessons: LessonReport[], sort: LessonSort) {
@@ -94,6 +78,8 @@ function sortLessons(lessons: LessonReport[], sort: LessonSort) {
 }
 
 // Students: "attention" puts the most flags first, then the lowest averages.
+// "inactive" puts the fewest active days first (then the longest gap since
+// last active), matching the days-active value the list shows for it.
 // Students without a score always sort last.
 function sortStudents(students: StudentReport[], sort: StudentSort) {
   const byName = (a: StudentReport, b: StudentReport) => a.name.localeCompare(b.name);
@@ -109,7 +95,11 @@ function sortStudents(students: StudentReport[], sort: StudentSort) {
     if (sort === "highest")
       return compareNullableNumbers(a.averagePercent, b.averagePercent, "desc") || byName(a, b);
     if (sort === "inactive")
-      return (b.daysSinceActive ?? Infinity) - (a.daysSinceActive ?? Infinity) || byName(a, b);
+      return (
+        a.activeDays - b.activeDays ||
+        (b.daysSinceActive ?? Infinity) - (a.daysSinceActive ?? Infinity) ||
+        byName(a, b)
+      );
     return byName(a, b);
   });
 }
@@ -244,6 +234,8 @@ export default function ClassroomReport() {
   );
   const sortedLessons = sortLessons(report.lessons, lessonSort);
   const sortedStudents = sortStudents(report.students, studentSort);
+  // The student list shows days active for "Least active", otherwise averages.
+  const showActiveDays = studentSort === "inactive";
   const hasScores = report.averagePercent !== null;
   const totalCompletions = report.students.reduce(
     (total, student) => total + student.completedCount,
@@ -480,9 +472,11 @@ export default function ClassroomReport() {
         <section className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold">Gradebook</h2>
+              <h2 className="text-sm font-bold">Students</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Each student's best score per lesson. Scroll sideways for more lessons.
+                {showActiveDays
+                  ? `How many days each student studied in the last ${ACTIVITY_WEEKS} weeks.`
+                  : "Each student's overall average. Open a lesson above for every student's score on it."}
               </p>
             </div>
             <SegmentedControl
@@ -504,102 +498,34 @@ export default function ClassroomReport() {
               Students will appear here once they join this classroom.
             </p>
           ) : (
-            <div className="mt-4 overflow-x-auto rounded-lg border border-slate-100">
-              <table className="w-full border-collapse text-left text-xs">
-                <thead className="bg-slate-50 text-[11px] text-slate-500">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="sticky left-0 z-[1] min-w-44 bg-slate-50 px-3 py-2 font-semibold"
-                    >
-                      Student
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Avg
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Done
-                    </th>
-                    <th scope="col" className="whitespace-nowrap px-3 py-2 font-semibold">
-                      Last active
-                    </th>
-                    {report.lessons.map((lesson) => (
-                      <th
-                        key={lesson.lessonId}
-                        scope="col"
-                        title={lesson.title}
-                        className="max-w-24 px-2 py-2 font-semibold"
-                      >
-                        <span className="block w-20 truncate">{lesson.title}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedStudents.map((student) => (
-                    <tr key={student.id}>
-                      <th
-                        scope="row"
-                        className="sticky left-0 z-[1] min-w-44 bg-white px-3 py-2 font-normal"
-                      >
-                        <span className="block truncate text-sm font-semibold text-slate-800">
-                          {student.name}
-                        </span>
-                        {student.flags.length > 0 && (
-                          <span className="block truncate text-[11px] text-slate-500">
-                            {flagText(student).join(" · ")}
-                          </span>
-                        )}
-                      </th>
-                      <td className="px-3 py-2 text-right text-sm font-bold">
-                        {formatPercent(student.averagePercent)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right text-slate-600">
-                        {student.completedCount}/{report.lessons.length}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
-                        {lastActiveText(student)}
-                      </td>
-                      {report.lessons.map((lesson) => {
-                        const result = student.results.get(lesson.lessonId);
-                        const band =
-                          result?.bestPercent != null ? scoreBand(result.bestPercent) : null;
-                        return (
-                          <td key={lesson.lessonId} className="px-2 py-2">
-                            {band && result ? (
-                              <span
-                                title={
-                                  result.attempts > 1
-                                    ? `${result.attempts} attempts · first try ${result.firstPercent ?? "—"}%`
-                                    : "1 attempt"
-                                }
-                                className={`flex h-7 w-14 items-center justify-center rounded-md text-[11px] font-semibold ${BAND_STYLES[band].cell}`}
-                              >
-                                {result.bestPercent}%
-                              </span>
-                            ) : result ? (
-                              <span
-                                title="Completed, no quiz"
-                                className="flex h-7 w-14 items-center justify-center rounded-md bg-slate-50 text-slate-500"
-                              >
-                                <Check size={14} />
-                              </span>
-                            ) : (
-                              <span
-                                title="Not attempted"
-                                className="flex h-7 w-14 items-center justify-center text-slate-300"
-                              >
-                                —
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="mt-3 divide-y divide-slate-100">
+              {sortedStudents.map((student) => (
+                <li key={student.id} className="flex items-center gap-3 py-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-violet-700">
+                    {student.initials}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-800">{student.name}</p>
+                    {student.flags.length > 0 && (
+                      <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                        {flagText(student).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  {/* One value per student: days active when sorted by "Least active", otherwise their average. */}
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-bold">
+                      {showActiveDays ? student.activeDays : formatPercent(student.averagePercent)}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {showActiveDays
+                        ? `active day${student.activeDays === 1 ? "" : "s"}`
+                        : "average"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       </div>

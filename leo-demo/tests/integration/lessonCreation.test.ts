@@ -444,9 +444,9 @@ describe("Editing a lesson", () => {
     expect((await lessonRow(lessonId))?.title).toBe("Original Title");
   });
 
-  test("Test E - A teacher edits a flashcard's word and definition", async () => {
+  test("Test E - A teacher edits a flashcard's word and definition in a scheduled lesson", async () => {
     await signInAs(teacher);
-    const lessonId = await createSampleLesson(classroomId);
+    const lessonId = await createSampleLesson(classroomId, { releaseDateKey: nextWeekKey() });
     const card = (await getFlashcards(lessonId)).find((row) => row.word === "invoice");
 
     await saveFlashcardEdit({
@@ -466,9 +466,9 @@ describe("Editing a lesson", () => {
     expect(cards.map((row) => row.word)).not.toContain("invoice");
   });
 
-  test("Test F - A teacher removes a flashcard", async () => {
+  test("Test F - A teacher removes a flashcard from a scheduled lesson", async () => {
     await signInAs(teacher);
-    const lessonId = await createSampleLesson(classroomId);
+    const lessonId = await createSampleLesson(classroomId, { releaseDateKey: nextWeekKey() });
     const card = (await getFlashcards(lessonId)).find((row) => row.word === "profit");
 
     await removeFlashcard(card!);
@@ -477,6 +477,55 @@ describe("Editing a lesson", () => {
 
     expect(words).toEqual(expect.arrayContaining(["invoice", "deadline"]));
     expect(words).not.toContain("profit");
+  });
+
+  // Once a lesson is released, students may already have studied its cards or
+  // taken its quiz, so its flashcards are locked. The lesson can still be deleted.
+
+  test("Test G - A released lesson's flashcards can't be edited", async () => {
+    await signInAs(teacher);
+    const lessonId = await createSampleLesson(classroomId); // Released now.
+    const card = (await getFlashcards(lessonId)).find((row) => row.word === "invoice");
+
+    await expect(
+      saveFlashcardEdit({
+        lessonId,
+        card: card!,
+        word: "receipt",
+        definition: "Proof that a payment was made",
+        newImage: null,
+        removeImage: false,
+      }),
+    ).rejects.toThrow("This lesson has been released");
+
+    // Read as admin, so RLS can't hide a change that slipped through.
+    const { data } = await admin
+      .from("flashcards")
+      .select("word, definition")
+      .eq("flashcard_id", card!.flashcard_id)
+      .single();
+
+    expect(data).toEqual({ word: "invoice", definition: "A bill sent to a customer" });
+  });
+
+  test("Test H - A released lesson's flashcards can't be removed", async () => {
+    await signInAs(teacher);
+    const lessonId = await createSampleLesson(classroomId); // Released now.
+    const card = (await getFlashcards(lessonId)).find((row) => row.word === "profit");
+
+    await expect(removeFlashcard(card!)).rejects.toThrow("This lesson has been released");
+
+    expect(await rowsInLesson("flashcards", lessonId)).toBe(3);
+  });
+
+  test("Test I - A released lesson can still be deleted, flashcards and all", async () => {
+    await signInAs(teacher);
+    const lessonId = await createSampleLesson(classroomId); // Released now.
+
+    await deleteLesson(lessonId);
+
+    expect(await lessonRow(lessonId)).toBeNull();
+    expect(await rowsInLesson("flashcards", lessonId)).toBe(0);
   });
 });
 

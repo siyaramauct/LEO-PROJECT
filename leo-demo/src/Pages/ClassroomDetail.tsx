@@ -483,6 +483,7 @@ export default function ClassroomDetail() {
                 rosterError={enrollmentError}
                 isRotating={isRotatingCode}
                 onRotate={() => void handleRotateCode()}
+                onRemoveStudent={setStudentToRemove}
               />
             </section>
           </div>

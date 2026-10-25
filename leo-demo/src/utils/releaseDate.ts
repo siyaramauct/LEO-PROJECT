@@ -41,6 +41,17 @@ export function releaseDateToIso(dateKey: string): string {
   return new Date(`${dateKey}T00:00:00`).toISOString();
 }
 
+// True while a lesson's release time (an ISO timestamp from the database) is
+// still ahead, so students can't open it yet. Only scheduled lessons can have
+// their flashcards edited or deleted; a missing date counts as released.
+export function isScheduledRelease(releaseDateIso: string | null): boolean {
+  if (!releaseDateIso) {
+    return false;
+  }
+
+  return new Date(releaseDateIso).getTime() > Date.now();
+}
+
 // "2026-10-14" to "Wednesday, October 14".
 export function formatDateKey(dateKey: string): string {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString("en-US", {

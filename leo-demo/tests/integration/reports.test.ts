@@ -158,6 +158,7 @@ describe("Class report", () => {
       averagePercent: 84, // Best scores 100% and 67%.
       lastActiveKey: dateKeyDaysAgo(0),
       daysSinceActive: 0,
+      activeDays: 3, // Studied today and the two days before.
       activeDaysLast7: 3,
       flags: [],
     });
@@ -174,9 +175,11 @@ describe("Class report", () => {
 
     // Ben: 33% average, no study days, 1 of 3 lessons done.
     expect(benReport?.flags).toEqual(["low-scores", "inactive", "behind"]);
+    expect(benReport?.activeDays).toBe(0);
 
     // Cara: studied 3 days ago (not inactive yet), but no lessons done.
     expect(caraReport?.daysSinceActive).toBe(3);
+    expect(caraReport?.activeDays).toBe(1);
     expect(caraReport?.flags).toEqual(["behind"]);
   });
 
