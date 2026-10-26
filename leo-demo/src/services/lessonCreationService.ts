@@ -10,7 +10,7 @@
 // -----------------------------------------------------------------------------
 
 import { MAX_LESSONS_PER_CLASSROOM } from "../config/limits";
-import { DataError } from "../data/errors";
+import { DataError, friendlyMessage } from "../data/errors";
 import {
   deleteFlashcard,
   insertFlashcards,
@@ -144,7 +144,9 @@ async function attachLessonDocuments(classroomId: string, lessonId: string, docu
       const storagePath = lessonDocumentPath(classroomId, lessonId, file);
 
       await uploadDocument(storagePath, file, "application/pdf").catch((uploadError) => {
-        throw new DataError(`Could not upload "${file.name}".`, uploadError);
+        // e.g. Could not upload "notes.pdf". That file is too large to upload.
+        const reason = friendlyMessage(uploadError, "Please try again.");
+        throw new DataError(`Could not upload "${file.name}". ${reason}`, uploadError);
       });
 
       return storagePath;
@@ -173,7 +175,11 @@ async function uploadFlashcardImage(lessonId: string, prefix: string, flashcard:
   const imagePath = `flashcards/${lessonId}/${prefix}-${crypto.randomUUID()}-${safeName}`;
 
   await uploadImage(imagePath, file).catch((uploadError) => {
-    throw new DataError(`Could not upload the image for "${flashcard.term}".`, uploadError);
+    const reason = friendlyMessage(uploadError, "Please try again.");
+    throw new DataError(
+      `Could not upload the image for "${flashcard.term}". ${reason}`,
+      uploadError,
+    );
   });
 
   return imagePath;
@@ -290,7 +296,7 @@ export async function addLessonDocument({
     };
   } catch (recordError) {
     await removeDocumentFiles([storagePath]);
-    throw new DataError("The lesson document could not be saved.", recordError);
+    throw new DataError("The lesson document could not be saved. Please try again.", recordError);
   }
 }
 

@@ -4,7 +4,8 @@
 // One lesson from the teacher's side:
 //   Summary     cover, title, word count and quiz name
 //   Statistics  enrolled students, quiz completion, average and highest score
-//               (flashcards-only lessons show a note instead, as nothing is scored)
+//               (LessonStatTiles); flashcards-only lessons show who finished
+//               and a note instead, as nothing is scored
 //   Documents   PDFs attached to this lesson, with upload and delete
 //   Flashcards  every card, editable in place (word, definition, image) while
 //               the lesson is scheduled; locked once it's released
@@ -17,24 +18,19 @@
 
 import {
   ArrowLeft,
-  BarChart3,
   Check,
-  CheckCircle2,
-  ClipboardList,
   ExternalLink,
   FileText,
   ImagePlus,
-  Layers,
   Pencil,
   Trash2,
   Upload,
-  Users,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
-import StatCard from "../Components/StatCard";
+import LessonStatTiles from "../Components/LessonStatTiles";
 import { MAX_FLASHCARD_IMAGE_BYTES } from "../config/limits";
 import { useAuth } from "../context/AuthContext";
 import { errorMessage } from "../data/errors";
@@ -55,21 +51,6 @@ import { isScheduledRelease } from "../utils/releaseDate";
 // -- Types --------------------------------------------------------------------
 
 // -- Small building blocks ----------------------------------------------------
-
-const NoScoresNotice = () => (
-  <div className="flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-      <Layers size={17} />
-    </span>
-    <div>
-      <p className="text-sm font-bold text-slate-800">No score statistics for this lesson</p>
-      <p className="mt-1 text-sm leading-5 text-slate-500">
-        This is a flashcards-only lesson without an MCQ activity, so students aren't scored and quiz
-        completion isn't tracked.
-      </p>
-    </div>
-  </div>
-);
 
 const formatDate = (value: string | null) =>
   value
@@ -149,23 +130,6 @@ export default function TeacherLessonReport() {
 
     void load();
   }, [classroomId, lessonId, teacherId]);
-
-  // -- Statistics --
-
-  const enrolledCount = results.length;
-  const attemptedResults = results.filter((student) => student.attempted);
-  const attemptedCount = attemptedResults.length;
-  const completionRate = enrolledCount ? Math.round((attemptedCount / enrolledCount) * 100) : 0;
-  const scoredResults = attemptedResults.filter((student) => student.scorePercent !== null);
-  const averageScore = scoredResults.length
-    ? Math.round(
-        scoredResults.reduce((total, student) => total + (student.scorePercent ?? 0), 0) /
-          scoredResults.length,
-      )
-    : null;
-  const highestScore = scoredResults.length
-    ? Math.max(...scoredResults.map((student) => student.scorePercent ?? 0))
-    : null;
 
   // -- Flashcard editing --
 
@@ -374,7 +338,7 @@ export default function TeacherLessonReport() {
             )}
             <p className="mt-3 text-xs text-slate-400">
               {flashcards.length} word{flashcards.length === 1 ? "" : "s"} ·{" "}
-              {isFlashcardsOnly ? "Flashcards only, no MCQ activity" : (mcq?.title ?? "Quiz")}
+              {isFlashcardsOnly ? "Flashcards only" : (mcq?.title ?? "Quiz")}
             </p>
           </div>
         </section>
@@ -382,32 +346,11 @@ export default function TeacherLessonReport() {
         {
           // Statistics. Flashcards-only lessons have no quiz, so nothing is scored.
         }
-        {isFlashcardsOnly ? (
-          <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-            <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
-            <NoScoresNotice />
-          </section>
-        ) : (
-          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard icon={<Users />} label="Enrolled students" value={String(enrolledCount)} />
-            <StatCard
-              icon={<CheckCircle2 />}
-              label="Completed the quiz"
-              value={`${attemptedCount}/${enrolledCount}`}
-              progress={completionRate}
-            />
-            <StatCard
-              icon={<BarChart3 />}
-              label="Average score"
-              value={averageScore === null ? "—" : `${averageScore}%`}
-            />
-            <StatCard
-              icon={<ClipboardList />}
-              label="Highest score"
-              value={highestScore === null ? "—" : `${highestScore}%`}
-            />
-          </section>
-        )}
+        <LessonStatTiles
+          results={results}
+          isFlashcardsOnly={isFlashcardsOnly}
+          classroomName={classroom.classroom_name}
+        />
 
         <section className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">

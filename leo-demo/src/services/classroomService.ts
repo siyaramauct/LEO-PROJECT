@@ -75,7 +75,9 @@ export async function getStudentClassroom(
   });
 
   if (!enrolled) {
-    throw new DataError("This classroom is unavailable.");
+    throw new DataError(
+      "This classroom is unavailable. It may have been deleted, or you're no longer a member.",
+    );
   }
 
   // 2. Together: the classroom, its released lessons and its shared materials.

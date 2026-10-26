@@ -4,8 +4,8 @@
 // Signing in and out, sessions and passwords, through Supabase Auth.
 //
 // Unlike the rest of src/data, these functions throw Supabase's own auth
-// errors unchanged: their messages ("Invalid login credentials" and so on)
-// are written for users, and the sign-in forms show them as they are.
+// errors unchanged, so the forms can read their error codes. The forms turn
+// them into plain messages with authErrorMessage (src/data/errors.ts).
 // -----------------------------------------------------------------------------
 
 import type { Session, User } from "@supabase/supabase-js";

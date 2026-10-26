@@ -11,6 +11,7 @@
 
 import { beforeAll, describe, expect, test } from "vitest";
 import { deleteClassroom, getInviteCode, getTeacherClassrooms } from "../../src/data/classrooms";
+import { DataError } from "../../src/data/errors";
 import { getClassroomMaterials } from "../../src/data/materials";
 import { getStudentClassroom } from "../../src/services/classroomService";
 import {
@@ -36,6 +37,21 @@ import {
 // The message Postgres gives when an RLS policy refuses a new row. Checking for
 // it makes sure a refusal test fails if something else goes wrong instead.
 const RLS_REFUSAL = "violates row-level security policy";
+
+// A refusal by RLS: the original database error (kept as the DataError's cause)
+// says so, while the user is shown a plain message instead of that wording.
+async function expectRlsRefusal(action: Promise<unknown>) {
+  const thrown = await action.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(thrown).toBeInstanceOf(DataError);
+  expect(((thrown as DataError).cause as { message?: string }).message).toContain(RLS_REFUSAL);
+  expect((thrown as DataError).message).toBe(
+    "You don't have permission to do that. If this seems wrong, sign out and back in.",
+  );
+}
 
 // The details a teacher fills in on the Create Classroom page.
 function classroomInput(teacher: TestUser, name: string) {
@@ -142,23 +158,17 @@ describe("Creating a classroom", () => {
 
   test("Test D - A student can't create a classroom", async () => {
     await signInAs(student);
-    await expect(createClassroom(classroomInput(student, "Student Club"))).rejects.toThrow(
-      RLS_REFUSAL,
-    );
+    await expectRlsRefusal(createClassroom(classroomInput(student, "Student Club")));
   });
 
   test("Test E - A teacher can't create a classroom for another teacher", async () => {
     await signInAs(teacher);
-    await expect(createClassroom(classroomInput(otherTeacher, "Not My Classroom"))).rejects.toThrow(
-      RLS_REFUSAL,
-    );
+    await expectRlsRefusal(createClassroom(classroomInput(otherTeacher, "Not My Classroom")));
   });
 
   test("Test F - A visitor who isn't signed in can't create a classroom", async () => {
     await signOut();
-    await expect(createClassroom(classroomInput(teacher, "Anonymous Class"))).rejects.toThrow(
-      RLS_REFUSAL,
-    );
+    await expectRlsRefusal(createClassroom(classroomInput(teacher, "Anonymous Class")));
   });
 });
 

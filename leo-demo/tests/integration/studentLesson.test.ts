@@ -393,12 +393,9 @@ describe("Progress and results", () => {
 // -- Finishing a flashcards-only lesson -----------------------------------------------
 
 describe("Finishing a flashcards-only lesson", () => {
-  // KNOWN BUG: the check_lesson_attempt trigger refuses every attempt on a
-  // lesson without a quiz ("This lesson has no quiz"), so finishLesson, which
-  // exists for exactly those lessons, always fails and students can't complete
-  // them. Marked `fails` until the trigger allows unscored attempts on
-  // flashcards-only lessons; then delete `.fails`.
-  test.fails("Test A - Finishing records the lesson as done, without a score", async () => {
+  // Guards the check_lesson_attempt fix (migration 20261026120000): a lesson
+  // without a quiz accepts an attempt with no score, which marks it done.
+  test("Test A - Finishing records the lesson as done, without a score", async () => {
     const { student, classroomId } = await seedClassWithStudent();
     const lessonId = await seedLesson(classroomId, { title: "Just Words" });
     await seedFlashcards(lessonId, ["agenda", "minutes"]);

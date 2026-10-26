@@ -444,7 +444,7 @@ export default function ClassroomReport() {
                     {lesson.hasQuiz ? (
                       <MasteryBar lesson={lesson} total={enrolled} />
                     ) : (
-                      <span className="text-xs text-slate-400">Flashcards only · no quiz</span>
+                      <span className="text-xs text-slate-400">Flashcards only</span>
                     )}
                   </span>
                   <span className="col-start-3 row-start-1 w-20 text-right md:col-start-auto md:row-start-auto">

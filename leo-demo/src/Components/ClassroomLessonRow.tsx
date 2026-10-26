@@ -55,7 +55,7 @@ export default function ClassroomLessonRow({ lesson, onDelete, onOpen }: Classro
             ) : (
               // Hidden on phones, where the tag squeezes the row.
               <span className="hidden items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 sm:inline-flex">
-                <Layers size={10} /> Flashcards only · no scores
+                <Layers size={10} /> Flashcards only
               </span>
             )}
           </p>

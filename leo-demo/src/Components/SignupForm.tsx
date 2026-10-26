@@ -11,6 +11,7 @@ import { useRef, useState, type FormEventHandler } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { authErrorMessage } from "../data/errors";
 
 type Inputs = {
   firstName: string;
@@ -60,9 +61,7 @@ export default function SignupForm() {
         );
       }
     } catch (error: unknown) {
-      setAuthError(
-        error instanceof Error ? error.message : "Something went wrong. Please try again.",
-      );
+      setAuthError(authErrorMessage(error, "Your account couldn't be created. Please try again."));
     } finally {
       setSaving(false);
       submitLock.current = false;

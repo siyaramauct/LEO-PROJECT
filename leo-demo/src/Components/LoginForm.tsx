@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { authErrorMessage } from "../data/errors";
 
 type Inputs = {
   email: string;
@@ -42,7 +43,7 @@ export default function LoginForm() {
       await login(data.email, data.password);
       navigate("/");
     } catch (error: unknown) {
-      setAuthError(error instanceof Error ? error.message : "Invalid email or password.");
+      setAuthError(authErrorMessage(error, "Sign-in didn't work. Please try again."));
     } finally {
       setSaving(false);
     }

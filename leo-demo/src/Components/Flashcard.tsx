@@ -27,6 +27,7 @@ import { useState } from "react";
 import { LanguageIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import type { Translation } from "../data/translations";
 import { translateFlashcard } from "../services/translationService";
+import { errorMessage } from "../data/errors";
 
 // -- Translation languages ----------------------------------------------------
 
@@ -104,7 +105,7 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
       setActiveLanguage(language);
     } catch (error) {
       setTranslationError(
-        error instanceof Error ? error.message : "This flashcard could not be translated.",
+        errorMessage(error, "This flashcard couldn't be translated. Please try again."),
       );
     } finally {
       setIsTranslating(false);

@@ -877,7 +877,7 @@ export default function CreateLesson() {
                     <button
                       type="button"
                       onClick={() => removeFlashcard(card.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors duration-200 ease-out hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:outline-none"
                       aria-label={`Remove flashcard ${index + 1}`}
                     >
                       <Trash2 size={16} />

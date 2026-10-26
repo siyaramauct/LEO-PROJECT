@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type ProfileName = {
   name: string | null;
@@ -72,7 +72,10 @@ export async function getAccountProfile(userId: string): Promise<AccountProfile 
     .maybeSingle();
 
   if (error) {
-    throw new DataError(`Your profile could not be loaded: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "Your profile could not be loaded right now. Please try again."),
+      error,
+    );
   }
 
   return data as AccountProfile | null;
@@ -91,7 +94,10 @@ export async function insertAccountProfile(
 
   if (error) {
     throw new DataError(
-      `Your account signed in, but its profile could not be created: ${error.message}`,
+      friendlyMessage(
+        error,
+        "You're signed in, but your profile couldn't be set up. Please refresh the page to try again.",
+      ),
       error,
     );
   }

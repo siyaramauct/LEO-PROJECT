@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type LessonFlashcard = {
   flashcard_id: string;
@@ -79,7 +79,10 @@ export async function insertFlashcards(flashcards: NewFlashcard[]): Promise<void
   const { error } = await supabase.from("flashcards").insert(flashcards);
 
   if (error) {
-    throw new DataError(error.message || "The flashcards could not be saved.", error);
+    throw new DataError(
+      friendlyMessage(error, "The flashcards could not be saved. Please try again."),
+      error,
+    );
   }
 }
 
@@ -96,7 +99,10 @@ export async function updateFlashcard(flashcardId: string, changes: FlashcardCha
     .eq("flashcard_id", flashcardId);
 
   if (error) {
-    throw new DataError(error.message || "The flashcard could not be saved.", error);
+    throw new DataError(
+      friendlyMessage(error, "The flashcard could not be saved. Please try again."),
+      error,
+    );
   }
 }
 
@@ -104,6 +110,9 @@ export async function deleteFlashcard(flashcardId: string): Promise<void> {
   const { error } = await supabase.from("flashcards").delete().eq("flashcard_id", flashcardId);
 
   if (error) {
-    throw new DataError(error.message || "The flashcard could not be deleted.", error);
+    throw new DataError(
+      friendlyMessage(error, "The flashcard could not be deleted. Please try again."),
+      error,
+    );
   }
 }

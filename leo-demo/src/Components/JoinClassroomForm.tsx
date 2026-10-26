@@ -9,7 +9,6 @@
 // Used by: StudentClassrooms
 // -----------------------------------------------------------------------------
 
-import { KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { errorMessage } from "../data/errors";
@@ -48,7 +47,7 @@ export default function JoinClassroomForm({ inputId, className = "" }: Props) {
   return (
     <form onSubmit={(event) => void handleJoin(event)} className={className}>
       <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-bold">
-        <KeyRound size={17} className="text-violet-700" /> Join a classroom
+        Join a classroom
       </label>
       <p className="mt-1 text-xs text-slate-500">
         Enter the invitation code your teacher shared with you.

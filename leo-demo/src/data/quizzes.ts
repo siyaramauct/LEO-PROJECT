@@ -9,7 +9,7 @@
 
 import type { QuizQuestion } from "../domain/scoring";
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type Quiz = {
   mcq_id: string;
@@ -81,7 +81,10 @@ export async function insertQuiz({ lessonId, title, scoreCeiling }: NewQuiz): Pr
     .single();
 
   if (error) {
-    throw new DataError(error.message || "The MCQ activity could not be created.", error);
+    throw new DataError(
+      friendlyMessage(error, "The MCQ activity could not be created. Please try again."),
+      error,
+    );
   }
 
   return data.mcq_id as string;
@@ -95,6 +98,9 @@ export async function insertQuestions(mcqId: string, questions: NewQuestion[]): 
     .insert(questions.map((question) => ({ ...question, mcq_id: mcqId })));
 
   if (error) {
-    throw new DataError(error.message || "The quiz questions could not be saved.", error);
+    throw new DataError(
+      friendlyMessage(error, "The quiz questions could not be saved. Please try again."),
+      error,
+    );
   }
 }

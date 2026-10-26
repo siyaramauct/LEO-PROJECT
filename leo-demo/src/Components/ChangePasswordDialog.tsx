@@ -15,6 +15,7 @@ import { LockKeyhole, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { updatePassword } from "../data/auth";
+import { authErrorMessage } from "../data/errors";
 
 type Props = { onClose: () => void };
 
@@ -59,7 +60,7 @@ export default function ChangePasswordDialog({ onClose }: Props) {
       setSuccess(true);
     } catch (updateError) {
       setError(
-        updateError instanceof Error ? updateError.message : "Your password could not be changed.",
+        authErrorMessage(updateError, "Your password could not be changed. Please try again."),
       );
     } finally {
       setIsSaving(false);

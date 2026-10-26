@@ -12,6 +12,7 @@ import { ArrowLeft, Mail } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { sendPasswordResetEmail } from "../data/auth";
+import { authErrorMessage } from "../data/errors";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -30,7 +31,7 @@ export default function ForgotPassword() {
       setSent(true);
     } catch (recoveryError) {
       setError(
-        recoveryError instanceof Error ? recoveryError.message : "The email could not be sent.",
+        authErrorMessage(recoveryError, "The reset email couldn't be sent. Please try again."),
       );
     } finally {
       setIsSending(false);

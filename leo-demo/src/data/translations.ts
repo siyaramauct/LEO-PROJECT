@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type Translation = {
   word: string;
@@ -28,7 +28,10 @@ export async function getCachedTranslation(
     .maybeSingle();
 
   if (error) {
-    throw new DataError(error.message || "Saved translations could not be checked.", error);
+    throw new DataError(
+      friendlyMessage(error, "Saved translations could not be checked. Please try again."),
+      error,
+    );
   }
 
   if (!data) {

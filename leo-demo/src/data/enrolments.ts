@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 type EnrolledIdsOptions = {
   newestFirst?: boolean; // Most recently joined first; otherwise no set order.
@@ -77,7 +77,10 @@ export async function joinClassroomWithCode(code: string): Promise<string> {
 
   // The function's own messages (wrong code, class full) are written for students.
   if (error) {
-    throw new DataError(error.message, error);
+    throw new DataError(
+      friendlyMessage(error, "You couldn't join this classroom. Check the code and try again."),
+      error,
+    );
   }
 
   if (!data) {
@@ -124,7 +127,10 @@ export async function getClassroomRoster(classroomId: string): Promise<RosterEnt
     .eq("classroom_id", classroomId);
 
   if (error) {
-    throw new DataError(`Could not load enrolled students: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The student list could not be loaded right now. Please try again."),
+      error,
+    );
   }
 
   return data as RosterEntry[];

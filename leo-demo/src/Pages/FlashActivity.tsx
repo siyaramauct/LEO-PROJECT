@@ -133,7 +133,7 @@ export default function FlashActivity() {
           </p>
           {!hasQuiz && (
             <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-              <Layers size={12} /> Flashcards only · no quiz or score
+              <Layers size={12} /> Flashcards only
             </span>
           )}
         </div>

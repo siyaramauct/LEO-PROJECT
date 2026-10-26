@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 // The details pages show for a classroom in lists and banners.
 export type ClassroomSummary = {
@@ -160,7 +160,10 @@ export async function insertClassroom({
   });
 
   if (error) {
-    throw new DataError(error.message || "The classroom could not be created.", error);
+    throw new DataError(
+      friendlyMessage(error, "The classroom could not be created. Please try again."),
+      error,
+    );
   }
 }
 
@@ -183,7 +186,10 @@ export async function getInviteCode(classroomId: string): Promise<string | null>
   });
 
   if (error) {
-    throw new DataError(`Could not load invitation code: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The invitation code could not be loaded. Please try again."),
+      error,
+    );
   }
 
   return (data as string | null) ?? null;
@@ -196,7 +202,10 @@ export async function rotateInviteCode(classroomId: string): Promise<string> {
   });
 
   if (error) {
-    throw new DataError(error.message || "Could not create a new code.", error);
+    throw new DataError(
+      friendlyMessage(error, "A new code could not be created. Please try again."),
+      error,
+    );
   }
 
   if (!data) {

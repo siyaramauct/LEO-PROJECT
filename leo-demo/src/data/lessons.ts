@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type Lesson = {
   lesson_id: string;
@@ -143,7 +143,10 @@ export async function deleteLesson(lessonId: string): Promise<void> {
   const { error } = await supabase.from("lessons").delete().eq("lesson_id", lessonId);
 
   if (error) {
-    throw new DataError(`Could not delete lesson: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The lesson could not be deleted. Please try again."),
+      error,
+    );
   }
 }
 
@@ -190,7 +193,10 @@ export async function insertLesson({
     .single();
 
   if (error) {
-    throw new DataError(error.message || "The lesson could not be created.", error);
+    throw new DataError(
+      friendlyMessage(error, "The lesson could not be created. Please try again."),
+      error,
+    );
   }
 
   return data.lesson_id as string;

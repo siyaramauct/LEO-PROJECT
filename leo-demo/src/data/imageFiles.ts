@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export async function uploadImage(storagePath: string, file: File): Promise<void> {
   const { error } = await supabase.storage
@@ -16,7 +16,10 @@ export async function uploadImage(storagePath: string, file: File): Promise<void
     .upload(storagePath, file, { contentType: file.type, upsert: false });
 
   if (error) {
-    throw new DataError(`The image could not be uploaded: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The image could not be uploaded. Please try again."),
+      error,
+    );
   }
 }
 

@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 import { fetchAllRows } from "./paging";
 
 export type Attempt = {
@@ -84,7 +84,10 @@ export async function saveCompletedAttempt({
 
   // The database's own messages (for example "This lesson has no quiz") are the most useful.
   if (error) {
-    throw new DataError(error.message || "Your attempt could not be saved.", error);
+    throw new DataError(
+      friendlyMessage(error, "Your answers could not be saved. Please try again."),
+      error,
+    );
   }
 }
 

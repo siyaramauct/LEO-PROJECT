@@ -11,7 +11,7 @@
 // -----------------------------------------------------------------------------
 
 import { supabase } from "../supabase-client";
-import { DataError } from "./errors";
+import { DataError, friendlyMessage } from "./errors";
 
 export type Material = {
   resource_id: string;
@@ -107,7 +107,10 @@ export async function uploadDocument(
     .upload(storagePath, file, { contentType, upsert: false });
 
   if (error) {
-    throw new DataError(`The document could not be uploaded: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The document could not be uploaded. Please try again."),
+      error,
+    );
   }
 }
 
@@ -167,6 +170,9 @@ export async function addLessonDocuments(
   );
 
   if (error) {
-    throw new DataError(`The lesson documents could not be attached: ${error.message}`, error);
+    throw new DataError(
+      friendlyMessage(error, "The lesson documents could not be attached. Please try again."),
+      error,
+    );
   }
 }

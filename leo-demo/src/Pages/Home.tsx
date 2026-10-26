@@ -30,7 +30,7 @@ export default function Home() {
       return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 p-4 text-center">
           <p role="alert" className="max-w-md text-sm text-red-700">
-            Google sign-in failed: {oauthError}
+            {oauthError}
           </p>
           <Link to="/login" className="text-sm font-semibold text-violet-700 underline">
             Try signing in again

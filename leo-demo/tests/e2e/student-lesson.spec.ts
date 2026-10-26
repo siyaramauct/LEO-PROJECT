@@ -110,11 +110,9 @@ test("Test A - A student studies the flashcards, takes the quiz and sees their s
   expect(attempts?.[0].completed_at).not.toBeNull();
 });
 
-// KNOWN BUG: the check_lesson_attempt trigger refuses every attempt on a lesson
-// without a quiz ("This lesson has no quiz"), so "Finish lesson" fails and the
-// student stays on the lesson. Marked `fail` until the trigger is fixed; then
-// change test.fail to test so it guards the fix.
-test.fail("Test B - A student finishes a flashcards-only lesson", async ({ page }) => {
+// Guards the check_lesson_attempt fix (migration 20261026120000): "Finish lesson"
+// on a flashcards-only lesson saves an unscored attempt and returns to the classrooms.
+test("Test B - A student finishes a flashcards-only lesson", async ({ page }) => {
   const { student, classroomId, lessonId, title } = await seedClassroomWithLesson({
     withQuiz: false,
   });

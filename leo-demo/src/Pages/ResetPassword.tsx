@@ -13,6 +13,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { signOut, updatePassword } from "../data/auth";
+import { authErrorMessage } from "../data/errors";
 
 export default function ResetPassword() {
   const { session, loading } = useAuth();
@@ -43,7 +44,11 @@ export default function ResetPassword() {
       setComplete(true);
     } catch (updateError) {
       setError(
-        updateError instanceof Error ? updateError.message : "Your password could not be reset.",
+        authErrorMessage(
+          updateError,
+          "Your password could not be reset. Please try again.",
+          "This reset link has expired or was already used. Request a new one from the sign-in page.",
+        ),
       );
     } finally {
       setIsSaving(false);

@@ -577,9 +577,12 @@ export async function getRosterStats(
   lessonIds: string[],
   activeSinceKey: string,
 ): Promise<RosterStatsResult> {
-  const failures: string[] = [];
+  // The details of each failure go to the console; the teacher gets one plain
+  // warning that some figures are missing.
+  let failureCount = 0;
   const failed = (failure: unknown) => {
-    failures.push(failure instanceof Error ? failure.message : "Unknown error");
+    console.error("A roster statistic could not be loaded:", failure);
+    failureCount += 1;
     return null;
   };
 
@@ -637,7 +640,9 @@ export async function getRosterStats(
   return {
     stats,
     quizLessonCount: ceilings ? ceilings.size : null,
-    errorMessage: failures.length ? `Some statistics could not be loaded: ${failures[0]}` : null,
+    errorMessage: failureCount
+      ? "Some statistics couldn't be loaded, so a few figures may be missing. Refresh the page to try again."
+      : null,
   };
 }
 
