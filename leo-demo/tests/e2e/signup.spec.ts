@@ -57,8 +57,10 @@ test("Test B - An email that's already registered can't be used to sign up again
   // 1. A new person tries to sign up with the same email.
   await signUp(page, existing.email);
 
-  // 2. The form explains, and they stay on the sign-up page.
-  await expect(page.getByText(/already registered/i)).toBeVisible();
+  // 2. The form explains in plain words, and they stay on the sign-up page.
+  await expect(
+    page.getByText("An account with this email already exists. Sign in instead."),
+  ).toBeVisible();
   await expect(page).toHaveURL(/\/signup$/);
 
   // 3. No second account was made, and the existing one is untouched.

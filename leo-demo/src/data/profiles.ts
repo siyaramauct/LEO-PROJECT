@@ -92,12 +92,11 @@ export async function insertAccountProfile(
     .select(ACCOUNT_COLUMNS)
     .single();
 
+  // Always this message: the usual cause is a session that has just ended, and
+  // the general "you don't have permission" wording would mislead here.
   if (error) {
     throw new DataError(
-      friendlyMessage(
-        error,
-        "You're signed in, but your profile couldn't be set up. Please refresh the page to try again.",
-      ),
+      "Your profile could not be created. Please sign out, then sign in again.",
       error,
     );
   }

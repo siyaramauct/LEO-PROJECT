@@ -15,6 +15,8 @@ import {
   mockAiReply,
   quizForFlashcards,
   seedClassroom,
+  seedFlashcards,
+  seedLesson,
   signedInUsers,
   TEACHER_STATE,
   uniqueName,
@@ -181,4 +183,33 @@ test("Test C - A teacher who tries to add 20 flashcards is stopped at the limit 
 
   expect(lesson?.flashcards[0].count).toBe(15);
   expect(lesson?.mcqs).toEqual([]);
+});
+
+// -- The lesson report ----------------------------------------------------------------
+
+test("Test D - Only a scheduled lesson's flashcards can be edited on its report", async ({
+  page,
+}) => {
+  const { teacher } = signedInUsers();
+  const classroomId = await seedClassroom(teacher, uniqueName("Business English"));
+  const released = await seedLesson(classroomId, { title: uniqueName("Released Words") });
+  const scheduled = await seedLesson(classroomId, {
+    title: uniqueName("Next Week's Words"),
+    scheduled: true,
+  });
+  await seedFlashcards(released, ["invoice"]);
+  await seedFlashcards(scheduled, ["deadline"]);
+
+  // 1. A released lesson: its cards are listed but locked, with no edit or delete.
+  await page.goto(`/teacher-classroom/${classroomId}/lesson/${released}`);
+  await expect(page.getByText("This lesson has been released, so its flashcards")).toBeVisible();
+  await expect(page.getByText("invoice", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit invoice" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Delete invoice" })).toHaveCount(0);
+
+  // 2. A scheduled lesson: each card can still be edited and deleted.
+  await page.goto(`/teacher-classroom/${classroomId}/lesson/${scheduled}`);
+  await expect(page.getByRole("button", { name: "Edit deadline" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete deadline" })).toBeVisible();
+  await expect(page.getByText("This lesson has been released")).toHaveCount(0);
 });

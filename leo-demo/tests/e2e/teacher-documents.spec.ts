@@ -130,10 +130,11 @@ test("Test C - A teacher attaches a PDF while creating a lesson", async ({ page 
   await expect(page.getByText("glossary.pdf")).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove glossary.pdf" })).toBeVisible();
 
-  // 3. One flashcard, no quiz, then save.
+  // 3. One flashcard (typed in the word list box), no quiz, then save.
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Term", { exact: true }).fill("invoice");
-  await page.getByLabel("Definition", { exact: true }).fill("A bill sent to a customer");
+  await page.getByLabel("Words and definitions").fill("invoice - A bill sent to a customer");
+  await page.getByRole("button", { name: "Add 1 flashcard" }).click();
+  await expect(page.getByLabel("Term", { exact: true })).toHaveValue("invoice");
   await page.getByRole("button", { name: "Choose activity" }).click();
   await page.getByRole("switch", { name: "Include an MCQ activity" }).click();
   await page.getByRole("button", { name: "Create lesson" }).click();

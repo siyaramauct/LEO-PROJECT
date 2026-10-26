@@ -6,12 +6,13 @@
 #
 #   1. checks       formatting, lint, type-check, build, unit and PWA tests
 #   2. integration  services and RLS against a fresh local Supabase
+#      e2e          whole user journeys clicked through the real app in
+#                   Chromium (desktop and phone layouts), against its own fresh
+#                   local Supabase. Runs alongside integration.
 #   3. deploy       builds the app with the hosted Supabase values and uploads
-#                   it to Cloudflare. Pushes to main only: pull requests are
-#                   tested but never deployed.
-#
-# The end-to-end tests (Playwright, tests/e2e) aren't run here; run them
-# locally with `npm run test:e2e`.
+#                   it to Cloudflare, once integration and e2e have both
+#                   passed. Pushes to main only: pull requests are tested but
+#                   never deployed.
 #
 # Where things are:
 #   This file must live in .github/workflows/ at the repository root (leo/),
@@ -22,7 +23,7 @@
 #
 # Credentials:
 #   integration  a throwaway local Supabase that the job starts itself, so no
-#                GitHub Secrets (see leo-demo/.env.test.example)
+#   and e2e      GitHub Secrets (see leo-demo/.env.test.example)
 #   deploy       repository Secrets CLOUDFLARE_API_TOKEN and
 #                CLOUDFLARE_ACCOUNT_ID (the sponsor's Cloudflare account), and
 #                repository Variables VITE_SUPABASE_URL and
@@ -179,13 +180,102 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+  # The end-to-end tests (tests/e2e): sign-up, sign-in, classrooms, lessons,
+  # documents and completing a lesson, clicked through the real app in Chromium
+  # at desktop and phone sizes. Playwright starts the app itself (`vite --mode
+  # test`) against a fresh local Supabase, so nothing touches the hosted project.
+  e2e:
+    name: End-to-end tests
+    # Stage 2: only once the checks and unit tests have passed. Runs alongside
+    # the integration tests.
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      # The same South African dates as the database (see `integration`).
+      TZ: Africa/Johannesburg
+
+    steps:
+      # 1. Download the repository onto the runner.
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # 2. Node from .nvmrc, with npm downloads cached between runs.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: leo-demo/.nvmrc
+          cache: npm
+          cache-dependency-path: leo-demo/package-lock.json
+
+      # 3. The Supabase CLI, the same version as the integration job.
+      - name: Set up the Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      # 4. A clean install of exactly the versions in package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # 5. Start Supabase in Docker, built from the migrations and config.toml.
+      #    Unlike the integration job, Realtime stays on: the app's
+      #    notification bell subscribes to it. Email isn't needed, because
+      #    sign-up confirmation is off locally.
+      - name: Start local Supabase
+        run: >-
+          supabase start
+          -x studio,postgres-meta,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor
+
+      # 6. Write this run's local URL and keys to .env.test, which both
+      #    playwright.config.ts (to seed data) and `vite --mode test` (the app
+      #    in the browser) read. The secret key is masked in the logs, and the
+      #    file is gone when the runner is.
+      - name: Write .env.test with the local Supabase credentials
+        run: |
+          supabase status -o env | grep -E '^[A-Z_]+=' > "$RUNNER_TEMP/supabase.env"
+          set -a
+          source "$RUNNER_TEMP/supabase.env"
+          set +a
+
+          echo "::add-mask::$SECRET_KEY"
+
+          {
+            echo "VITE_SUPABASE_URL=$API_URL"
+            echo "VITE_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+            echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+          } > .env.test
+
+      # 7. The browser the tests use, with the system libraries it needs.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # 8. Every journey, at desktop and phone sizes. In CI a failed test gets
+      #    one retry, to tell a flaky test from a broken one.
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      # 9. If anything failed, keep Playwright's HTML report, with a trace,
+      #    screenshot and video of each failure, to download from the run's
+      #    page for a week. `uses:` steps ignore `defaults`, hence leo-demo/.
+      - name: Keep the test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            leo-demo/playwright-report/
+            leo-demo/test-results/
+          retention-days: 7
+
   # Puts the tested code live: builds the app and uploads dist/ to the
   # sponsor's Cloudflare account (see leo-demo/wrangler.jsonc).
   deploy:
     name: Deploy to Cloudflare
-    # Stage 3: only once the integration tests have passed, and only for
-    # pushes to main (pull requests are tested but never deployed).
-    needs: integration
+    # Stage 3: only once the integration and end-to-end tests have both passed,
+    # and only for pushes to main (pull requests are tested but never deployed).
+    needs: [integration, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

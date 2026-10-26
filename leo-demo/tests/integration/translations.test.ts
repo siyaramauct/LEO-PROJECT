@@ -170,12 +170,9 @@ describe("Translating a flashcard", () => {
     expect(await cachedRow(card.flashcard_id, "fr")).toBeNull();
   });
 
-  // KNOWN BUG: the app offers French, Russian, Spanish and Portuguese (see
-  // languageOptions in src/Components/Flashcard.tsx), but the table only
-  // accepts zh, es and fr (flashcard_translations_language_code_check). So
-  // Russian and Portuguese translations are never saved and every request goes
-  // to the AI. Marked `fails` until the two lists match; then delete `.fails`.
-  test.fails("Test F - Russian and Portuguese translations are saved like the others", async () => {
+  // Guards migration 20261026130000: the table accepts every language the
+  // flashcards offer (languageOptions in src/Components/Flashcard.tsx).
+  test("Test F - Russian and Portuguese translations are saved like the others", async () => {
     const card = await newFlashcard();
     mockedAskAi
       .mockResolvedValueOnce({ word: "счёт", definition: "Документ для оплаты" })
