@@ -31,7 +31,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import LessonStatTiles from "../Components/LessonStatTiles";
-import { MAX_FLASHCARD_IMAGE_BYTES } from "../config/limits";
+import { flashcardError } from "../domain/lessonValidation";
+import { MAX_FLASHCARD_IMAGE_BYTES } from "../domain/limits";
 import { useAuth } from "../context/AuthContext";
 import { errorMessage } from "../data/errors";
 import type { LessonFlashcard } from "../data/flashcards";
@@ -47,6 +48,7 @@ import {
 import { getTeacherLessonReport, type LessonStudentResult } from "../services/reportService";
 import { bucketImageUrl, bucketImageUrlOrBroken } from "../utils/images";
 import { isScheduledRelease } from "../utils/releaseDate";
+import { scoreTextColour } from "../utils/scoreColours";
 
 // -- Types --------------------------------------------------------------------
 
@@ -176,8 +178,21 @@ export default function TeacherLessonReport() {
     const definition = editDefinition.trim();
     const currentCard = flashcards.find((card) => card.flashcard_id === editingCardId);
 
-    if (!word || !definition) {
-      setCardError("A flashcard needs both a word and a definition.");
+    // The same rules as a new flashcard: real words, a definition that doesn't
+    // repeat the term, and no term another card in the lesson already uses.
+    const problem = flashcardError({ term: word, definition });
+    if (problem) {
+      setCardError(problem);
+      return;
+    }
+
+    const isRepeatedWord = flashcards.some(
+      (card) =>
+        card.flashcard_id !== editingCardId &&
+        card.word.trim().toLowerCase() === word.toLowerCase(),
+    );
+    if (isRepeatedWord) {
+      setCardError(`"${word}" is already a flashcard in this lesson.`);
       return;
     }
 
@@ -617,7 +632,9 @@ export default function TeacherLessonReport() {
                     </div>
                     <div className="shrink-0 text-right">
                       {student.attempted ? (
-                        <span className="text-sm font-bold text-violet-700">
+                        <span
+                          className={`text-sm font-bold ${student.scorePercent !== null ? scoreTextColour(student.scorePercent) : "text-violet-700"}`}
+                        >
                           {student.scorePercent !== null
                             ? `${student.scorePercent}%`
                             : student.score}

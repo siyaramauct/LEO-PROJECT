@@ -12,7 +12,7 @@
 
 import { Copy, Mail, RefreshCw, Share2, UserMinus } from "lucide-react";
 import { useState } from "react";
-import { MAX_CLASSROOM_STUDENTS } from "../config/limits";
+import { MAX_CLASSROOM_STUDENTS } from "../domain/limits";
 import SearchSortBar from "./SearchSortBar";
 import {
   compareNullableNumbers,

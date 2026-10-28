@@ -1,8 +1,10 @@
 // -----------------------------------------------------------------------------
 // Quick Quiz
 //
-// The lesson's multiple-choice quiz, one question at a time. Students can move
-// back and forth and change answers until they press "Complete attempt".
+// The lesson's multiple-choice quiz, one question at a time. A question must
+// be answered before Next or "Complete attempt" will move on (the button stays
+// faded until then, and pressing it explains why). Students can always go back
+// and change earlier answers until they complete the attempt.
 //
 // On completion, lessonService marks and saves the attempt, notifies the
 // teacher and logs today for the streak. The page then stores the detailed
@@ -11,7 +13,7 @@
 // Route: /quiz/:lessonId || Access: students
 // -----------------------------------------------------------------------------
 
-import { ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -36,6 +38,8 @@ export default function QuickQuiz() {
   const [isLoading, setIsLoading] = useState(() => Boolean(lessonId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // Shown when Next or Complete is pressed before an answer is chosen.
+  const [needsAnswer, setNeedsAnswer] = useState(false);
 
   // Load the lesson's quiz, then its questions.
   useEffect(() => {
@@ -69,6 +73,16 @@ export default function QuickQuiz() {
 
   async function completeAttempt() {
     if (!session?.user || !lessonId || !mcq) return;
+
+    // Every question needs an answer. Next already stops a skipped question,
+    // so this jumps back to any that is still blank, just in case.
+    const firstUnanswered = questions.findIndex((item) => !answers[item.question_id]);
+    if (firstUnanswered !== -1) {
+      setIndex(firstUnanswered);
+      setNeedsAnswer(true);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -135,6 +149,24 @@ export default function QuickQuiz() {
     ["D", question.option_d],
   ];
   const isLastQuestion = index === questions.length - 1;
+  const hasAnswer = Boolean(answers[question.question_id]);
+
+  // Forward only once this question is answered; back is always allowed, and
+  // earlier answers can be changed on the way.
+  function goToNextQuestion() {
+    if (!hasAnswer) {
+      setNeedsAnswer(true);
+      return;
+    }
+    setNeedsAnswer(false);
+    setIndex((current) => current + 1);
+  }
+
+  function goToPreviousQuestion() {
+    setNeedsAnswer(false);
+    setIndex((current) => current - 1);
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <StudentBottomNav />
@@ -175,16 +207,23 @@ export default function QuickQuiz() {
             <h2 className="mt-3 text-xl font-bold leading-8 sm:text-2xl">
               {question.question_text}
             </h2>
-            <div className="mt-6 space-y-2">
+            <div
+              className="mt-6 space-y-2"
+              role="radiogroup"
+              aria-label={`Answers for question ${index + 1}`}
+            >
               {options.map(([key, option]) => {
                 const selected = answers[question.question_id] === key;
                 return (
                   <button
                     key={key}
                     type="button"
-                    onClick={() =>
-                      setAnswers((current) => ({ ...current, [question.question_id]: key }))
-                    }
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      setAnswers((current) => ({ ...current, [question.question_id]: key }));
+                      setNeedsAnswer(false);
+                    }}
                     className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left text-sm transition ${selected ? "border-violet-700 inset-ring inset-ring-violet-700" : "border-slate-200 hover:bg-slate-50"}`}
                   >
                     <span
@@ -197,6 +236,17 @@ export default function QuickQuiz() {
                 );
               })}
             </div>
+            {needsAnswer && (
+              <p
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm"
+              >
+                <AlertCircle size={18} className="mt-px shrink-0" aria-hidden="true" />
+                <span>
+                  Choose an answer before you continue. You can come back and change it later.
+                </span>
+              </p>
+            )}
             {error && (
               <p role="alert" className="mt-4 text-sm text-red-700">
                 {error}
@@ -206,7 +256,7 @@ export default function QuickQuiz() {
               <button
                 type="button"
                 disabled={index === 0}
-                onClick={() => setIndex((current) => current - 1)}
+                onClick={goToPreviousQuestion}
                 className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 disabled:opacity-40"
               >
                 <ChevronLeft size={17} /> Previous
@@ -215,16 +265,18 @@ export default function QuickQuiz() {
                 <button
                   type="button"
                   disabled={isSubmitting}
+                  aria-disabled={!hasAnswer}
                   onClick={completeAttempt}
-                  className="flex items-center gap-1 rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300"
+                  className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:bg-slate-300 ${hasAnswer ? "bg-violet-700 hover:bg-violet-800" : "bg-violet-300"}`}
                 >
                   <Check size={17} /> {isSubmitting ? "Submitting..." : "Complete attempt"}
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIndex((current) => current + 1)}
-                  className="flex items-center gap-1 rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white"
+                  aria-disabled={!hasAnswer}
+                  onClick={goToNextQuestion}
+                  className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${hasAnswer ? "bg-violet-700 hover:bg-violet-800" : "bg-violet-300"}`}
                 >
                   Next <ChevronRight size={17} />
                 </button>

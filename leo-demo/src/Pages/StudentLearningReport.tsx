@@ -40,6 +40,7 @@ import {
 } from "../services/reportService";
 import { projectImageUrl } from "../utils/images";
 import { ACTIVITY_WEEKS, buildActivityWeeks } from "../utils/activityCalendar";
+import { scoreBarColour, scoreTextColour } from "../utils/scoreColours";
 
 // -- Types --------------------------------------------------------------------
 
@@ -93,13 +94,17 @@ function LessonRowItem({ lesson }: { lesson: StudentLessonReport }) {
       </span>
       {lesson.bestPercent !== null ? (
         <span className="w-20 shrink-0 text-right sm:w-28">
-          <span className="block text-sm font-bold text-slate-900">
+          <span className={`block text-sm font-bold ${scoreTextColour(lesson.bestPercent)}`}>
             {lesson.bestPercent}%
             <span className="ml-1.5 hidden text-xs font-medium text-slate-400 sm:inline">
               {lesson.bestScore}/{lesson.scoreCeiling}
             </span>
           </span>
-          <ProgressBar value={lesson.bestPercent} className="ml-auto mt-1.5 w-full" />
+          <ProgressBar
+            value={lesson.bestPercent}
+            className="ml-auto mt-1.5 w-full"
+            barClassName={scoreBarColour(lesson.bestPercent)}
+          />
         </span>
       ) : lesson.completed ? (
         <CheckCircle2 size={18} className="shrink-0 text-violet-700" aria-label="Completed" />
@@ -258,6 +263,7 @@ export default function StudentLearningReport() {
     {
       label: "Average score",
       value: overallAverage === null ? "—" : `${overallAverage}%`,
+      valueColour: scoreTextColour(overallAverage),
       detail: "Best attempt per quiz",
     },
     {
@@ -327,7 +333,9 @@ export default function StudentLearningReport() {
                 {overviewStats.map((stat) => (
                   <div key={stat.label} className="bg-white p-3">
                     <dt className="text-xs text-slate-500">{stat.label}</dt>
-                    <dd className="mt-1 text-lg font-bold">{stat.value}</dd>
+                    <dd className={`mt-1 text-lg font-bold ${stat.valueColour ?? ""}`}>
+                      {stat.value}
+                    </dd>
                     <dd className="mt-0.5 truncate text-[11px] text-slate-400">{stat.detail}</dd>
                   </div>
                 ))}
@@ -432,7 +440,9 @@ export default function StudentLearningReport() {
                           <ProgressBar value={classroomCompletion} className="mt-1.5" />
                         </span>
                         <span className="w-12 shrink-0 text-right">
-                          <span className="block text-sm font-bold">
+                          <span
+                            className={`block text-sm font-bold ${scoreTextColour(classroom.averagePercent)}`}
+                          >
                             {classroom.averagePercent === null
                               ? "—"
                               : `${classroom.averagePercent}%`}
@@ -473,7 +483,9 @@ export default function StudentLearningReport() {
                   <dl className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
                     <div className="p-3 sm:p-4">
                       <dt className="text-[11px] text-slate-500">Average</dt>
-                      <dd className="mt-1 text-base font-bold">
+                      <dd
+                        className={`mt-1 text-base font-bold ${scoreTextColour(selectedClassroom.averagePercent)}`}
+                      >
                         {selectedClassroom.averagePercent === null
                           ? "—"
                           : `${selectedClassroom.averagePercent}%`}

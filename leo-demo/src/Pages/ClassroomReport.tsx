@@ -44,21 +44,22 @@ import {
   type StudentReport,
 } from "../services/reportService";
 import { compareNullableNumbers } from "../utils/listControls";
+import { BAND_COLOURS, scoreTextColour } from "../utils/scoreColours";
 
 // -- Sorting and display helpers ----------------------------------------------
 
 type LessonSort = "order" | "hardest" | "easiest" | "completion";
 type StudentSort = "attention" | "lowest" | "highest" | "inactive" | "name";
 
-// One colour scale for score bands everywhere on the page: dark violet is
-// secure, dark slate needs reteaching.
+// One colour scale for score bands everywhere on the page: green is secure,
+// yellow is developing, red needs reteaching (utils/scoreColours).
 const BAND_STYLES = {
-  mastered: { bar: "bg-violet-700", label: `Mastered (${MASTERY_PERCENT}%+)` },
+  mastered: { bar: BAND_COLOURS.mastered.bar, label: `Mastered (${MASTERY_PERCENT}%+)` },
   developing: {
-    bar: "bg-violet-300",
+    bar: BAND_COLOURS.developing.bar,
     label: `Developing (${SUPPORT_PERCENT}–${MASTERY_PERCENT - 1}%)`,
   },
-  support: { bar: "bg-slate-700", label: `Needs support (<${SUPPORT_PERCENT}%)` },
+  support: { bar: BAND_COLOURS.support.bar, label: `Needs support (<${SUPPORT_PERCENT}%)` },
   notAttempted: { bar: "bg-slate-100", label: "Not attempted" },
 } as const;
 
@@ -118,16 +119,18 @@ function KpiCard({
   value,
   detail,
   progress,
+  valueColour = "",
 }: {
   label: string;
   value: string;
   detail: string;
   progress?: number;
+  valueColour?: string; // A score's traffic-light colour.
 }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-4">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1.5 text-2xl font-bold leading-none">{value}</p>
+      <p className={`mt-1.5 text-2xl font-bold leading-none ${valueColour}`}>{value}</p>
       {progress !== undefined && <ProgressBar value={progress} className="mt-3" />}
       <p className="mt-2 text-[11px] text-slate-400">{detail}</p>
     </div>
@@ -278,6 +281,7 @@ export default function ClassroomReport() {
           <KpiCard
             label="Class average"
             value={formatPercent(report.averagePercent)}
+            valueColour={scoreTextColour(report.averagePercent)}
             detail={
               report.masteryRate === null
                 ? "No quiz scores yet"
@@ -337,7 +341,9 @@ export default function ClassroomReport() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-bold">{formatPercent(student.averagePercent)}</p>
+                      <p className={`text-sm font-bold ${scoreTextColour(student.averagePercent)}`}>
+                        {formatPercent(student.averagePercent)}
+                      </p>
                       <p className="text-[11px] text-slate-400">
                         {student.completedCount}/{report.lessons.length} done
                       </p>
@@ -448,7 +454,9 @@ export default function ClassroomReport() {
                     )}
                   </span>
                   <span className="col-start-3 row-start-1 w-20 text-right md:col-start-auto md:row-start-auto">
-                    <span className="block text-sm font-bold">
+                    <span
+                      className={`block text-sm font-bold ${scoreTextColour(lesson.averagePercent)}`}
+                    >
                       {lesson.hasQuiz ? (
                         formatPercent(lesson.averagePercent)
                       ) : (
@@ -514,7 +522,9 @@ export default function ClassroomReport() {
                   </div>
                   {/* One value per student: days active when sorted by "Least active", otherwise their average. */}
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold">
+                    <p
+                      className={`text-sm font-bold ${showActiveDays ? "" : scoreTextColour(student.averagePercent)}`}
+                    >
                       {showActiveDays ? student.activeDays : formatPercent(student.averagePercent)}
                     </p>
                     <p className="text-[11px] text-slate-400">

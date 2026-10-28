@@ -8,8 +8,9 @@
 //   lessons, and editing or deleting the ones already scheduled
 //
 // Phones and tablets (under 1024px) and desktop get two separate layouts built
-// from the same data. The page stays on the loading screen until the data and
-// cover images are ready.
+// from the same data. The page stays on PageLoader until the data and cover
+// images are ready. Cards and buttons use the game-* hover classes from
+// index.css: cards lift and tilt their pictures, buttons press down.
 //
 // Route: /teacher-dashboard || Access: teachers
 // -----------------------------------------------------------------------------
@@ -19,8 +20,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import LessonPlanner from "../Components/LessonPlanner";
-import LoadingScreen from "../Components/LoadingScreen";
 import NotificationBell from "../Components/NotificationBell";
+import PageLoader from "../Components/PageLoader";
 import type { ScheduledLesson, ScheduledLessonEdits } from "../Components/ScheduledLessonCard";
 import TeacherBottomNav from "../Components/TeacherBottomNav";
 import TeacherSidebar from "../Components/TeacherSidebar";
@@ -280,7 +281,7 @@ export default function TeacherDashboard() {
   const imagesReady = usePreloadImages(imageUrls);
 
   if (classrooms === null || isLessonsLoading || scheduledLessons === null || !imagesReady) {
-    return <LoadingScreen label="Loading your dashboard" />;
+    return <PageLoader portal="teacher" />;
   }
 
   const newestClassroom = classrooms[0];
@@ -316,8 +317,8 @@ export default function TeacherDashboard() {
         // Newest classroom banner
       }
       <section className="mt-2 shrink-0 px-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-xl bg-violet-700 p-3.5 text-white shadow-lg shadow-violet-200">
-          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
+        <div className="game-banner relative overflow-hidden rounded-xl bg-violet-700 p-3.5 text-white shadow-lg shadow-violet-200">
+          <div className="game-bubble absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
 
           <div className="relative">
             <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium uppercase tracking-wide">
@@ -337,7 +338,7 @@ export default function TeacherDashboard() {
               </div>
 
               {newestClassroom && (
-                <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
+                <div className="game-tilt h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-white p-1 shadow-sm">
                   <img
                     src={newestClassroom.image}
                     alt={newestClassroom.imageAlt}
@@ -352,10 +353,10 @@ export default function TeacherDashboard() {
               to={
                 newestClassroom ? `/teacher-classroom/${newestClassroom.id}` : "/create-classroom"
               }
-              className="mt-3 flex w-fit items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50"
+              className="game-button mt-3 flex w-fit items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-violet-700 hover:bg-violet-50"
             >
               {newestClassroom ? "View Classroom" : "Create Classroom"}
-              <ChevronRight size={15} />
+              <ChevronRight size={15} className="game-arrow" />
             </Link>
           </div>
         </div>
@@ -370,9 +371,9 @@ export default function TeacherDashboard() {
           {/* Lessons need a classroom; until there is one, this starts a classroom. */}
           <Link
             to={classrooms.length > 0 ? "/create-lesson" : "/create-classroom"}
-            className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100"
+            className="game-card flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
+            <div className="game-icon flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
               <Plus size={19} />
             </div>
             <div className="min-w-0">
@@ -386,9 +387,9 @@ export default function TeacherDashboard() {
           </Link>
           <Link
             to="/TeacherClassroom"
-            className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left transition hover:bg-slate-100"
+            className="game-card flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-left"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
+            <div className="game-icon flex h-10 w-10 shrink-0 items-center justify-center text-violet-700">
               <Users size={19} />
             </div>
             <div>
@@ -421,7 +422,7 @@ export default function TeacherDashboard() {
               <Link
                 key={item.id}
                 to={`/teacher-classroom/${item.id}`}
-                className="flex h-32 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white text-center shadow-sm transition hover:border-violet-200"
+                className="game-card flex h-32 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white text-center shadow-sm"
               >
                 <div className="min-h-0 w-full flex-1 overflow-hidden bg-slate-50">
                   <img
@@ -456,7 +457,7 @@ export default function TeacherDashboard() {
               <Link
                 key={lesson.lesson_id}
                 to={`/teacher-classroom/${lesson.classroom_id}/lesson/${lesson.lesson_id}`}
-                className="flex min-w-0 items-center rounded-xl border border-slate-100 bg-white p-2 text-left transition hover:border-violet-200"
+                className="game-card flex min-w-0 items-center rounded-xl border border-slate-100 bg-white p-2 text-left"
               >
                 <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-slate-50">
                   <img
@@ -535,9 +536,9 @@ export default function TeacherDashboard() {
                 </div>
                 <Link
                   to="/create-classroom"
-                  className="flex items-center gap-1 rounded-xl bg-violet-700 px-4 py-2 text-xs font-semibold text-white"
+                  className="game-button flex items-center gap-1 rounded-xl bg-violet-700 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-800"
                 >
-                  <Plus size={15} />
+                  <Plus size={15} className="game-spin" />
                   Create Class
                 </Link>
               </div>
@@ -557,9 +558,9 @@ export default function TeacherDashboard() {
                     </p>
                     <Link
                       to="/create-classroom"
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
+                      className="game-button mt-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-800"
                     >
-                      <Plus size={15} /> Create Classroom
+                      <Plus size={15} className="game-spin" /> Create Classroom
                     </Link>
                   </div>
                 ) : (
@@ -567,7 +568,7 @@ export default function TeacherDashboard() {
                     <Link
                       key={item.id}
                       to={`/teacher-classroom/${item.id}`}
-                      className="flex items-center rounded-lg border border-slate-100 p-2"
+                      className="game-card flex items-center rounded-lg border border-slate-100 bg-white p-2"
                     >
                       <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-50 p-1">
                         <img
@@ -583,7 +584,7 @@ export default function TeacherDashboard() {
                           {item.studentCount} students · {item.lessonCount} lessons
                         </p>
                       </div>
-                      <span className="rounded-lg p-2 hover:bg-slate-50">
+                      <span className="game-arrow rounded-lg p-2 text-slate-400">
                         <ChevronRight size={17} />
                       </span>
                     </Link>
@@ -615,7 +616,7 @@ export default function TeacherDashboard() {
                   <Link
                     key={lesson.lesson_id}
                     to={`/teacher-classroom/${lesson.classroom_id}/lesson/${lesson.lesson_id}`}
-                    className="flex items-center rounded-lg border border-slate-100 p-2"
+                    className="game-card flex items-center rounded-lg border border-slate-100 bg-white p-2"
                   >
                     <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-50">
                       <img
@@ -630,7 +631,7 @@ export default function TeacherDashboard() {
                         {lesson.classroomName} · {lesson.wordCount} words
                       </p>
                     </div>
-                    <span className="rounded-lg p-2 hover:bg-slate-50">
+                    <span className="game-arrow rounded-lg p-2 text-slate-400">
                       <ChevronRight size={17} />
                     </span>
                   </Link>

@@ -2,10 +2,11 @@
 // Image Helpers
 //
 // Every image the app shows lives in the public "images" storage bucket:
-//   classroomImgs/   classroom covers
-//   lessonImgs/      lesson covers
-//   projectimgs/     decorative artwork
-//   flashcards/      images teachers upload for flashcards
+//   classroomImgs/                       classroom covers
+//   classroomImgs/classroomReportImgs/   sharper covers for the reports
+//   lessonImgs/                          lesson covers
+//   projectimgs/                         decorative artwork
+//   flashcards/                          images teachers upload for flashcards
 //
 // These helpers turn a stored path into a URL, replace any image that fails to
 // load with a single placeholder, and spot tall (portrait) covers.
@@ -27,6 +28,37 @@ export const BROKEN_IMAGE_URL = projectImageUrl("broken.png");
 // For optional covers: a missing path shows the same placeholder as a failed load.
 export function bucketImageUrlOrBroken(path: string | null | undefined): string {
   return path ? bucketImageUrl(path) : BROKEN_IMAGE_URL;
+}
+
+// The classroom reports stretch a cover across a wide banner, where the
+// regular covers (at most 800px) look pixelated. classroomImgs/classroomReportImgs/
+// holds sharper copies of the built-in covers under the same names, most as
+// WebP. Keyed by the cover's name without its extension; any other cover
+// falls back to the regular one.
+const REPORT_COVER_FOLDER = "classroomImgs/classroomReportImgs";
+
+const REPORT_COVER_FILES: Record<string, string> = {
+  fetchbook: "fetchbook.webp",
+  libIl: "libIl.webp",
+  "Nerd-amico": "Nerd-amico.webp",
+  desktopwindowspeople: "desktopwindowspeople.webp",
+  dinosaurpeople: "dinosaurpeople.webp",
+  kidletterdrawings: "kidletterdrawings.webp",
+  guypatchclassroom: "guypatchclassroom.webp",
+  englishHoldingBack: "englishHoldingBack.webp",
+  "whitetopaz-beach-illustration": "whitetopaz-beach-illustration.jpg",
+  "whitetopaz-girlreadingjungle": "whitetopaz-girlreadingjungle.jpg",
+};
+
+export function reportCoverUrl(path: string | null | undefined): string {
+  const name = path?.match(/^classroomImgs\/([^/]+)\.\w+$/)?.[1];
+  const reportFile = name ? REPORT_COVER_FILES[name] : undefined;
+
+  if (reportFile) {
+    return bucketImageUrl(`${REPORT_COVER_FOLDER}/${reportFile}`);
+  }
+
+  return bucketImageUrlOrBroken(path);
 }
 
 // An onLoad handler for covers fitted whole into a wide box (object-contain),

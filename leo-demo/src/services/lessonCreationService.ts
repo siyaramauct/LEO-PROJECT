@@ -9,7 +9,13 @@
 // Functions throw a DataError whose message can be shown to the teacher.
 // -----------------------------------------------------------------------------
 
-import { MAX_LESSONS_PER_CLASSROOM } from "../config/limits";
+import {
+  flashcardError,
+  flashcardsError,
+  lessonDetailsError,
+  quizError,
+} from "../domain/lessonValidation";
+import { MAX_LESSONS_PER_CLASSROOM } from "../domain/limits";
 import { DataError, friendlyMessage } from "../data/errors";
 import {
   deleteFlashcard,
@@ -75,6 +81,16 @@ export async function createLesson({
   flashcards,
   quiz,
 }: CreateLessonInput): Promise<string> {
+  // 0. The same text rules the form applies, in case a caller skipped them.
+  const problem =
+    lessonDetailsError(title, description) ??
+    flashcardsError(flashcards) ??
+    (quiz ? quizError(quiz.title, quiz.questions) : null);
+
+  if (problem) {
+    throw new DataError(problem);
+  }
+
   // 1. The lesson row, with a release date if it is scheduled.
   const lessonId = await insertLesson({
     classroomId,
@@ -218,11 +234,18 @@ export async function saveFlashcardEdit({
   newImage,
   removeImage,
 }: FlashcardEdit): Promise<string | null> {
-  // 1. Only a scheduled lesson's flashcards can change. The card's own lesson
+  // 1. The edit must meet the same text rules as a new flashcard.
+  const problem = flashcardError({ term: word, definition });
+
+  if (problem) {
+    throw new DataError(problem);
+  }
+
+  // 2. Only a scheduled lesson's flashcards can change. The card's own lesson
   //    is checked, so a mismatched lessonId can't get round it.
   await requireScheduledLesson(card.lesson_id);
 
-  // 2. Upload the new picture, if one was chosen.
+  // 3. Upload the new picture, if one was chosen.
   let imagePath = removeImage ? null : card.image_path;
 
   if (newImage) {
@@ -233,10 +256,10 @@ export async function saveFlashcardEdit({
     });
   }
 
-  // 3. Update the flashcard row.
+  // 4. Update the flashcard row.
   await updateFlashcard(card.flashcard_id, { word, definition, image_path: imagePath });
 
-  // 4. Remove the old picture once nothing points to it (best effort).
+  // 5. Remove the old picture once nothing points to it (best effort).
   if (card.image_path && card.image_path !== imagePath) {
     await removeImageFiles([card.image_path]);
   }

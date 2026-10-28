@@ -51,7 +51,7 @@ import {
 import { scorePercent } from "../domain/scoring";
 import { average, bestOf, median, scoredOnly } from "../domain/statistics";
 import { buildActivityWeeks, daysBetween } from "../utils/activityCalendar";
-import { bucketImageUrlOrBroken } from "../utils/images";
+import { bucketImageUrlOrBroken, reportCoverUrl } from "../utils/images";
 import { toDateKey } from "../utils/releaseDate";
 import { signLessonDocuments, type LessonDocument } from "./lessonCreationService";
 
@@ -249,7 +249,7 @@ function buildClassReport({
   return {
     classroomId: classroom.classroom_id,
     name: classroom.classroom_name,
-    coverUrl: bucketImageUrlOrBroken(classroom.cover_image_path),
+    coverUrl: reportCoverUrl(classroom.cover_image_path),
     students: studentReports,
     lessons: lessonReports,
     activeStudentsByDay: countActiveStudentsByDay(studentIds, daysByStudent),
@@ -544,7 +544,7 @@ export async function getLearningReport(
     return {
       classroomId: classroom.classroom_id,
       name: classroom.classroom_name,
-      coverUrl: bucketImageUrlOrBroken(classroom.cover_image_path),
+      coverUrl: reportCoverUrl(classroom.cover_image_path),
       lessons: classroomLessons,
       completedCount: classroomLessons.filter((lesson) => lesson.completed).length,
       averagePercent: average(scoredOnly(classroomLessons.map((lesson) => lesson.bestPercent))),

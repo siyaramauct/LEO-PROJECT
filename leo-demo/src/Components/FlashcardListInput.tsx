@@ -14,7 +14,7 @@
 
 import { useState, type KeyboardEvent } from "react";
 import { Check } from "lucide-react";
-import { MAX_FLASHCARDS_PER_LESSON } from "../config/limits";
+import { MAX_FLASHCARDS_PER_LESSON } from "../domain/limits";
 import { parseWordList, type WordEntry } from "../domain/wordList";
 
 type FlashcardListInputProps = {

@@ -7,8 +7,8 @@
 //   their two newest classrooms
 //   the four newest lessons released to their classrooms
 //
-// The page stays on the loading screen until all data and cover images are
-// ready, so it appears in one piece.
+// The page stays on PageLoader until all data and cover images are ready, so
+// it appears in one piece.
 //
 // Route: /student/dashboard || Access: students
 // -----------------------------------------------------------------------------
@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../Components/NotificationBell";
 import StudentBottomNav from "../Components/StudentBottomNav";
-import LoadingScreen from "../Components/LoadingScreen";
+import PageLoader from "../Components/PageLoader";
 import { useAuth } from "../context/AuthContext";
 import { type ClassroomSummary } from "../data/classrooms";
 import { errorMessage } from "../data/errors";
@@ -216,7 +216,7 @@ export default function StudentDashboard() {
   const imagesReady = usePreloadImages(imageUrls);
 
   if (isProfileLoading || classrooms === null || recentlyAddedLessons === null || !imagesReady) {
-    return <LoadingScreen label="Loading your dashboard" />;
+    return <PageLoader portal="student" />;
   }
 
   // -- Layout --

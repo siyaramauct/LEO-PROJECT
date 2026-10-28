@@ -6,7 +6,8 @@
 //
 //   Phone   (under 768px)    bottom bar: Home, Classrooms, Practice, Report, Profile
 //   Tablet  (768 to 1023px)  full-width bottom bar that adds Lessons and Hub
-//   Desktop (1024px and up)  fixed violet sidebar with every link and Log out
+//   Desktop (1024px and up)  fixed violet sidebar: Home, Classrooms, Practice,
+//                            Report, Hub, Profile and Log out (no Lessons)
 //
 // Student pages leave room for it with "pb-nav-20 lg:pb-0 lg:ml-56" on their
 // main element: bottom padding for the bar below 1024px (pb-nav-20, see
@@ -45,10 +46,11 @@ const navItems = {
 
 type NavEntry = (typeof navItems)[keyof typeof navItems];
 
+// Desktop shows Practice in the list where the bars show Lessons.
 const desktopItems = [
   navItems.home,
   navItems.classrooms,
-  navItems.lessons,
+  navItems.practice,
   navItems.report,
   navItems.hub,
   navItems.profile,
@@ -124,18 +126,6 @@ export default function StudentBottomNav() {
             {item.label}
           </NavLink>
         ))}
-
-        <NavLink
-          to="/student/practice"
-          className={({ isActive }) =>
-            `mt-4 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${
-              isActive ? "bg-white text-violet-800" : "bg-white/10 text-violet-50 hover:bg-white/15"
-            }`
-          }
-        >
-          <PlayCircleIcon className="h-5 w-5" />
-          Practice
-        </NavLink>
 
         <button
           type="button"

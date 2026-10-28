@@ -4,7 +4,8 @@
 // The full-page "please wait" screen shown while the session, profile or a
 // page's data is loading. The label prop says what is being loaded.
 //
-// Used by: GuardRoute and the data-heavy dashboard and report pages
+// Used by: GuardRoute, Home and the data-heavy report pages (the dashboards use
+// the lighter PageLoader)
 // -----------------------------------------------------------------------------
 
 import { projectImageUrl } from "../utils/images";

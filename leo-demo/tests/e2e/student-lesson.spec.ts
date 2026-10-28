@@ -86,7 +86,7 @@ test("Test A - A student studies the flashcards, takes the quiz and sees their s
     await expect(page.getByText(`Question ${questionNumber} of 3`)).toBeVisible();
 
     const question = (await page.getByRole("heading", { level: 2 }).textContent())?.trim() ?? "";
-    await page.getByRole("button").filter({ hasText: answers[question] }).click();
+    await page.getByRole("radio").filter({ hasText: answers[question] }).click();
 
     const nextStep = questionNumber < 3 ? "Next" : "Complete attempt";
     await page.getByRole("button", { name: nextStep }).click();
@@ -96,7 +96,7 @@ test("Test A - A student studies the flashcards, takes the quiz and sees their s
   await expect(page).toHaveURL(/\/summary$/);
   await expect(page.getByRole("heading", { name: "Quiz result" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "67%" })).toBeVisible();
-  await expect(page.getByText("Score out of 3")).toBeVisible();
+  await expect(page.getByText("Score 2 out of 3")).toBeVisible();
 
   // 5. The attempt was saved with that score.
   const { data: attempts } = await admin

@@ -91,11 +91,238 @@ body {
   animation: illustration-settle 5s ease-in-out infinite;
 }
 
+/* The small loader shown when a user returns to their dashboard (PageLoader).
+   Adapted from Uiverse.io by alexruix, recoloured to the LEO violets: a pill
+   that stretches and shrinks under a word that drifts along with it. */
+.leo-loader {
+  position: relative;
+  width: 80px;
+  height: 50px;
+}
+
+.leo-loader-text {
+  position: absolute;
+  top: 0;
+  margin: 0;
+  padding: 0;
+  color: rgb(109 40 217);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  animation: leo-loader-text 3.5s ease both infinite;
+}
+
+.leo-loader-bar {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  height: 16px;
+  width: 16px;
+  border-radius: 50px;
+  background-color: rgb(109 40 217);
+  transform: translateX(64px);
+  animation: leo-loader-bar 3.5s ease both infinite;
+}
+
+.leo-loader-bar::before {
+  position: absolute;
+  content: "";
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background-color: rgb(196 181 253);
+  animation: leo-loader-bar-inner 3.5s ease both infinite;
+}
+
+@keyframes leo-loader-text {
+  0% {
+    letter-spacing: 1px;
+    transform: translateX(0px);
+  }
+  40% {
+    letter-spacing: 2px;
+    transform: translateX(26px);
+  }
+  80% {
+    letter-spacing: 1px;
+    transform: translateX(32px);
+  }
+  90% {
+    letter-spacing: 2px;
+    transform: translateX(0px);
+  }
+  100% {
+    letter-spacing: 1px;
+    transform: translateX(0px);
+  }
+}
+
+@keyframes leo-loader-bar {
+  0% {
+    width: 16px;
+    transform: translateX(0px);
+  }
+  40% {
+    width: 100%;
+    transform: translateX(0px);
+  }
+  80% {
+    width: 16px;
+    transform: translateX(64px);
+  }
+  90% {
+    width: 100%;
+    transform: translateX(0px);
+  }
+  100% {
+    width: 16px;
+    transform: translateX(0px);
+  }
+}
+
+@keyframes leo-loader-bar-inner {
+  0% {
+    width: 16px;
+    transform: translateX(0px);
+  }
+  40% {
+    width: 80%;
+    transform: translateX(0%);
+  }
+  80% {
+    width: 100%;
+    transform: translateX(0px);
+  }
+  90% {
+    width: 80%;
+    transform: translateX(15px);
+  }
+  100% {
+    width: 16px;
+    transform: translateX(0px);
+  }
+}
+
+/* Hover play for the teacher dashboard. Cards are kept subtle: they lift a
+   little onto a solid violet edge, their pictures grow slightly and their
+   arrows nudge forward. Buttons (such as Create Class) are bolder: they rise
+   on their edge, spin their icon, and press down into the edge when clicked.
+   Hover effects only run on devices with a real pointer, so a tap on a phone
+   doesn't leave a card stuck lifted; the press-down works everywhere.
+
+     .game-card     a clickable card or row (with .game-arrow, .game-icon inside)
+     .game-button   a solid button with a dark violet edge
+     .game-spin     an icon that turns a quarter when its button is hovered
+     .game-banner   a banner whose .game-tilt picture and .game-bubble grow */
+.game-card {
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.game-card img,
+.game-icon,
+.game-tilt,
+.game-bubble {
+  transition: transform 200ms ease-out;
+}
+
+/* The button's icon keeps a springy turn, as the original design had. */
+.game-spin {
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.game-arrow {
+  transition:
+    transform 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.game-button {
+  box-shadow: 0 4px 0 0 rgb(76 29 149);
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out,
+    background-color 150ms ease-out;
+}
+
+@media (hover: hover) {
+  .game-card:hover {
+    transform: translateY(-2px);
+    border-color: rgb(109 40 217);
+    box-shadow: 0 3px 0 0 rgb(109 40 217);
+  }
+
+  .game-card:hover img {
+    transform: scale(1.04);
+  }
+
+  .game-card:hover .game-icon {
+    transform: scale(1.1);
+  }
+
+  .game-card:hover .game-arrow,
+  .game-button:hover .game-arrow {
+    transform: translateX(2px);
+    color: rgb(109 40 217);
+  }
+
+  .game-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 0 rgb(76 29 149);
+  }
+
+  .game-button:hover .game-spin {
+    transform: rotate(90deg);
+  }
+
+  .game-banner:hover .game-tilt {
+    transform: scale(1.03);
+  }
+
+  .game-banner:hover .game-bubble {
+    transform: scale(1.15);
+  }
+}
+
+.game-card:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 0 rgb(109 40 217);
+}
+
+.game-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 0 rgb(76 29 149);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-card,
+  .game-card:hover,
+  .game-card:active,
+  .game-button,
+  .game-button:hover,
+  .game-button:active,
+  .game-card:hover img,
+  .game-card:hover .game-icon,
+  .game-card:hover .game-arrow,
+  .game-button:hover .game-arrow,
+  .game-button:hover .game-spin,
+  .game-banner:hover .game-tilt,
+  .game-banner:hover .game-bubble {
+    transform: none;
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loading-orbit,
   .loading-progress,
   .loading-illustration,
-  .not-found-illustration {
+  .not-found-illustration,
+  .leo-loader-text,
+  .leo-loader-bar,
+  .leo-loader-bar::before {
     animation: none;
   }
 }

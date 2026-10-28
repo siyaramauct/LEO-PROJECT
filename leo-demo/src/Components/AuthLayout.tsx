@@ -9,11 +9,13 @@
 //                                     the form centred on the right
 //
 // The page passes its heading, subheading and form as props and children.
+// A link to the About page sits under every form.
 //
 // Used by: Login || Signup
 // -----------------------------------------------------------------------------
 
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { projectImageUrl } from "../utils/images";
 
 type AuthLayoutProps = {
@@ -79,6 +81,13 @@ export default function AuthLayout({ heading, subheading, children }: AuthLayout
           <p className="mt-1 text-xs text-gray-400">{subheading}</p>
         </div>
         {children}
+
+        <p className="mt-6 text-center text-xs text-gray-400">
+          New to LEO?{" "}
+          <Link to="/about" className="font-semibold text-violet-600 hover:underline">
+            Learn what we're about
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ import PwaStatus from "./Components/PwaStatus";
 import { installBrokenImageFallback } from "./utils/images";
 
 // Public pages
+import About from "./Pages/About";
 import ForgotPassword from "./Pages/ForgotPassword";
 import Home from "./Pages/Home";
 import Login from "./Pages/Login";
@@ -63,6 +64,7 @@ import LearningHub from "./Pages/LearningHub";
 const router = createBrowserRouter([
   // Anyone, signed in or not.
   { path: "/", element: <Home /> },
+  { path: "/about", element: <About /> },
   { path: "/signup", element: <SignUp /> },
   { path: "/login", element: <Login /> },
   { path: "/forgot-password", element: <ForgotPassword /> },

@@ -16,6 +16,10 @@
 //   before step 4 opens. If anything fails, a red notice offers to try again
 //   or save the lesson without a quiz.
 //
+// Each step checks the teacher's typing with domain/lessonValidation before
+// moving on: no empty or numbers-only text, minimum lengths for the title and
+// description, no repeated terms and no repeated answers in a question.
+//
 // Nothing is saved until the final button, so leaving part way discards the
 // draft. A release date picked on the dashboard planner arrives as
 // ?releaseDate=YYYY-MM-DD, and a classroom opened beforehand as ?classroomId=.
@@ -42,16 +46,20 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "../Components/ConfirmDialog";
 import FlashcardListInput from "../Components/FlashcardListInput";
-import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON } from "../config/limits";
+import { MAX_FLASHCARD_IMAGE_BYTES, MAX_FLASHCARDS_PER_LESSON } from "../domain/limits";
 import { useAuth } from "../context/AuthContext";
 import { getTeacherClassrooms } from "../data/classrooms";
 import { errorMessage } from "../data/errors";
 import {
-  ANSWER_OPTIONS,
-  isQuizComplete,
-  type DraftQuestion,
-  type QuizFormat,
-} from "../domain/quizDraft";
+  flashcardsError,
+  isValidText,
+  lessonDetailsError,
+  MIN_DESCRIPTION_LENGTH,
+  MIN_TITLE_LENGTH,
+  quizError,
+  sameText,
+} from "../domain/lessonValidation";
+import { ANSWER_OPTIONS, type DraftQuestion, type QuizFormat } from "../domain/quizDraft";
 import { type WordEntry } from "../domain/wordList";
 import { checkLessonLimit, createLesson } from "../services/lessonCreationService";
 import { generateQuiz } from "../services/quizGenerationService";
@@ -142,12 +150,21 @@ const PRIMARY_BUTTON =
 const BACK_BUTTON =
   "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100";
 
-const inputClassName =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-600";
+// Fields share one shape; only the border colours change.
+const FIELD_BASE =
+  "w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400";
+
+const inputClassName = `${FIELD_BASE} border-slate-200 focus:border-violet-600`;
 
 // The flashcard Term and Definition boxes focus in grey, like the word list box above them.
-const flashcardInputClassName =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-500";
+const flashcardInputClassName = `${FIELD_BASE} border-slate-200 focus:border-slate-500`;
+
+// A field that breaks a rule after a failed Continue or Save: a solid red outline.
+const INVALID_BORDER = "border-red-700 ring-1 ring-red-700 focus:border-red-700";
+
+function fieldClassName(isInvalid: boolean, validClassName = inputClassName) {
+  return isInvalid ? `${FIELD_BASE} ${INVALID_BORDER}` : validClassName;
+}
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -162,13 +179,15 @@ function isStartedFlashcard(card: Flashcard) {
 
 // -- Small building blocks ----------------------------------------------------
 
+// Solid red with white text, so a problem can't be missed.
 function FormError({ message, className = "" }: { message: string; className?: string }) {
   return (
     <p
       role="alert"
-      className={`rounded-lg bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700 ${className}`}
+      className={`flex items-start gap-2 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm ${className}`}
     >
-      {message}
+      <AlertCircle size={18} className="mt-px shrink-0" aria-hidden="true" />
+      <span>{message}</span>
     </p>
   );
 }
@@ -252,6 +271,9 @@ export default function CreateLesson() {
 
   // -- State: shared --
   const [error, setError] = useState("");
+  // After a Continue or Save that failed the text rules, fields at fault are
+  // outlined in red; each outline clears as soon as its field is fixed.
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingLessonLimit, setIsCheckingLessonLimit] = useState(false);
 
@@ -274,6 +296,44 @@ export default function CreateLesson() {
     : isSaving
       ? "Creating..."
       : "Create lesson";
+
+  // -- Fields at fault, for the red outlines --
+
+  const isTitleInvalid = showFieldErrors && !isValidText(title, MIN_TITLE_LENGTH);
+  const isDescriptionInvalid = showFieldErrors && !isValidText(description, MIN_DESCRIPTION_LENGTH);
+  const isClassroomInvalid = showFieldErrors && !classroomId;
+  const isQuizTitleInvalid = showFieldErrors && !isValidText(generatedTitle, MIN_TITLE_LENGTH);
+
+  // A started card's term is at fault when it breaks the text rules or repeats
+  // an earlier card's term; its definition when it breaks them or repeats the term.
+  function flashcardFaults(card: Flashcard, index: number) {
+    if (!showFieldErrors || !isStartedFlashcard(card)) {
+      return { term: false, definition: false };
+    }
+
+    const repeatsEarlierTerm = flashcards
+      .slice(0, index)
+      .some((other) => isStartedFlashcard(other) && sameText(other.term, card.term));
+
+    return {
+      term: !isValidText(card.term) || repeatsEarlierTerm,
+      definition: !isValidText(card.definition) || sameText(card.term, card.definition),
+    };
+  }
+
+  // An option is at fault when it breaks the text rules or matches another option.
+  function isOptionInvalid(question: EditableQuestion, optionKey: OptionKey) {
+    if (!showFieldErrors) {
+      return false;
+    }
+
+    const value = question[optionKey];
+    const repeatsAnother = optionKeys.some(
+      (otherKey) => otherKey !== optionKey && sameText(question[otherKey], value),
+    );
+
+    return !isValidText(value) || repeatsAnother;
+  }
 
   // The teacher's classrooms, for the classroom picker. Keyed on the user's id,
   // so a refreshed session for the same teacher doesn't load them again.
@@ -353,6 +413,7 @@ export default function CreateLesson() {
     setGeneratedQuestions([]);
     setGenerationFailed(false);
     setError("");
+    setShowFieldErrors(false);
     setShowDraftNotice(false);
     setConfirmingStartOver(false);
     window.scrollTo({ top: 0 });
@@ -447,10 +508,13 @@ export default function CreateLesson() {
   async function continueToFlashcards() {
     if (!classroomId) {
       setError("Choose the classroom where this lesson will be created.");
+      setShowFieldErrors(true);
       return;
     }
-    if (!title.trim() || !description.trim()) {
-      setError("Add a title and a short description before continuing.");
+    const detailsProblem = lessonDetailsError(title, description);
+    if (detailsProblem) {
+      setError(detailsProblem);
+      setShowFieldErrors(true);
       return;
     }
     setIsCheckingLessonLimit(true);
@@ -459,6 +523,7 @@ export default function CreateLesson() {
       await checkLessonLimit(classroomId);
 
       setError("");
+      setShowFieldErrors(false);
       setStep("flashcards");
     } catch (limitError) {
       setError(
@@ -469,18 +534,19 @@ export default function CreateLesson() {
     }
   }
 
-  // Step 2 to 3: blank cards are dropped; half-filled ones block moving on.
+  // Step 2 to 3: blank cards are dropped; every started card (typed in, or
+  // given an image) must pass the flashcard rules in lessonValidation.
   function continueToActivities() {
-    const completedCards = flashcards.filter((card) => card.term.trim() || card.definition.trim());
-    const hasIncompleteCard = completedCards.some(
-      (card) => !card.term.trim() || !card.definition.trim(),
-    );
-    if (!completedCards.length || hasIncompleteCard) {
-      setError("Add at least one complete flashcard with both a term and definition.");
+    const startedCards = flashcards.filter(isStartedFlashcard);
+    const flashcardProblem = flashcardsError(startedCards);
+    if (flashcardProblem) {
+      setError(flashcardProblem);
+      setShowFieldErrors(true);
       return;
     }
-    setFlashcards(completedCards);
+    setFlashcards(startedCards);
     setError("");
+    setShowFieldErrors(false);
     setStep("activity");
   }
 
@@ -539,10 +605,13 @@ export default function CreateLesson() {
   async function handleCreateLesson() {
     if (!classroomId) return;
 
-    if (includeMcq && !isQuizComplete(generatedTitle, generatedQuestions)) {
-      setError("Give the activity a title and fill in every question and option before saving.");
+    const quizProblem = includeMcq ? quizError(generatedTitle, generatedQuestions) : null;
+    if (quizProblem) {
+      setError(quizProblem);
+      setShowFieldErrors(true);
       return;
     }
+    setShowFieldErrors(false);
 
     setIsSaving(true);
     setError("");
@@ -673,7 +742,8 @@ export default function CreateLesson() {
                     <select
                       value={classroomId}
                       onChange={(event) => setClassroomId(event.target.value)}
-                      className={inputClassName}
+                      aria-invalid={isClassroomInvalid}
+                      className={fieldClassName(isClassroomInvalid)}
                     >
                       <option value="">Select a classroom</option>
                       {classrooms.map((classroom) => (
@@ -696,7 +766,8 @@ export default function CreateLesson() {
                     onChange={(event) => setTitle(event.target.value)}
                     maxLength={80}
                     placeholder="e.g. Essential travel vocabulary"
-                    className={inputClassName}
+                    aria-invalid={isTitleInvalid}
+                    className={fieldClassName(isTitleInvalid)}
                   />
                 </label>
                 <label className="block">
@@ -707,7 +778,8 @@ export default function CreateLesson() {
                     rows={4}
                     maxLength={280}
                     placeholder="What will learners understand or practise in this lesson?"
-                    className={`${inputClassName} resize-none`}
+                    aria-invalid={isDescriptionInvalid}
+                    className={`${fieldClassName(isDescriptionInvalid)} resize-none`}
                   />
                 </label>
                 <div>
@@ -892,7 +964,11 @@ export default function CreateLesson() {
                         value={card.term}
                         onChange={(event) => updateFlashcard(card.id, "term", event.target.value)}
                         placeholder="e.g. Itinerary"
-                        className={flashcardInputClassName}
+                        aria-invalid={flashcardFaults(card, index).term}
+                        className={fieldClassName(
+                          flashcardFaults(card, index).term,
+                          flashcardInputClassName,
+                        )}
                       />
                     </label>
                     <label>
@@ -905,7 +981,11 @@ export default function CreateLesson() {
                           updateFlashcard(card.id, "definition", event.target.value)
                         }
                         placeholder="A planned route or journey"
-                        className={flashcardInputClassName}
+                        aria-invalid={flashcardFaults(card, index).definition}
+                        className={fieldClassName(
+                          flashcardFaults(card, index).definition,
+                          flashcardInputClassName,
+                        )}
                       />
                     </label>
                     <div>
@@ -962,6 +1042,7 @@ export default function CreateLesson() {
                 type="button"
                 onClick={() => {
                   setError("");
+                  setShowFieldErrors(false);
                   setStep("details");
                 }}
                 className={BACK_BUTTON}
@@ -1104,7 +1185,8 @@ export default function CreateLesson() {
                 onChange={(event) => setGeneratedTitle(event.target.value)}
                 maxLength={100}
                 placeholder="e.g. Travel vocabulary check"
-                className={inputClassName}
+                aria-invalid={isQuizTitleInvalid}
+                className={fieldClassName(isQuizTitleInvalid)}
               />
             </label>
 
@@ -1127,7 +1209,10 @@ export default function CreateLesson() {
                         updateGeneratedQuestion(question.id, "question_text", event.target.value)
                       }
                       rows={2}
-                      className={`${inputClassName} resize-none`}
+                      aria-invalid={showFieldErrors && !isValidText(question.question_text)}
+                      className={`${fieldClassName(
+                        showFieldErrors && !isValidText(question.question_text),
+                      )} resize-none`}
                     />
                   </label>
                   <span className="mb-1.5 block text-xs font-semibold text-slate-600">
@@ -1137,10 +1222,11 @@ export default function CreateLesson() {
                     {optionKeys.map((optionKey, optionIndex) => {
                       const letter = ANSWER_OPTIONS[optionIndex];
                       const isCorrect = question.correct_option === letter;
+                      const isInvalid = isOptionInvalid(question, optionKey);
                       return (
                         <label
                           key={optionKey}
-                          className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition focus-within:border-violet-600 ${isCorrect ? "border-slate-800" : "border-slate-200"}`}
+                          className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition ${isInvalid ? INVALID_BORDER : `focus-within:border-violet-600 ${isCorrect ? "border-slate-800" : "border-slate-200"}`}`}
                         >
                           <input
                             type="radio"
@@ -1161,6 +1247,7 @@ export default function CreateLesson() {
                               updateGeneratedQuestion(question.id, optionKey, event.target.value)
                             }
                             placeholder={`Option ${letter}`}
+                            aria-invalid={isInvalid}
                             className="w-full flex-1 border-none bg-transparent p-0 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                           />
                         </label>
@@ -1180,6 +1267,7 @@ export default function CreateLesson() {
                 type="button"
                 onClick={() => {
                   setError("");
+                  setShowFieldErrors(false);
                   setGenerationFailed(false);
                   setStep("activity");
                 }}

@@ -14,6 +14,7 @@
 
 import { scoreBand, type ScoreBand } from "../domain/progress";
 import type { LessonStudentResult } from "../services/reportService";
+import { scoreTextColour } from "../utils/scoreColours";
 
 type LessonStatTilesProps = {
   results: LessonStudentResult[]; // One per enrolled student.
@@ -86,11 +87,13 @@ export default function LessonStatTiles({
           <StatTile
             label="Average score"
             value={average === null ? "—" : `${average}%`}
+            valueColour={scoreTextColour(average)}
             detail={average === null ? "No quiz results yet" : BAND_LABELS[scoreBand(average)]}
           />
           <StatTile
             label="Highest score"
             value={highest === null ? "—" : `${highest}%`}
+            valueColour={scoreTextColour(highest)}
             detail={highest === null ? "No quiz results yet" : topStudentsText}
             detailTitle={topStudents.map((student) => student.name).join(", ")}
           />
@@ -107,13 +110,20 @@ type StatTileProps = {
   value: string;
   detail: string;
   detailTitle?: string; // The full text, when the detail may be cut short.
+  valueColour?: string; // A score's traffic-light colour.
 };
 
-function StatTile({ label, value, detail, detailTitle }: StatTileProps) {
+function StatTile({
+  label,
+  value,
+  detail,
+  detailTitle,
+  valueColour = "text-slate-900",
+}: StatTileProps) {
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-4">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-1.5 text-2xl font-bold tabular-nums text-slate-900">{value}</p>
+      <p className={`mt-1.5 text-2xl font-bold tabular-nums ${valueColour}`}>{value}</p>
       <p className="mt-1 truncate text-xs text-slate-500" title={detailTitle ?? detail}>
         {detail}
       </p>
