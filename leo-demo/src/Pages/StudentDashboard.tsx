@@ -8,7 +8,9 @@
 //   the four newest lessons released to their classrooms
 //
 // The page stays on PageLoader until all data and cover images are ready, so
-// it appears in one piece.
+// it appears in one piece. Cards and buttons use the same game-* hover classes
+// as the teacher dashboard (index.css): cards lift and grow their pictures,
+// buttons press down.
 //
 // Route: /student/dashboard || Access: students
 // -----------------------------------------------------------------------------
@@ -253,14 +255,14 @@ export default function StudentDashboard() {
 
         <div className="mx-auto max-w-7xl space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
           <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-            <article className="relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6">
+            <article className="game-banner relative overflow-hidden rounded-xl bg-violet-700 p-5 text-white sm:p-6">
               {studentClassroom && (
                 <>
                   <div className="absolute inset-y-0 right-0 w-40 bg-white/10 sm:w-52" />
                   <img
                     src={studentClassroom.cover_image_path ?? undefined}
                     alt="Student learning"
-                    className="absolute inset-y-0 right-0 w-40 object-cover sm:w-52"
+                    className="game-tilt absolute inset-y-0 right-0 w-40 object-cover sm:w-52"
                   />
                 </>
               )}
@@ -280,9 +282,9 @@ export default function StudentDashboard() {
                       onClick={() =>
                         navigate(`/student/classrooms/${studentClassroom.classroom_id}`)
                       }
-                      className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50"
+                      className="game-button mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50"
                     >
-                      Open Classroom <ChevronRight size={16} />
+                      Open Classroom <ChevronRight size={16} className="game-arrow" />
                     </button>
                   </>
                 ) : (
@@ -295,7 +297,7 @@ export default function StudentDashboard() {
                     <button
                       type="button"
                       onClick={() => navigate("/student/classrooms")}
-                      className="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50"
+                      className="game-button mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50"
                     >
                       View Classrooms <Users size={16} />
                     </button>
@@ -306,11 +308,11 @@ export default function StudentDashboard() {
             <button
               type="button"
               onClick={() => navigate("/student/report")}
-              className="rounded-xl border border-slate-100 bg-white p-5 text-left transition hover:bg-slate-50"
+              className="game-card rounded-xl border border-slate-100 bg-white p-5 text-left"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold">Learning overview</h2>
-                <ChevronRight size={16} className="text-slate-400" />
+                <ChevronRight size={16} className="game-arrow text-slate-400" />
               </div>
               <div className="mt-5 grid grid-cols-2 gap-4">
                 <div>
@@ -374,14 +376,16 @@ export default function StudentDashboard() {
                       key={classroom.classroom_id}
                       type="button"
                       onClick={() => navigate(`/student/classrooms/${classroom.classroom_id}`)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50"
+                      className="game-card flex w-full items-center gap-3 rounded-lg border border-slate-100 bg-white p-3 text-left"
                     >
                       {classroom.cover_image_path ? (
-                        <img
-                          src={classroom.cover_image_path}
-                          alt=""
-                          className="h-11 w-14 shrink-0 rounded-lg object-cover"
-                        />
+                        <div className="h-11 w-14 shrink-0 overflow-hidden rounded-lg">
+                          <img
+                            src={classroom.cover_image_path}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
                       ) : (
                         <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />
                       )}
@@ -393,7 +397,7 @@ export default function StudentDashboard() {
                           {classroom.description ?? "Classroom"}
                         </span>
                       </span>
-                      <ChevronRight size={16} className="text-slate-400" />
+                      <ChevronRight size={16} className="game-arrow text-slate-400" />
                     </button>
                   ))}
                 </div>
@@ -430,14 +434,16 @@ export default function StudentDashboard() {
                       key={lesson.lesson_id}
                       type="button"
                       onClick={() => navigate(`/lesson/${lesson.lesson_id}`)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-slate-100 p-3 text-left transition hover:bg-slate-50"
+                      className="game-card flex w-full items-center gap-3 rounded-lg border border-slate-100 bg-white p-3 text-left"
                     >
                       {lesson.lesson_image_path ? (
-                        <img
-                          src={lesson.lesson_image_path}
-                          alt=""
-                          className="h-11 w-14 shrink-0 rounded-lg object-cover"
-                        />
+                        <div className="h-11 w-14 shrink-0 overflow-hidden rounded-lg">
+                          <img
+                            src={lesson.lesson_image_path}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
                       ) : (
                         <div className="h-11 w-14 shrink-0 rounded-lg bg-violet-50" />
                       )}
@@ -447,7 +453,7 @@ export default function StudentDashboard() {
                           {lesson.classroomName}
                         </span>
                       </span>
-                      <ChevronRight size={16} className="text-slate-400" />
+                      <ChevronRight size={16} className="game-arrow text-slate-400" />
                     </button>
                   ))}
                 </div>

@@ -6,6 +6,12 @@
 // aloud, and the back can be translated into French, Russian, Spanish or
 // Portuguese.
 //
+// How reading aloud works (src/utils/speech.ts):
+//   Text is spoken in the language it's showing in: English, or the active
+//   translation's language, with a matching voice from the device. If the
+//   device has no voice for a translation's language, a short note says how
+//   to add one. Browsers without speech don't show the read-aloud buttons.
+//
 // How the flip works:
 //   The outer div is the click target. The inner div holds both faces stacked
 //   on top of each other and keeps them in 3D space (preserve-3d). The back
@@ -28,16 +34,18 @@ import { LanguageIcon, SpeakerWaveIcon } from "@heroicons/react/24/outline";
 import type { Translation } from "../data/translations";
 import { translateFlashcard } from "../services/translationService";
 import { errorMessage } from "../data/errors";
+import { canSpeak, ENGLISH_SPEECH, hasVoiceFor, installedVoices, speakText } from "../utils/speech";
 
 // -- Translation languages ----------------------------------------------------
 
 type LanguageCode = "fr" | "ru" | "es" | "pt";
 
-const languageOptions: { code: LanguageCode; label: string; name: string }[] = [
-  { code: "fr", label: "FR", name: "French" },
-  { code: "ru", label: "RU", name: "Russian" },
-  { code: "es", label: "ES", name: "Spanish" },
-  { code: "pt", label: "PT", name: "Portuguese" },
+// speech is the language tag the translation is read aloud in.
+const languageOptions: { code: LanguageCode; label: string; name: string; speech: string }[] = [
+  { code: "fr", label: "FR", name: "French", speech: "fr-FR" },
+  { code: "ru", label: "RU", name: "Russian", speech: "ru-RU" },
+  { code: "es", label: "ES", name: "Spanish", speech: "es-ES" },
+  { code: "pt", label: "PT", name: "Portuguese", speech: "pt-PT" },
 ];
 
 // -- Styles -------------------------------------------------------------------
@@ -60,12 +68,23 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
   const [translations, setTranslations] = useState<Partial<Record<LanguageCode, Translation>>>({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState("");
+  const [speechNote, setSpeechNote] = useState("");
 
-  // Reads text aloud with the browser's built-in speech, stopping anything
-  // already being read first.
-  const speak = (text: string) => {
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  // Reads text aloud in the language the card is showing. For a translation,
+  // also checks the device has a voice for it, and says how to add one if not.
+  const readAloud = (text: string) => {
+    const option = languageOptions.find((language) => language.code === activeLanguage);
+    const lang = option?.speech ?? ENGLISH_SPEECH;
+
+    speakText(text, lang);
+
+    if (option && !hasVoiceFor(installedVoices(), lang)) {
+      setSpeechNote(
+        `This device has no ${option.name} voice, so it may be read in another accent. You can add one in your device's text-to-speech settings.`,
+      );
+    } else {
+      setSpeechNote("");
+    }
   };
 
   // Shows the card in another language, or back in English if that language
@@ -73,6 +92,7 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
   async function handleTranslate(language: LanguageCode) {
     if (!flashcardId) return;
     setTranslationError("");
+    setSpeechNote(""); // A voice note is about the language being left.
 
     // Clicking the active language switches back to English.
     if (activeLanguage === language) {
@@ -119,6 +139,13 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
 
   const flip = () => setFlipped((current) => !current);
 
+  // Browsers without speech get no read-aloud buttons, rather than ones that fail.
+  const speechSupported = canSpeak();
+  // Shown only on the face the student is looking at, so it's read out once.
+  const voiceNote = speechNote && (
+    <p className="mt-2 max-w-64 text-center text-xs text-slate-500">{speechNote}</p>
+  );
+
   // -- Front face: image, word and read-aloud --
 
   const front = (
@@ -128,18 +155,21 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
       )}
       <h1 className="text-2xl font-bold">{displayedWord}</h1>
 
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation(); // Don't flip the card.
-          speak(displayedWord);
-        }}
-        aria-label={`Read ${displayedWord} aloud`}
-        className={READ_ALOUD_BUTTON}
-      >
-        <SpeakerWaveIcon className="h-5 w-5 text-white" />
-        Read word
-      </button>
+      {speechSupported && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation(); // Don't flip the card.
+            readAloud(displayedWord);
+          }}
+          aria-label={`Read ${displayedWord} aloud`}
+          className={READ_ALOUD_BUTTON}
+        >
+          <SpeakerWaveIcon className="h-5 w-5 text-white" />
+          Read word
+        </button>
+      )}
+      {!flipped && voiceNote}
     </div>
   );
 
@@ -153,18 +183,21 @@ export default function Flashcard({ word, definition, flashcardId, imageUrl }: F
       )}
       <p className="text-lg font-bold text-center text-gray-700">{displayedDefinition}</p>
 
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          speak(displayedDefinition);
-        }}
-        aria-label="Read definition aloud"
-        className={READ_ALOUD_BUTTON}
-      >
-        <SpeakerWaveIcon className="h-5 w-5 text-white" />
-        Read definition
-      </button>
+      {speechSupported && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            readAloud(displayedDefinition);
+          }}
+          aria-label="Read definition aloud"
+          className={READ_ALOUD_BUTTON}
+        >
+          <SpeakerWaveIcon className="h-5 w-5 text-white" />
+          Read definition
+        </button>
+      )}
+      {flipped && voiceNote}
 
       {flashcardId && (
         // Clicks inside the language picker must not flip the card.

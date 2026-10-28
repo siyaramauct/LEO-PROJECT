@@ -10,6 +10,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   admin,
+  mockAiReply,
   seedClassroom,
   seedEnrolment,
   seedFlashcards,
@@ -133,4 +134,99 @@ test("Test B - A student finishes a flashcards-only lesson", async ({ page }) =>
     .eq("lesson_id", lessonId);
 
   expect(attempts).toEqual([{ score: null }]);
+});
+
+// -- Reading aloud ----------------------------------------------------------------------
+
+type Spoken = { text: string; lang: string; voice: string | null };
+
+// Replaces the browser's speech with a recorder before the app loads, noting
+// what was read, in which language and with which voice. The "device" has an
+// English voice and a French one (named the Android way, fr_FR), but no Russian.
+async function recordSpeech(page: Page) {
+  await page.addInitScript(() => {
+    const spoken: Spoken[] = [];
+    Object.assign(window, { __spoken: spoken });
+
+    class RecordedUtterance {
+      text: string;
+      lang = "";
+      voice: { lang: string } | null = null;
+
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+
+    Object.defineProperty(window, "SpeechSynthesisUtterance", {
+      value: RecordedUtterance,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        cancel() {},
+        speak(utterance: RecordedUtterance) {
+          spoken.push({
+            text: utterance.text,
+            lang: utterance.lang,
+            voice: utterance.voice?.lang ?? null,
+          });
+        },
+        getVoices: () => [
+          { lang: "en-GB", name: "English" },
+          { lang: "fr_FR", name: "French" },
+        ],
+      },
+    });
+  });
+}
+
+async function lastSpoken(page: Page): Promise<Spoken | undefined> {
+  const spoken = await page.evaluate(() => (window as unknown as { __spoken: Spoken[] }).__spoken);
+  return spoken.at(-1);
+}
+
+test("Test C - Flashcards are read aloud in the language they're showing", async ({ page }) => {
+  const { classroomId, lessonId, title } = await seedClassroomWithLesson();
+  await recordSpeech(page);
+  await openLessonFromClassroom(page, classroomId, lessonId, title);
+
+  // 1. The English word is read in English, with the English voice.
+  await page.getByRole("button", { name: "Read invoice aloud" }).click();
+  expect(await lastSpoken(page)).toEqual({ text: "invoice", lang: "en-GB", voice: "en-GB" });
+
+  // 2. Flipped and translated to French, the definition is read in French with
+  //    the device's French voice, and there's no note about voices.
+  await page.getByRole("button", { name: "Show definition" }).press("Enter");
+  await mockAiReply(page, { word: "facture", definition: "Un document de paiement" });
+  await page.getByRole("button", { name: "Translate to French" }).click();
+  await expect(page.getByText("Un document de paiement")).toBeVisible();
+  await page.getByRole("button", { name: "Read definition aloud" }).click();
+  expect(await lastSpoken(page)).toEqual({
+    text: "Un document de paiement",
+    lang: "fr-FR",
+    voice: "fr_FR",
+  });
+  await expect(page.getByText(/has no French voice/)).toHaveCount(0);
+
+  // 3. In Russian, which this device has no voice for, it's still read as
+  //    Russian (the browser picks a voice), and a note says how to add one.
+  await mockAiReply(page, { word: "счёт", definition: "Документ для оплаты" });
+  await page.getByRole("button", { name: "Translate to Russian" }).click();
+  await expect(page.getByText("Документ для оплаты")).toBeVisible();
+  await page.getByRole("button", { name: "Read definition aloud" }).click();
+  expect(await lastSpoken(page)).toEqual({
+    text: "Документ для оплаты",
+    lang: "ru-RU",
+    voice: null,
+  });
+  await expect(page.getByText(/This device has no Russian voice/)).toBeVisible();
+
+  // 4. Back in English, the note goes and English is read again.
+  await page.getByRole("button", { name: "Translate to Russian" }).click();
+  await expect(page.getByText(/This device has no Russian voice/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Read definition aloud" }).click();
+  expect(await lastSpoken(page)).toMatchObject({ lang: "en-GB", voice: "en-GB" });
 });

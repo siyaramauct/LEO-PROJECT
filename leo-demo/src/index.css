@@ -203,7 +203,7 @@ body {
   }
 }
 
-/* Hover play for the teacher dashboard. Cards are kept subtle: they lift a
+/* Hover play for the teacher and student dashboards. Cards are kept subtle: they lift a
    little onto a solid violet edge, their pictures grow slightly and their
    arrows nudge forward. Buttons (such as Create Class) are bolder: they rise
    on their edge, spin their icon, and press down into the edge when clicked.
