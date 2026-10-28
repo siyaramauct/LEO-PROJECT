@@ -167,6 +167,37 @@ export async function insertClassroom({
   }
 }
 
+type ClassroomDetails = {
+  name: string;
+  description: string;
+};
+
+// Changes only the name and description; the cover, level and codes stay.
+export async function updateClassroomDetails(
+  teacherId: string,
+  classroomId: string,
+  { name, description }: ClassroomDetails,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("classrooms")
+    .update({ classroom_name: name, description })
+    .eq("classroom_id", classroomId)
+    .eq("teacher_id", teacherId)
+    .select("classroom_id");
+
+  if (error) {
+    throw new DataError(
+      friendlyMessage(error, "The classroom could not be updated. Please try again."),
+      error,
+    );
+  }
+
+  // RLS doesn't raise an error for a refused update; it updates nothing.
+  if (data.length === 0) {
+    throw new DataError("This classroom couldn't be found. It may have been deleted.");
+  }
+}
+
 export async function deleteClassroom(teacherId: string, classroomId: string): Promise<void> {
   const { error } = await supabase
     .from("classrooms")

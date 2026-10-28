@@ -3,9 +3,10 @@
 //
 // The "create a classroom" form: name, description, proficiency level and a
 // cover image. Built with react-hook-form, which handles the field values and
-// validation messages. On submit it inserts the classroom and returns the
-// teacher to their classroom list. A database trigger then creates the private
-// invite code students use to join.
+// validation messages; the name and description rules come from
+// domain/classroomValidation, shared with EditClassroomDialog. On submit it
+// inserts the classroom and returns the teacher to their classroom list. A
+// database trigger then creates the private invite code students use to join.
 //
 // Used by: CreateClassroom
 // -----------------------------------------------------------------------------
@@ -16,6 +17,7 @@ import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { errorMessage } from "../data/errors";
+import { classroomDescriptionError, classroomNameError } from "../domain/classroomValidation";
 import { createClassroom } from "../services/teacherClassroomService";
 import { bucketImageUrl } from "../utils/images";
 import ClassroomFormField from "./ClassroomFormField";
@@ -134,10 +136,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
           id={`${idPrefix}-classroom-name`}
           placeholder="e.g. English for Everyday Life"
           className={inputClassName}
-          {...register("name", {
-            required: "Enter a classroom name.",
-            maxLength: { value: 80, message: "Keep the classroom name under 80 characters." },
-          })}
+          {...register("name", { validate: (value) => classroomNameError(value) ?? true })}
         />
       </ClassroomFormField>
       <ClassroomFormField
@@ -152,12 +151,7 @@ export default function ClassroomForm({ idPrefix }: ClassroomFormProps) {
           placeholder="What will learners practise in this classroom?"
           className={`${inputClassName} resize-none`}
           {...register("description", {
-            required: "Add a short classroom description.",
-            minLength: {
-              value: 10,
-              message: "Use at least 10 characters so learners have enough context.",
-            },
-            maxLength: { value: 240, message: "Keep the description under 240 characters." },
+            validate: (value) => classroomDescriptionError(value) ?? true,
           })}
         />
       </ClassroomFormField>

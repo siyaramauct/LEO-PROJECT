@@ -16,6 +16,7 @@ import { getClassroomMaterials } from "../../src/data/materials";
 import { getStudentClassroom } from "../../src/services/classroomService";
 import {
   createClassroom,
+  editClassroom,
   removeMaterial,
   removeStudent,
   shareDocument,
@@ -169,6 +170,151 @@ describe("Creating a classroom", () => {
   test("Test F - A visitor who isn't signed in can't create a classroom", async () => {
     await signOut();
     await expectRlsRefusal(createClassroom(classroomInput(teacher, "Anonymous Class")));
+  });
+});
+
+// -- Editing a classroom --------------------------------------------------------------
+
+// The columns an edit must change or leave alone, read as admin.
+async function savedClassroom(classroomId: string) {
+  const { data } = await admin
+    .from("classrooms")
+    .select(
+      "teacher_id, classroom_name, description, cover_image_path, proficiency_level, join_code, invite_only",
+    )
+    .eq("classroom_id", classroomId)
+    .single();
+
+  return data;
+}
+
+// The new details a teacher types in the edit dialog.
+function editInput(teacher: TestUser, classroomId: string) {
+  return {
+    teacherId: teacher.id,
+    classroomId,
+    name: "  Advanced Business English  ",
+    description: "  Negotiation, reports and formal emails.  ",
+  };
+}
+
+describe("Editing a classroom", () => {
+  let teacher: TestUser;
+  let otherTeacher: TestUser;
+  let student: TestUser;
+
+  beforeAll(async () => {
+    teacher = await seedUser("teacher");
+    otherTeacher = await seedUser("teacher");
+    student = await seedUser("student");
+  });
+
+  test("Test A - A teacher edits their classroom, and their list shows the new text, trimmed", async () => {
+    const classroomId = await seedClassroom(teacher, "Business English");
+
+    await signInAs(teacher);
+    const saved = await editClassroom(editInput(teacher, classroomId));
+
+    // The service hands back what it saved, for the page to show.
+    expect(saved).toEqual({
+      name: "Advanced Business English",
+      description: "Negotiation, reports and formal emails.",
+    });
+
+    const [classroom] = await getTeacherClassrooms(teacher.id, { classroomId });
+
+    expect(classroom.classroom_name).toBe("Advanced Business English");
+    expect(classroom.description).toBe("Negotiation, reports and formal emails.");
+  });
+
+  test("Test B - Only the name and description change; the cover, level and codes stay", async () => {
+    const classroomId = await seedClassroom(teacher);
+    await admin
+      .from("classrooms")
+      .update({ cover_image_path: "classroomImgs/libIl.jpg", proficiency_level: "Advanced" })
+      .eq("classroom_id", classroomId);
+    const before = await savedClassroom(classroomId);
+
+    await signInAs(teacher);
+    await editClassroom(editInput(teacher, classroomId));
+
+    expect(await savedClassroom(classroomId)).toEqual({
+      ...before,
+      classroom_name: "Advanced Business English",
+      description: "Negotiation, reports and formal emails.",
+    });
+  });
+
+  test("Test C - Enrolled students see the new name and description", async () => {
+    const classroomId = await seedClassroom(teacher);
+    const classmate = await seedUser("student");
+    await seedEnrolment(classmate, classroomId);
+
+    await signInAs(teacher);
+    await editClassroom(editInput(teacher, classroomId));
+
+    await signInAs(classmate);
+    const { classroom } = await getStudentClassroom(classmate.id, classroomId);
+
+    expect(classroom).toMatchObject({
+      classroom_name: "Advanced Business English",
+      description: "Negotiation, reports and formal emails.",
+    });
+  });
+
+  test("Test D - An empty name or a too-short description is refused, and nothing is saved", async () => {
+    const classroomId = await seedClassroom(teacher, "Business English");
+    const before = await savedClassroom(classroomId);
+
+    await signInAs(teacher);
+
+    await expect(
+      editClassroom({ ...editInput(teacher, classroomId), name: "   " }),
+    ).rejects.toThrow("Enter a classroom name.");
+    await expect(
+      editClassroom({ ...editInput(teacher, classroomId), description: " Short " }),
+    ).rejects.toThrow("Use at least 10 characters so learners have enough context.");
+
+    expect(await savedClassroom(classroomId)).toEqual(before);
+  });
+
+  test("Test E - Another teacher can't edit this classroom", async () => {
+    const classroomId = await seedClassroom(teacher, "Business English");
+    const before = await savedClassroom(classroomId);
+
+    await signInAs(otherTeacher);
+    // RLS refuses the update silently, so the service reports the classroom as
+    // missing rather than claiming it was saved. Even naming the real owner.
+    for (const owner of [otherTeacher, teacher]) {
+      await expect(editClassroom(editInput(owner, classroomId))).rejects.toThrow(
+        "This classroom couldn't be found. It may have been deleted.",
+      );
+    }
+
+    expect(await savedClassroom(classroomId)).toEqual(before);
+  });
+
+  test("Test F - A student can't edit their classroom", async () => {
+    const classroomId = await seedClassroom(teacher, "Business English");
+    await seedEnrolment(student, classroomId);
+    const before = await savedClassroom(classroomId);
+
+    await signInAs(student);
+    await expect(editClassroom(editInput(teacher, classroomId))).rejects.toThrow(
+      "This classroom couldn't be found. It may have been deleted.",
+    );
+
+    expect(await savedClassroom(classroomId)).toEqual(before);
+  });
+
+  test("Test G - Editing a deleted classroom says so instead of failing silently", async () => {
+    const classroomId = await seedClassroom(teacher);
+    await admin.from("classrooms").delete().eq("classroom_id", classroomId);
+
+    await signInAs(teacher);
+    await expect(editClassroom(editInput(teacher, classroomId))).rejects.toThrow(
+      "This classroom couldn't be found. It may have been deleted.",
+    );
   });
 });
 

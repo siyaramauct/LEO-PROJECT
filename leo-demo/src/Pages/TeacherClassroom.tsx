@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // Teacher Classrooms
 //
-// Every classroom the teacher owns, with search, sorting, a create button and
-// a delete button on each card (confirmed in a popup first).
+// Every classroom the teacher owns, with search, sorting, a create button, and
+// on each card an edit button (a popup for the name and description) and a
+// delete button (confirmed in a popup first).
 //
 // Phones and tablets show compact cards, in one column on phones and two on
 // tablets. Desktop shows larger cards beside the sidebar.
@@ -16,6 +17,7 @@ import { Link } from "react-router-dom";
 import ClassroomDesktopCard from "../Components/ClassroomDesktopCard";
 import ClassroomMobileCard, { type Classroom } from "../Components/ClassroomMobileCard";
 import ConfirmDialog from "../Components/ConfirmDialog";
+import EditClassroomDialog from "../Components/EditClassroomDialog";
 import { EmptyClassrooms } from "../Components/EmptyClassroomContent";
 import NotificationBell from "../Components/NotificationBell";
 import SearchSortBar from "../Components/SearchSortBar";
@@ -29,6 +31,7 @@ import {
   type ClassroomWithCounts,
 } from "../data/classrooms";
 import { errorMessage } from "../data/errors";
+import type { ClassroomDetails } from "../services/teacherClassroomService";
 import { bucketImageUrlOrBroken } from "../utils/images";
 import { compareText, matchesSearch, toTime, type SortOption } from "../utils/listControls";
 
@@ -43,12 +46,15 @@ const formatCreatedDate = (createdAt: string | null) => {
   }).format(new Date(createdAt));
 };
 
+const NO_DESCRIPTION = "No description has been added yet.";
+
 // Turns a database row into what the classroom cards display.
 const toClassroom = (classroom: ClassroomWithCounts): Classroom => {
   return {
     id: classroom.classroom_id,
     name: classroom.classroom_name,
-    description: classroom.description ?? "No description has been added yet.",
+    description: classroom.description || NO_DESCRIPTION,
+    savedDescription: classroom.description ?? "",
     studentCount: classroom.studentCount,
     lessonCount: classroom.lessonCount,
     createdDate: formatCreatedDate(classroom.created_date),
@@ -56,6 +62,17 @@ const toClassroom = (classroom: ClassroomWithCounts): Classroom => {
     image: bucketImageUrlOrBroken(classroom.cover_image_path),
     imageAlt: `${classroom.classroom_name} classroom cover`,
     imageClassName: "object-cover",
+  };
+};
+
+// The same card after an edit: only the name, description and alt text change.
+const withDetails = (classroom: Classroom, { name, description }: ClassroomDetails): Classroom => {
+  return {
+    ...classroom,
+    name,
+    description: description || NO_DESCRIPTION,
+    savedDescription: description,
+    imageAlt: `${name} classroom cover`,
   };
 };
 
@@ -103,6 +120,7 @@ export default function TeacherClassrooms() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
   const [isDeletingClassroom, setIsDeletingClassroom] = useState(false);
   const [classroomQuery, setClassroomQuery] = useState("");
@@ -148,6 +166,16 @@ export default function TeacherClassrooms() {
   }, [session?.user]);
 
   const totalStudents = classrooms.reduce((total, classroom) => total + classroom.studentCount, 0);
+
+  // Runs once the edit dialog has saved; the list shows the new text straight away.
+  function handleClassroomSaved(classroomId: string, details: ClassroomDetails) {
+    setClassrooms((currentClassrooms) =>
+      currentClassrooms.map((classroom) =>
+        classroom.id === classroomId ? withDetails(classroom, details) : classroom,
+      ),
+    );
+    setClassroomToEdit(null);
+  }
 
   // Runs after the teacher confirms in the dialog.
   async function handleDeleteClassroom() {
@@ -252,6 +280,7 @@ export default function TeacherClassrooms() {
                 <ClassroomMobileCard
                   key={classroom.id}
                   classroom={classroom}
+                  onEdit={setClassroomToEdit}
                   onDelete={setClassroomToDelete}
                 />
               ))}
@@ -355,6 +384,7 @@ export default function TeacherClassrooms() {
                     <ClassroomDesktopCard
                       key={classroom.id}
                       classroom={classroom}
+                      onEdit={setClassroomToEdit}
                       onDelete={setClassroomToDelete}
                     />
                   ))}
@@ -364,6 +394,15 @@ export default function TeacherClassrooms() {
           </div>
         </main>
       </div>
+
+      {classroomToEdit && (
+        <EditClassroomDialog
+          key={classroomToEdit.id}
+          classroom={classroomToEdit}
+          onClose={() => setClassroomToEdit(null)}
+          onSaved={handleClassroomSaved}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(classroomToDelete)}

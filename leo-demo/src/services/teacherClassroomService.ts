@@ -1,15 +1,15 @@
 // -----------------------------------------------------------------------------
 // Teacher Classroom Service
 //
-// What a teacher does to run a classroom, step by step: create it, load its
-// lessons and students, share files and links with the class, remove a
-// material, and remove a student. Pages call these instead of querying
-// Supabase (see src/data).
+// What a teacher does to run a classroom, step by step: create it, edit its
+// name and description, load its lessons and students, share files and links
+// with the class, remove a material, and remove a student. Pages call these
+// instead of querying Supabase (see src/data).
 //
 // Functions throw a DataError whose message can be shown to the teacher.
 // -----------------------------------------------------------------------------
 
-import { insertClassroom } from "../data/classrooms";
+import { insertClassroom, updateClassroomDetails } from "../data/classrooms";
 import { getClassroomRoster, removeEnrolment, type RosterEntry } from "../data/enrolments";
 import { DataError } from "../data/errors";
 import { getFlashcardCounts } from "../data/flashcards";
@@ -24,6 +24,7 @@ import {
 import { notifyClassroomStudents, notifyUser } from "../data/notifications";
 import { getStudentProfiles, type StudentProfile } from "../data/profiles";
 import { getQuizCeilings } from "../data/quizzes";
+import { classroomDetailsError } from "../domain/classroomValidation";
 
 // -- Classrooms ---------------------------------------------------------------------
 
@@ -50,6 +51,37 @@ export function createClassroom({
     coverImagePath,
     joinCode: generateJoinCode(name),
   });
+}
+
+type ClassroomEditInput = {
+  teacherId: string;
+  classroomId: string;
+  name: string;
+  description: string;
+};
+
+export type ClassroomDetails = { name: string; description: string };
+
+// Saves a new name and description, trimmed, and returns what was saved so the
+// page can show it without reloading. Refused before saving if either breaks
+// the classroom rules.
+export async function editClassroom({
+  teacherId,
+  classroomId,
+  name,
+  description,
+}: ClassroomEditInput): Promise<ClassroomDetails> {
+  const problem = classroomDetailsError(name, description);
+
+  if (problem) {
+    throw new DataError(problem);
+  }
+
+  const details = { name: name.trim(), description: description.trim() };
+
+  await updateClassroomDetails(teacherId, classroomId, details);
+
+  return details;
 }
 
 // Fills the legacy classrooms.join_code column, which must still be unique, as

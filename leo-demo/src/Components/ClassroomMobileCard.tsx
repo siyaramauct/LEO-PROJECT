@@ -2,19 +2,20 @@
 // Classroom Mobile Card
 //
 // A teacher's classroom as a compact card for phones and tablets: cover,
-// name, student and lesson counts, and a delete button. The whole card opens
-// the classroom. Also defines the Classroom type shared with the desktop card.
+// name, student and lesson counts, and edit and delete buttons. The whole card
+// opens the classroom. Also defines the Classroom type shared with the desktop card.
 //
 // Used by: TeacherClassroom (below lg) || ClassroomDesktopCard (for the type)
 // -----------------------------------------------------------------------------
 
-import { BookOpen, ChevronRight, Trash2, Users } from "lucide-react";
+import { BookOpen, ChevronRight, Pencil, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export interface Classroom {
   id: string;
   name: string;
-  description: string;
+  description: string; // For display: a placeholder when none has been added.
+  savedDescription: string; // As stored, for editing; empty when none has been added.
   studentCount: number;
   lessonCount: number;
   createdDate: string;
@@ -26,10 +27,15 @@ export interface Classroom {
 
 type ClassroomMobileCardProps = {
   classroom: Classroom;
+  onEdit: (classroom: Classroom) => void;
   onDelete: (classroom: Classroom) => void;
 };
 
-export default function ClassroomMobileCard({ classroom, onDelete }: ClassroomMobileCardProps) {
+export default function ClassroomMobileCard({
+  classroom,
+  onEdit,
+  onDelete,
+}: ClassroomMobileCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -38,6 +44,8 @@ export default function ClassroomMobileCard({ classroom, onDelete }: ClassroomMo
       tabIndex={0}
       onClick={() => navigate(`/teacher-classroom/${classroom.id}`)}
       onKeyDown={(event) => {
+        // Keys pressed on the edit and delete buttons are theirs, not the card's.
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           navigate(`/teacher-classroom/${classroom.id}`);
@@ -63,6 +71,18 @@ export default function ClassroomMobileCard({ classroom, onDelete }: ClassroomMo
               </p>
             </div>
             <div className="flex shrink-0 items-center">
+              <button
+                type="button"
+                aria-label={`Edit ${classroom.name}`}
+                title="Edit classroom"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(classroom);
+                }}
+                className="rounded-lg p-2 text-violet-700 transition hover:bg-violet-50"
+              >
+                <Pencil size={14} />
+              </button>
               <button
                 type="button"
                 aria-label={`Delete ${classroom.name}`}

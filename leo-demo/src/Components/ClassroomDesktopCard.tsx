@@ -2,21 +2,27 @@
 // Classroom Desktop Card
 //
 // The desktop version of the classroom card, with larger stats, the creation
-// date and a "View Classroom" button. Same data as ClassroomMobileCard.
+// date, edit and delete buttons and a "View Classroom" button. Same data as
+// ClassroomMobileCard.
 //
 // Used by: TeacherClassroom (lg and up)
 // -----------------------------------------------------------------------------
 
-import { BookOpen, ChevronRight, Trash2, Users } from "lucide-react";
+import { BookOpen, ChevronRight, Pencil, Trash2, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Classroom } from "./ClassroomMobileCard";
 
 type ClassroomDesktopCardProps = {
   classroom: Classroom;
+  onEdit: (classroom: Classroom) => void;
   onDelete: (classroom: Classroom) => void;
 };
 
-export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomDesktopCardProps) {
+export default function ClassroomDesktopCard({
+  classroom,
+  onEdit,
+  onDelete,
+}: ClassroomDesktopCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -25,6 +31,8 @@ export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomD
       tabIndex={0}
       onClick={() => navigate(`/teacher-classroom/${classroom.id}`)}
       onKeyDown={(event) => {
+        // Keys pressed on the edit and delete buttons are theirs, not the card's.
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           navigate(`/teacher-classroom/${classroom.id}`);
@@ -33,7 +41,7 @@ export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomD
       className="group cursor-pointer rounded-xl border border-slate-100 bg-white p-3 transition hover:border-violet-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-200"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 shadow-inner">
             <img
               src={classroom.image}
@@ -42,25 +50,41 @@ export default function ClassroomDesktopCard({ classroom, onDelete }: ClassroomD
             />
           </div>
 
-          <div>
-            <h3 className="text-sm font-bold">{classroom.name}</h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold">{classroom.name}</h3>
             <p className="mt-1 text-[11px] text-slate-400">Created {classroom.createdDate}</p>
           </div>
         </div>
-        <button
-          type="button"
-          aria-label={`Delete ${classroom.name}`}
-          title="Delete classroom"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete(classroom);
-          }}
-          // Grey bin at rest; on hover (or keyboard focus) the button turns red
-          // and the bin white. The icon takes the button's text colour.
-          className="rounded-lg p-2 text-slate-600 transition-colors duration-200 ease-out hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:outline-none"
-        >
-          <Trash2 size={15} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            aria-label={`Edit ${classroom.name}`}
+            title="Edit classroom"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(classroom);
+            }}
+            // Same pattern as the bin beside it, in the app's violet: grey pen
+            // at rest, a violet button with a white pen on hover or focus.
+            className="rounded-lg p-2 text-slate-600 transition-colors duration-200 ease-out hover:bg-violet-700 hover:text-white focus-visible:bg-violet-700 focus-visible:text-white focus-visible:outline-none"
+          >
+            <Pencil size={15} />
+          </button>
+          <button
+            type="button"
+            aria-label={`Delete ${classroom.name}`}
+            title="Delete classroom"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(classroom);
+            }}
+            // Grey bin at rest; on hover (or keyboard focus) the button turns red
+            // and the bin white. The icon takes the button's text colour.
+            className="rounded-lg p-2 text-slate-600 transition-colors duration-200 ease-out hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:outline-none"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       </div>
 
       <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{classroom.description}</p>
